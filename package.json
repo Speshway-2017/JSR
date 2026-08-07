@@ -16,9 +16,9 @@
     "mongodb:download": "node scripts/download-mongodb.cjs",
     "mongodb:download:win": "node scripts/download-mongodb.cjs win32",
     "mongodb:download:mac": "node scripts/download-mongodb.cjs darwin",
-    "dist:win": "npm run build:client && npm run mongodb:download:win && electron-builder --win portable --x64",
-    "dist:win:setup": "npm run build:client && npm run mongodb:download:win && node scripts/fix-nsis-crc.cjs && electron-builder --win nsis --x64",
-    "dist:win:all": "npm run build:client && npm run mongodb:download:win && node scripts/fix-nsis-crc.cjs && electron-builder --win --x64",
+    "dist:win": "npm run build:client && npm run mongodb:download:win && electron-builder --win nsis --x64",
+    "dist:win:portable": "npm run build:client && npm run mongodb:download:win && electron-builder --win portable --x64",
+    "dist:win:all": "npm run build:client && npm run mongodb:download:win && electron-builder --win nsis portable --x64",
     "dist:mac": "npm run build:client && npm run mongodb:download:mac && electron-builder --mac",
     "dist": "npm run dist:win"
   },
@@ -54,7 +54,7 @@
     "win": {
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": [
             "x64"
           ]
@@ -67,18 +67,20 @@
           "to": "mongodb"
         }
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "JSR",
       "uninstallDisplayName": "JSR",
+      "deleteAppDataOnUninstall": false,
       "license": "build/license.txt",
-      "include": "build/installer.nsh",
       "artifactName": "JSR-Setup-${version}.${ext}"
     },
     "portable": {

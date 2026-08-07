@@ -40,9 +40,7 @@ Clients do **not** need Node, MongoDB, or your source code. The Windows installe
 - Express API  
 - Embedded MongoDB (data stored on that PC under the app’s user data folder)
 
-### Build the Windows app (on your machine)
-
-**Prefer portable** when building on a Mac. NSIS Setup (`.exe` installer) often fails on Windows with “Installer integrity check has failed” when packaged via Wine on macOS.
+### Build the Windows installer (on Windows)
 
 ```bash
 # once
@@ -50,32 +48,34 @@ npm install
 npm install --prefix server
 npm install --prefix client
 
-# creates release/JSR-Portable-1.0.0.exe  (recommended)
+# creates release/JSR-Setup-1.0.0.exe
 npm run dist:win
 ```
 
-Give the client: `release/JSR-Portable-1.0.0.exe`
-
-Optional (only if you need a real installer; best built on a Windows PC):
-
-```bash
-npm run dist:win:setup   # → release/JSR-Setup-1.0.0.exe
-```
+Optional no-install build: `npm run dist:win:portable` → `JSR-Portable-1.0.0.exe`
 
 ### What the client does
 
-1. Copy `JSR-Portable-1.0.0.exe` to the PC (USB / Drive / download — not WhatsApp if it truncates large files)  
-2. Double-click to run (no install step)  
-3. If Windows SmartScreen appears: **More info** → **Run anyway**  
+1. Run `JSR-Setup-1.0.0.exe`  
+2. If SmartScreen appears: **More info** → **Run anyway** (unsigned build is normal)  
+3. Finish the installer, open **JSR**  
 4. Login: `admin@agritrades.com` / `admin123`  
-5. Works **offline** — no internet required  
+
+### If Setup won’t install / hangs
+
+1. Close any running JSR / AgriTrades  
+2. Delete old folders if present:
+   - `%LOCALAPPDATA%\Programs\JSR`
+   - `%LOCALAPPDATA%\Programs\AgriTrades`
+3. Run Setup again as Administrator (right-click → Run as administrator)  
+4. Or use portable: `npm run dist:win:portable`
 
 ### Notes
 
-- App size is large (~200MB+) because MongoDB is included  
-- For a proper Start Menu installer, build `dist:win:setup` on **Windows** (or a Windows CI agent)  
+- Installer is large (~200MB+) because MongoDB is included  
+- Build on the same OS you target when possible (Windows → Windows `.exe`)  
 - For macOS DMG: `npm run dist:mac`  
-- Data lives on the client PC (survives updates if you keep the same `appId`)
+- Data lives on the client PC under the app userData folder
 
 ## Desktop app (Electron) — development
 
