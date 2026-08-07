@@ -18,7 +18,10 @@ export function AuthProvider({ children }) {
     }
     api
       .get('/auth/me')
-      .then((res) => setUser(res.data))
+      .then((res) => {
+        setUser(res.data);
+        localStorage.setItem('user', JSON.stringify(res.data));
+      })
       .catch(() => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -41,11 +44,28 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const role = user?.role || 'admin';
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        logout,
+        isAuthenticated: !!user,
+        role,
+        isAdmin: role === 'admin',
+        isSales: role === 'sales',
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
 export const useAuth = () => useContext(AuthContext);
+
+export function homePathForRole(role) {
+  return role === 'sales' ? '/sales-orders' : '/dashboard';
+}

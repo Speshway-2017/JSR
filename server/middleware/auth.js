@@ -15,5 +15,17 @@ export const auth = (req, res, next) => {
   }
 };
 
-export const signToken = (userId) =>
-  jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
+export const requireRole = (...roles) => (req, res, next) => {
+  const role = req.user?.role || 'admin';
+  if (!roles.includes(role)) {
+    return res.status(403).json({ message: 'Access denied for this role' });
+  }
+  next();
+};
+
+export const signToken = (user) =>
+  jwt.sign(
+    { id: user._id, role: user.role || 'admin' },
+    process.env.JWT_SECRET,
+    { expiresIn: '30d' }
+  );

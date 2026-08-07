@@ -35,7 +35,7 @@ export function openVendorBillPdf(bill, previewTab) {
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
-  doc.text('AgriTrades — Sale settlement invoice', PAGE_LEFT, 68);
+  doc.text('JSR — Sale settlement invoice', PAGE_LEFT, 68);
 
   doc.setFontSize(10);
   doc.text(`Bill Date: ${formatDateEn(new Date())}`, PAGE_RIGHT, 48, { align: 'right' });

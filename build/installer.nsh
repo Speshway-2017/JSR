@@ -1,5 +1,5 @@
-; Fix NSIS "Installer integrity check has failed" on uninstall
-; when the Windows installer is built on macOS (Wine toolchain).
+; Disable NSIS self-CRC when Windows installers are built on macOS (Wine).
+; Without this, Setup often fails with "Installer integrity check has failed".
 !macro customHeader
   CRCCheck off
 !macroend

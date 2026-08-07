@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
-import { ensureAdminUser } from './utils/ensureAdmin.js';
+import { ensureDefaultUsers } from './utils/ensureAdmin.js';
 import authRoutes from './routes/auth.js';
 import vendorRoutes from './routes/vendors.js';
 import materialRoutes from './routes/materials.js';
@@ -15,6 +15,7 @@ import transactionRoutes from './routes/transactions.js';
 import inventoryRoutes from './routes/inventory.js';
 import customerRoutes from './routes/customers.js';
 import settingsRoutes from './routes/settings.js';
+import salesBagReportRoutes from './routes/salesBagReports.js';
 
 dotenv.config();
 
@@ -29,7 +30,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get('/api/health', (_, res) => res.json({ status: 'ok', message: 'AgriTrades API running' }));
+app.get('/api/health', (_, res) => res.json({ status: 'ok', message: 'JSR API running' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
@@ -37,6 +38,7 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/materials', materialRoutes);
 app.use('/api/loads', loadRoutes);
 app.use('/api/sales', saleRoutes);
+app.use('/api/sales-bag-reports', salesBagReportRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/settings', settingsRoutes);
@@ -54,7 +56,7 @@ const PORT = process.env.PORT || 5000;
 
 const start = async () => {
   await connectDB();
-  await ensureAdminUser();
+  await ensureDefaultUsers();
   const server = app.listen(PORT, '127.0.0.1', () => console.log(`Server running on port ${PORT}`));
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {

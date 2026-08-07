@@ -28,6 +28,6 @@ if (text.includes('CRCCheck off')) {
   process.exit(0);
 }
 
-text = `${text.trimEnd()}\n\n; AgriTrades: allow uninstall when built on macOS\nCRCCheck off\n`;
+text = `${text.trimEnd()}\n\n; JSR: allow uninstall when built on macOS\nCRCCheck off\n`;
 fs.writeFileSync(target, text);
 console.log('[nsis-fix] Added CRCCheck off to', target);

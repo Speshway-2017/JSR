@@ -1,4 +1,4 @@
-# AgriTrades — Vendor Load Tracking & POS Billing
+# JSR — Vendor Load Tracking & POS Billing
 
 A full-stack MERN application for agricultural trading businesses. Manage vendors, record incoming loads, track vendor credit, set material prices, and bill customers via a simple POS — all with a clean, mobile-friendly UI.
 
@@ -36,11 +36,13 @@ Designed for agricultural/trading context:
 
 Clients do **not** need Node, MongoDB, or your source code. The Windows installer bundles:
 
-- AgriTrades UI  
+- JSR UI  
 - Express API  
 - Embedded MongoDB (data stored on that PC under the app’s user data folder)
 
-### Build the Windows installer (on your machine)
+### Build the Windows app (on your machine)
+
+**Prefer portable** when building on a Mac. NSIS Setup (`.exe` installer) often fails on Windows with “Installer integrity check has failed” when packaged via Wine on macOS.
 
 ```bash
 # once
@@ -48,27 +50,32 @@ npm install
 npm install --prefix server
 npm install --prefix client
 
-# creates release/AgriTrades-Setup-1.0.0.exe
+# creates release/JSR-Portable-1.0.0.exe  (recommended)
 npm run dist:win
 ```
 
-This downloads a portable MongoDB binary (large, one-time), builds the UI, and packages an NSIS installer.
+Give the client: `release/JSR-Portable-1.0.0.exe`
 
-Give the client: `release/AgriTrades-Setup-1.0.0.exe`
+Optional (only if you need a real installer; best built on a Windows PC):
+
+```bash
+npm run dist:win:setup   # → release/JSR-Setup-1.0.0.exe
+```
 
 ### What the client does
 
-1. Run the Setup `.exe` and install  
-2. Open **AgriTrades** from Desktop / Start Menu  
-3. Login: `admin@agritrades.com` / `admin123`  
-4. Works **offline** — no internet required after install  
+1. Copy `JSR-Portable-1.0.0.exe` to the PC (USB / Drive / download — not WhatsApp if it truncates large files)  
+2. Double-click to run (no install step)  
+3. If Windows SmartScreen appears: **More info** → **Run anyway**  
+4. Login: `admin@agritrades.com` / `admin123`  
+5. Works **offline** — no internet required  
 
 ### Notes
 
-- Installer size is large (~200MB+) because MongoDB is included  
-- Build Windows `.exe` from a Mac/Windows/Linux machine with Node installed  
+- App size is large (~200MB+) because MongoDB is included  
+- For a proper Start Menu installer, build `dist:win:setup` on **Windows** (or a Windows CI agent)  
 - For macOS DMG: `npm run dist:mac`  
-- Data lives on the client PC (survives app updates if you keep the same `appId`)
+- Data lives on the client PC (survives updates if you keep the same `appId`)
 
 ## Desktop app (Electron) — development
 
@@ -152,9 +159,12 @@ App: http://localhost:3000
 
 ### Default Login
 
-| Email | Password |
-|-------|----------|
-| admin@agritrades.com | admin123 |
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@agritrades.com | admin123 |
+| Sales | sales@agritrades.com | sales123 |
+
+Sales users only see **Sales Orders** (customer + material bag list → Excel export). Admin keeps full access.
 
 ## Usage Flow
 

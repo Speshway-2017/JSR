@@ -7,7 +7,7 @@ const CONTENT_WIDTH = PAGE_RIGHT - PAGE_LEFT;
 
 const LABELS = {
   title: 'Load Invoice',
-  subtitle: 'AgriTrades — Vendor Purchase Invoice',
+  subtitle: 'JSR — Vendor Purchase Invoice',
   invoiceDate: 'Invoice Date',
   invoiceId: 'Invoice ID',
   vendorDetails: 'Vendor Details',

@@ -35,11 +35,16 @@ export default function TitleBar() {
       style={{ WebkitAppRegion: 'drag' }}
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        <span className="text-sm font-semibold text-primary-700 truncate">AgriTrades</span>
+        <img
+          src="/jsr-icon.png"
+          alt=""
+          className="w-5 h-5 rounded object-contain"
+          draggable={false}
+        />
+        <span className="text-sm font-semibold text-primary-700 truncate">JSR</span>
         <span className="text-[10px] uppercase tracking-wide text-primary-400 hidden sm:inline">Desktop</span>
       </div>
 
-      {/* Native traffic lights on macOS; custom controls elsewhere */}
       {!isMac && platform && (
         <div className="flex items-stretch h-full" style={{ WebkitAppRegion: 'no-drag' }}>
           <button

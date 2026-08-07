@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import PrivateRoute from './components/PrivateRoute';
+import RoleRoute from './components/RoleRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Vendors from './pages/Vendors';
@@ -15,26 +16,43 @@ import PriceSettings from './pages/PriceSettings';
 import Transactions from './pages/Transactions';
 import InventoryHistory from './pages/InventoryHistory';
 import SalesReport from './pages/SalesReport';
+import SalesOrders, { SalesBagReportsList } from './pages/SalesOrders';
+import { useAuth, homePathForRole } from './context/AuthContext';
+
+function HomeRedirect() {
+  const { role } = useAuth();
+  return <Navigate to={homePathForRole(role)} replace />;
+}
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route element={<PrivateRoute />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/vendors" element={<Vendors />} />
-        <Route path="/vendors/:id" element={<VendorDetail />} />
-        <Route path="/vendors/:id/bill" element={<VendorBill />} />
-        <Route path="/loads/:loadId/bill" element={<LoadBill />} />
-        <Route path="/customers" element={<Customers />} />
-        <Route path="/customers/:id" element={<CustomerDetail />} />
-        <Route path="/loads" element={<AddLoad />} />
-        <Route path="/sell" element={<Sell />} />
-        <Route path="/materials" element={<Materials />} />
-        <Route path="/settings" element={<PriceSettings />} />
-        <Route path="/transactions" element={<Transactions />} />
-        <Route path="/inventory" element={<InventoryHistory />} />
-        <Route path="/sales-report" element={<SalesReport />} />
+        <Route path="/" element={<HomeRedirect />} />
+
+        <Route element={<RoleRoute roles={['sales', 'admin']} />}>
+          <Route path="/sales-orders" element={<SalesOrders />} />
+          <Route path="/sales-orders/previous" element={<SalesBagReportsList />} />
+          <Route path="/sales-orders/:id" element={<SalesOrders />} />
+        </Route>
+
+        <Route element={<RoleRoute roles={['admin']} />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/vendors" element={<Vendors />} />
+          <Route path="/vendors/:id" element={<VendorDetail />} />
+          <Route path="/vendors/:id/bill" element={<VendorBill />} />
+          <Route path="/loads/:loadId/bill" element={<LoadBill />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/customers/:id" element={<CustomerDetail />} />
+          <Route path="/loads" element={<AddLoad />} />
+          <Route path="/sell" element={<Sell />} />
+          <Route path="/materials" element={<Materials />} />
+          <Route path="/settings" element={<PriceSettings />} />
+          <Route path="/transactions" element={<Transactions />} />
+          <Route path="/inventory" element={<InventoryHistory />} />
+          <Route path="/sales-report" element={<SalesReport />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

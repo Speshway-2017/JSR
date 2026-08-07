@@ -10,7 +10,7 @@ const {
 
 if (!app) {
   console.error(
-    'AgriTrades must be started with the Electron runtime (npm run electron:dev).\n' +
+    'JSR must be started with the Electron runtime (npm run electron:dev).\n' +
       'If ELECTRON_RUN_AS_NODE is set in your environment, unset it and retry.'
   );
   process.exit(1);
@@ -61,7 +61,8 @@ function createWindow() {
     frame: isMac,
     titleBarStyle: isMac ? 'hiddenInset' : undefined,
     trafficLightPosition: isMac ? { x: 14, y: 11 } : undefined,
-    title: 'AgriTrades',
+    title: 'JSR',
+    icon: path.join(__dirname, '..', 'build', 'icon.png'),
     backgroundColor: '#F8F9F4',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -150,8 +151,8 @@ async function confirmAndQuit() {
       buttons: ['Quit', 'Cancel'],
       defaultId: 1,
       cancelId: 1,
-      title: 'Quit AgriTrades',
-      message: 'Close AgriTrades?',
+      title: 'Quit JSR',
+      message: 'Close JSR?',
       detail: 'The application will quit. Your data stays saved on this PC.',
       noLink: true,
     });
@@ -249,6 +250,8 @@ function startEmbeddedServer(mongoUri) {
         CLIENT_DIST: clientDist,
         ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@agritrades.com',
         ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'admin123',
+        SALES_EMAIL: process.env.SALES_EMAIL || 'sales@agritrades.com',
+        SALES_PASSWORD: process.env.SALES_PASSWORD || 'sales123',
         JWT_SECRET: process.env.JWT_SECRET || 'agri_trades_desktop_secret',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -370,7 +373,7 @@ app.whenReady().then(async () => {
     }
   } catch (err) {
     dialog.showErrorBox(
-      'AgriTrades failed to start',
+      'JSR failed to start',
       `${err.message}\n\n${
         isDev
           ? `Make sure the API (:${SERVER_PORT}) and Vite (:3000) are running.`

@@ -1,23 +1,16 @@
 import dotenv from 'dotenv';
 import connectDB from '../config/db.js';
-import { ensureAdminUser } from '../utils/ensureAdmin.js';
-import User from '../models/User.js';
+import { ensureDefaultUsers } from '../utils/ensureAdmin.js';
 
 dotenv.config();
 
 const seed = async () => {
   await connectDB();
+  await ensureDefaultUsers();
 
-  const email = process.env.ADMIN_EMAIL || 'admin@agritrades.com';
-  const password = process.env.ADMIN_PASSWORD || 'admin123';
-
-  const created = await ensureAdminUser();
-  if (!created) {
-    const existing = await User.findOne({ email });
-    console.log('Admin user already exists:', existing?.email || email);
-  }
-
-  console.log('Seed complete. Login with:', email, '/', password);
+  console.log('Seed complete.');
+  console.log('Admin:', process.env.ADMIN_EMAIL || 'admin@agritrades.com', '/', process.env.ADMIN_PASSWORD || 'admin123');
+  console.log('Sales:', process.env.SALES_EMAIL || 'sales@agritrades.com', '/', process.env.SALES_PASSWORD || 'sales123');
   process.exit(0);
 };
 

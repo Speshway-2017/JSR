@@ -46,7 +46,7 @@ export function openCustomerSaleBillPdf(sale, previewTab) {
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
-  doc.text('AgriTrades — Customer invoice', PAGE_LEFT, 68);
+  doc.text('JSR — Customer invoice', PAGE_LEFT, 68);
 
   doc.setFontSize(10);
   doc.text(`Bill Date: ${formatDateEn(sale.createdAt || new Date())}`, PAGE_RIGHT, 48, { align: 'right' });

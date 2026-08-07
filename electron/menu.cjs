@@ -20,7 +20,7 @@ function buildAppMenu({ getMainWindow, requestQuit, isDev }) {
             { role: 'unhide' },
             { type: 'separator' },
             {
-              label: 'Quit AgriTrades',
+              label: 'Quit JSR',
               accelerator: 'CmdOrCtrl+Q',
               click: () => requestQuit(),
             },
@@ -44,7 +44,7 @@ function buildAppMenu({ getMainWindow, requestQuit, isDev }) {
         ...(!isMac
           ? []
           : [{
-              label: 'Quit AgriTrades',
+              label: 'Quit JSR',
               accelerator: 'CmdOrCtrl+Q',
               click: () => requestQuit(),
             }]),
@@ -142,12 +142,12 @@ function buildAppMenu({ getMainWindow, requestQuit, isDev }) {
       label: 'Help',
       submenu: [
         {
-          label: 'About AgriTrades',
+          label: 'About JSR',
           click: () => {
             dialog.showMessageBox(getMainWindow(), {
               type: 'info',
-              title: 'About AgriTrades',
-              message: 'AgriTrades',
+              title: 'About JSR',
+              message: 'JSR',
               detail: `Version ${app.getVersion()}\nDesktop app for vendor loads, sales, and settlements.`,
             });
           },

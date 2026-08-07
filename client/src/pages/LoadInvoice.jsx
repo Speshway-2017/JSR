@@ -52,7 +52,7 @@ export default function LoadInvoice() {
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 border-b border-primary-100 pb-6">
             <div>
               <h1 className="text-3xl font-bold text-primary-800">Load Invoice</h1>
-              <p className="text-primary-500 mt-2">AgriTrades Vendor Purchase Invoice</p>
+              <p className="text-primary-500 mt-2">JSR Vendor Purchase Invoice</p>
             </div>
             <div className="text-left md:text-right">
               <p className="text-sm text-primary-500">Invoice Date</p>

@@ -4,6 +4,15 @@ import { auth, signToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
+function publicUser(user) {
+  return {
+    id: user._id,
+    email: user.email,
+    name: user.name,
+    role: user.role || 'admin',
+  };
+}
+
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -17,8 +26,8 @@ router.post('/login', async (req, res) => {
     }
 
     res.json({
-      token: signToken(user._id),
-      user: { id: user._id, email: user.email, name: user.name },
+      token: signToken(user),
+      user: publicUser(user),
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -29,7 +38,7 @@ router.get('/me', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(user);
+    res.json(publicUser(user));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -13,18 +13,24 @@ import {
   LogOut,
   Menu,
   X,
-  Leaf,
   ChevronDown,
+  ClipboardPen,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useIsElectron } from './TitleBar';
+import BrandLogo from './BrandLogo';
 
-const topLinks = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
+const adminTopLinks = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
 ];
 
-const navSections = [
+const salesTopLinks = [
+  { to: '/sales-orders', icon: ClipboardPen, label: 'Sales Orders', end: true },
+  { to: '/sales-orders/previous', icon: FileBarChart, label: 'Previous Reports' },
+];
+
+const adminNavSections = [
   {
     id: 'parties',
     label: 'Parties',
@@ -39,6 +45,8 @@ const navSections = [
     items: [
       { to: '/loads', icon: Truck, label: 'Add Load' },
       { to: '/sell', icon: ShoppingCart, label: 'Sell' },
+      { to: '/sales-orders', icon: ClipboardPen, label: 'Sales Orders' },
+      { to: '/sales-orders/previous', icon: FileBarChart, label: 'Previous Reports' },
     ],
   },
   {
@@ -65,8 +73,8 @@ function pathMatches(to, pathname, end = false) {
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
-function getActiveSectionId(pathname) {
-  for (const section of navSections) {
+function getActiveSectionId(sections, pathname) {
+  for (const section of sections) {
     if (section.items.some((item) => pathMatches(item.to, pathname))) {
       return section.id;
     }
@@ -83,23 +91,27 @@ function linkClass(isActive) {
 }
 
 export default function Layout({ children }) {
-  const { logout, user } = useAuth();
+  const { logout, user, role, isSales } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const isElectron = useIsElectron();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const topLinks = isSales ? salesTopLinks : adminTopLinks;
+  const navSections = useMemo(() => (isSales ? [] : adminNavSections), [isSales]);
+
   const [openSections, setOpenSections] = useState(() => {
-    const activeId = getActiveSectionId(location.pathname);
+    const activeId = getActiveSectionId(adminNavSections, location.pathname);
     return Object.fromEntries(
-      navSections.map((s) => [s.id, !activeId || s.id === activeId])
+      adminNavSections.map((s) => [s.id, !activeId || s.id === activeId])
     );
   });
 
   useEffect(() => {
-    const activeId = getActiveSectionId(location.pathname);
+    const activeId = getActiveSectionId(navSections, location.pathname);
     if (!activeId) return;
     setOpenSections((prev) => (prev[activeId] ? prev : { ...prev, [activeId]: true }));
-  }, [location.pathname]);
+  }, [location.pathname, navSections]);
 
   const handleLogout = () => {
     logout();
@@ -111,16 +123,15 @@ export default function Layout({ children }) {
   };
 
   const closeMenu = () => setMenuOpen(false);
+  const roleLabel = role === 'sales' ? 'Sales' : 'Admin';
 
   const NavContent = () => (
     <>
       <div className="flex items-center gap-3 px-4 py-6 border-b border-primary-100">
-        <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center">
-          <Leaf className="w-6 h-6 text-primary-600" />
-        </div>
+        <BrandLogo className="w-10 h-10" />
         <div>
-          <h1 className="font-bold text-primary-700 text-lg leading-tight">AgriTrades</h1>
-          <p className="text-xs text-primary-400">Admin</p>
+          <h1 className="font-bold text-primary-700 text-lg leading-tight">JSR</h1>
+          <p className="text-xs text-primary-400">{roleLabel}</p>
         </div>
       </div>
 
@@ -214,10 +225,8 @@ export default function Layout({ children }) {
         style={{ top: topOffset }}
       >
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
-            <Leaf className="w-5 h-5 text-primary-600" />
-          </div>
-          <span className="font-bold text-primary-700">AgriTrades</span>
+          <BrandLogo className="w-8 h-8" />
+          <span className="font-bold text-primary-700">JSR</span>
         </div>
         <button
           type="button"

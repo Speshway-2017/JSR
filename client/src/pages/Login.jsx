@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Leaf, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, homePathForRole } from '../context/AuthContext';
+import BrandLogo from '../components/BrandLogo';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, role } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/', { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated) navigate(homePathForRole(role), { replace: true });
+  }, [isAuthenticated, role, navigate]);
 
   if (isAuthenticated) return null;
 
@@ -22,9 +23,9 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(email, password);
+      const data = await login(email, password);
       toast.success('Welcome back!');
-      navigate('/');
+      navigate(homePathForRole(data.user?.role));
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login failed');
     } finally {
@@ -36,11 +37,11 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-cream to-accent-50 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-100 mb-4">
-            <Leaf className="w-9 h-9 text-primary-600" />
+          <div className="inline-flex items-center justify-center mb-4">
+            <BrandLogo className="w-20 h-20 shadow-soft" />
           </div>
-          <h1 className="text-3xl font-bold text-primary-700">AgriTrades</h1>
-          <p className="text-primary-500 mt-2 text-lg">Vendor & POS Management</p>
+          <h1 className="text-3xl font-bold text-primary-700">JSR</h1>
+          <p className="text-primary-500 mt-2 text-lg">Vendor &amp; Sales Management</p>
         </div>
 
         <form onSubmit={handleSubmit} className="card !p-8 space-y-5">
@@ -90,9 +91,10 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="text-center text-primary-400 text-sm mt-6">
-          Default: admin@agritrades.com / admin123
-        </p>
+        <div className="text-center text-primary-400 text-sm mt-6 space-y-1">
+          <p>Admin: admin@agritrades.com / admin123</p>
+          <p>Sales: sales@agritrades.com / sales123</p>
+        </div>
       </div>
     </div>
   );
