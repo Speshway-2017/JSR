@@ -1,0 +1,124 @@
+{
+  "name": "agritrades",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AgriTrades desktop application — offline vendor & sales management",
+  "author": "AgriTrades",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "build:client": "npm run build --prefix client",
+    "electron": "electron .",
+    "electron:dev": "node scripts/electron-dev.cjs",
+    "electron:open": "node scripts/electron-open.cjs",
+    "electron:start": "npm run build:client && cross-env NODE_ENV=production electron .",
+    "mongodb:download": "node scripts/download-mongodb.cjs",
+    "mongodb:download:win": "node scripts/download-mongodb.cjs win32",
+    "mongodb:download:mac": "node scripts/download-mongodb.cjs darwin",
+    "dist:win": "npm run build:client && npm run mongodb:download:win && node scripts/fix-nsis-crc.cjs && electron-builder --win --x64",
+    "dist:win:portable": "npm run build:client && npm run mongodb:download:win && electron-builder --win portable --x64",
+    "dist:mac": "npm run build:client && npm run mongodb:download:mac && electron-builder --mac",
+    "dist": "npm run dist:win"
+  },
+  "build": {
+    "appId": "com.agritrades.app",
+    "productName": "AgriTrades",
+    "copyright": "Copyright © AgriTrades",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*",
+          "!.env",
+          "!scripts/**",
+          "!**/*.md"
+        ]
+      },
+      {
+        "from": "client/dist",
+        "to": "client/dist"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "AgriTrades-${version}-${os}-${arch}.${ext}",
+      "extraResources": [
+        {
+          "from": "resources/mongodb/win32",
+          "to": "mongodb"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AgriTrades",
+      "uninstallDisplayName": "AgriTrades",
+      "license": "build/license.txt",
+      "include": "build/installer.nsh",
+      "artifactName": "AgriTrades-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "AgriTrades-Portable-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.business",
+      "artifactName": "AgriTrades-${version}.${ext}",
+      "extraResources": [
+        {
+          "from": "resources/mongodb/darwin",
+          "to": "mongodb"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Office",
+      "extraResources": [
+        {
+          "from": "resources/mongodb/linux",
+          "to": "mongodb"
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^34.2.0",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.2"
+  }
+}

@@ -1,0 +1,21 @@
+import mongoose from 'mongoose';
+
+const transactionSchema = new mongoose.Schema(
+  {
+    vendor: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' },
+    customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
+    type: {
+      type: String,
+      required: true,
+      enum: ['customer_credit', 'customer_payment', 'vendor_credit', 'vendor_payment'],
+    },
+    amount: { type: Number, required: true },
+    description: { type: String, required: true },
+    load: { type: mongoose.Schema.Types.ObjectId, ref: 'Load' },
+    sale: { type: mongoose.Schema.Types.ObjectId, ref: 'Sale' },
+    balanceAfter: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
+
+export default mongoose.model('Transaction', transactionSchema);

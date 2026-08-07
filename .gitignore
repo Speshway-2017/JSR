@@ -1,0 +1,14 @@
+node_modules/
+dist/
+client/dist/
+server/node_modules/
+client/node_modules/
+.DS_Store
+*.log
+.env
+.env.local
+server/.env
+out/
+release/
+*.exe
+*.blockmap
