@@ -4,7 +4,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import connectDB from './config/db.js';
+import connectDB, { isDbReady } from './config/db.js';
 import { ensureDefaultUsers } from './utils/ensureAdmin.js';
 import authRoutes from './routes/auth.js';
 import vendorRoutes from './routes/vendors.js';
@@ -16,6 +16,7 @@ import inventoryRoutes from './routes/inventory.js';
 import customerRoutes from './routes/customers.js';
 import settingsRoutes from './routes/settings.js';
 import salesBagReportRoutes from './routes/salesBagReports.js';
+import salesMaterialRoutes from './routes/salesMaterials.js';
 
 dotenv.config();
 
@@ -24,13 +25,34 @@ const __dirname = path.dirname(__filename);
 const clientDist = process.env.CLIENT_DIST
   ? path.resolve(process.env.CLIENT_DIST)
   : path.join(__dirname, '../client/dist');
+const STARTUP_TOKEN = process.env.JSR_STARTUP_TOKEN || '';
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-app.get('/api/health', (_, res) => res.json({ status: 'ok', message: 'JSR API running' }));
+app.get('/api/health', (_, res) => {
+  const dbOk = isDbReady();
+  res.status(dbOk ? 200 : 503).json({
+    status: dbOk ? 'ok' : 'degraded',
+    message: 'JSR API running',
+    db: dbOk ? 'connected' : 'disconnected',
+    token: STARTUP_TOKEN || undefined,
+  });
+});
+
+// Fail fast with a clear message when embedded MongoDB is down
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') return next();
+  if (!isDbReady()) {
+    return res.status(503).json({
+      message:
+        'Database is not ready. Close JSR completely from the system tray/taskbar, wait a few seconds, and open it again.',
+    });
+  }
+  next();
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
@@ -39,6 +61,7 @@ app.use('/api/materials', materialRoutes);
 app.use('/api/loads', loadRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/sales-bag-reports', salesBagReportRoutes);
+app.use('/api/sales-materials', salesMaterialRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/settings', settingsRoutes);
@@ -51,6 +74,24 @@ if (fs.existsSync(clientDist)) {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }
+
+// Convert raw Mongo connection errors into a clear API response
+app.use((err, _req, res, next) => {
+  if (!err) return next();
+  const msg = err.message || String(err);
+  if (
+    err.name === 'MongoServerSelectionError' ||
+    err.name === 'MongoNetworkError' ||
+    /ECONNREFUSED.*27018|buffering timed out|topology was destroyed/i.test(msg)
+  ) {
+    return res.status(503).json({
+      message:
+        'Database connection lost. Close JSR fully, wait a few seconds, then open it again.',
+    });
+  }
+  console.error(err);
+  res.status(err.status || 500).json({ message: msg || 'Server error' });
+});
 
 const PORT = process.env.PORT || 5000;
 

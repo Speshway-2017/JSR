@@ -18,8 +18,9 @@ if (!app) {
 
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const http = require('http');
+const crypto = require('crypto');
 const { buildAppMenu } = require('./menu.cjs');
 const { createMongoManager } = require('./mongoManager.cjs');
 
@@ -28,6 +29,7 @@ const isDev = !isPackaged && process.env.NODE_ENV !== 'production';
 const SERVER_PORT = process.env.PORT || 5050;
 const CLIENT_DEV_URL = process.env.ELECTRON_START_URL || 'http://127.0.0.1:3000';
 const APP_PROD_URL = `http://127.0.0.1:${SERVER_PORT}`;
+const STARTUP_TOKEN = crypto.randomBytes(16).toString('hex');
 
 let mainWindow = null;
 let serverProcess = null;
@@ -35,6 +37,64 @@ let mongoManager = null;
 let isQuitting = false;
 let allowClose = false;
 let confirmOpen = false;
+
+// Only one desktop instance — avoids zombie API on :5050 with a dead MongoDB
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+  process.exit(0);
+}
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
+function killPortListeners(port) {
+  if (process.platform === 'win32') {
+    try {
+      const out = execFileSync(
+        'cmd.exe',
+        ['/c', `netstat -ano | findstr :${port}`],
+        { encoding: 'utf8', windowsHide: true }
+      );
+      const pids = new Set();
+      for (const line of out.split(/\r?\n/)) {
+        if (!line.includes('LISTENING')) continue;
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && /^\d+$/.test(pid) && pid !== '0') pids.add(pid);
+      }
+      for (const pid of pids) {
+        try {
+          execFileSync('taskkill', ['/pid', pid, '/f', '/t'], {
+            windowsHide: true,
+            stdio: 'ignore',
+          });
+          console.log(`[electron] Cleared leftover PID ${pid} on port ${port}`);
+        } catch {
+          // ignore
+        }
+      }
+    } catch {
+      // nothing listening
+    }
+    return;
+  }
+  try {
+    const out = execFileSync('lsof', ['-ti', `tcp:${port}`], { encoding: 'utf8' });
+    for (const pid of out.split(/\s+/).filter(Boolean)) {
+      try {
+        process.kill(Number(pid), 'SIGTERM');
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // empty
+  }
+}
 
 function resourcesRoot() {
   if (isPackaged) return process.resourcesPath;
@@ -173,17 +233,34 @@ async function confirmAndQuit() {
   }
 }
 
-function waitForUrl(url, { timeoutMs = 120000, intervalMs = 400 } = {}) {
+function waitForUrl(url, { timeoutMs = 120000, intervalMs = 400, expectToken } = {}) {
   const started = Date.now();
   return new Promise((resolve, reject) => {
     const tick = () => {
       const req = http.get(url, (res) => {
-        res.resume();
-        if (res.statusCode && res.statusCode < 500) {
+        let body = '';
+        res.on('data', (c) => {
+          body += c;
+        });
+        res.on('end', () => {
+          if (!res.statusCode || res.statusCode >= 500) {
+            retry();
+            return;
+          }
+          if (expectToken) {
+            try {
+              const json = JSON.parse(body);
+              if (json.token !== expectToken || json.db !== 'connected') {
+                retry();
+                return;
+              }
+            } catch {
+              retry();
+              return;
+            }
+          }
           resolve();
-          return;
-        }
-        retry();
+        });
       });
       req.on('error', retry);
       req.setTimeout(2000, () => {
@@ -238,6 +315,9 @@ function startEmbeddedServer(mongoUri) {
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
 
+    // Avoid talking to a zombie API from a previous crashed session
+    killPortListeners(SERVER_PORT);
+
     serverProcess = spawn(process.execPath, [entry], {
       cwd: serverDir,
       env: {
@@ -248,6 +328,7 @@ function startEmbeddedServer(mongoUri) {
         NODE_ENV: 'production',
         MONGODB_URI: mongoUri,
         CLIENT_DIST: clientDist,
+        JSR_STARTUP_TOKEN: STARTUP_TOKEN,
         ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@agritrades.com',
         ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'admin123',
         SALES_EMAIL: process.env.SALES_EMAIL || 'sales@agritrades.com',
@@ -272,7 +353,9 @@ function startEmbeddedServer(mongoUri) {
       serverProcess = null;
     });
 
-    waitForUrl(`http://127.0.0.1:${SERVER_PORT}/api/health`)
+    waitForUrl(`http://127.0.0.1:${SERVER_PORT}/api/health`, {
+      expectToken: STARTUP_TOKEN,
+    })
       .then(() => done())
       .catch((err) => done(err));
   });

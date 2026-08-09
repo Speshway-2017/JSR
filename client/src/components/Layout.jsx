@@ -27,6 +27,7 @@ const adminTopLinks = [
 
 const salesTopLinks = [
   { to: '/sales-orders', icon: ClipboardPen, label: 'Sales Orders', end: true },
+  { to: '/sales-materials', icon: Package, label: 'Sales Materials' },
   { to: '/sales-orders/previous', icon: FileBarChart, label: 'Previous Reports' },
 ];
 
@@ -46,6 +47,7 @@ const adminNavSections = [
       { to: '/loads', icon: Truck, label: 'Add Load' },
       { to: '/sell', icon: ShoppingCart, label: 'Sell' },
       { to: '/sales-orders', icon: ClipboardPen, label: 'Sales Orders' },
+      { to: '/sales-materials', icon: Package, label: 'Sales Materials' },
       { to: '/sales-orders/previous', icon: FileBarChart, label: 'Previous Reports' },
     ],
   },
@@ -212,7 +214,7 @@ export default function Layout({ children }) {
   const topOffset = isElectron ? '2.5rem' : '0';
 
   return (
-    <div className="min-h-screen flex bg-cream">
+    <div className="h-full min-h-0 flex bg-cream overflow-hidden">
       <aside
         className="hidden lg:flex lg:flex-col lg:w-64 bg-surface border-r border-primary-100 fixed z-30"
         style={{ top: topOffset, bottom: 0 }}
@@ -250,8 +252,10 @@ export default function Layout({ children }) {
         </>
       )}
 
-      <main className="flex-1 lg:ml-64 pt-16 lg:pt-0">
-        <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">{children}</div>
+      <main className="flex-1 lg:ml-64 pt-16 lg:pt-0 h-full min-h-0 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full flex flex-col">
+          {children}
+        </div>
       </main>
     </div>
   );

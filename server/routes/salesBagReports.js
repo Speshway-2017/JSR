@@ -1,6 +1,7 @@
 import express from 'express';
 import SalesBagReport from '../models/SalesBagReport.js';
 import { auth } from '../middleware/auth.js';
+import { apiErrorMessage } from '../utils/apiError.js';
 
 const router = express.Router();
 router.use(auth);
@@ -23,7 +24,7 @@ router.get('/', async (req, res) => {
       .lean();
     res.json(reports);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: apiErrorMessage(error) });
   }
 });
 
@@ -43,7 +44,7 @@ router.get('/suggestions', async (_req, res) => {
       materials: Array.from(materials).sort((a, b) => a.localeCompare(b)),
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: apiErrorMessage(error) });
   }
 });
 
@@ -55,7 +56,7 @@ router.get('/:id', async (req, res) => {
     if (!report) return res.status(404).json({ message: 'Report not found' });
     res.json(report);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: apiErrorMessage(error) });
   }
 });
 
@@ -80,7 +81,7 @@ router.post('/', async (req, res) => {
     });
     res.status(201).json(report);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: apiErrorMessage(error) });
   }
 });
 
@@ -102,7 +103,7 @@ router.put('/:id', async (req, res) => {
     if (!report) return res.status(404).json({ message: 'Report not found' });
     res.json(report);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: apiErrorMessage(error) });
   }
 });
 
@@ -112,7 +113,7 @@ router.delete('/:id', async (req, res) => {
     if (!report) return res.status(404).json({ message: 'Report not found' });
     res.json({ message: 'Report deleted' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: apiErrorMessage(error) });
   }
 });
 

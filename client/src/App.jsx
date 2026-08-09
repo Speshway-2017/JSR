@@ -17,6 +17,7 @@ import Transactions from './pages/Transactions';
 import InventoryHistory from './pages/InventoryHistory';
 import SalesReport from './pages/SalesReport';
 import SalesOrders, { SalesBagReportsList } from './pages/SalesOrders';
+import SalesMaterials from './pages/SalesMaterials';
 import { useAuth, homePathForRole } from './context/AuthContext';
 
 function HomeRedirect() {
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/sales-orders" element={<SalesOrders />} />
           <Route path="/sales-orders/previous" element={<SalesBagReportsList />} />
           <Route path="/sales-orders/:id" element={<SalesOrders />} />
+          <Route path="/sales-materials" element={<SalesMaterials />} />
         </Route>
 
         <Route element={<RoleRoute roles={['admin']} />}>

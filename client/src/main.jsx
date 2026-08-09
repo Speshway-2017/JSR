@@ -14,8 +14,16 @@ function Root() {
     <BrowserRouter>
       <AuthProvider>
         <TitleBar />
-        <div className={electron ? 'pt-10 min-h-screen' : 'min-h-screen'}>
-          <App />
+        <div
+          className={
+            electron
+              ? 'pt-10 h-[100dvh] box-border flex flex-col overflow-hidden'
+              : 'h-[100dvh] flex flex-col overflow-hidden'
+          }
+        >
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <App />
+          </div>
         </div>
         <Toaster
           position="top-center"

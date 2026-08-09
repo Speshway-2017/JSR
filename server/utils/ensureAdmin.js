@@ -1,4 +1,6 @@
 import User from '../models/User.js';
+import SalesMaterial from '../models/SalesMaterial.js';
+import SalesBagReport from '../models/SalesBagReport.js';
 
 async function ensureUser({ email, password, name, role }) {
   const normalized = email.toLowerCase().trim();
@@ -16,6 +18,32 @@ async function ensureUser({ email, password, name, role }) {
 
   user = await User.create({ email: normalized, password, name, role });
   return { user, created: true };
+}
+
+/** Seed sales materials from past bag-order entries if catalog is empty. */
+async function seedSalesMaterialsFromReports() {
+  const count = await SalesMaterial.countDocuments();
+  if (count > 0) return;
+
+  const reports = await SalesBagReport.find().select('entries.materialName').lean();
+  const names = new Set();
+  for (const report of reports) {
+    for (const e of report.entries || []) {
+      const n = String(e.materialName || '').trim();
+      if (n) names.add(n);
+    }
+  }
+  if (names.size === 0) return;
+
+  try {
+    await SalesMaterial.insertMany(
+      Array.from(names).map((name) => ({ name })),
+      { ordered: false }
+    );
+    console.log(`Seeded ${names.size} sales material(s) from previous reports`);
+  } catch {
+    // ignore duplicate race
+  }
 }
 
 /** Ensure default Admin + Sales users exist (create if missing). */
@@ -50,6 +78,8 @@ export async function ensureDefaultUsers() {
   if (sales.created) {
     console.log(`Sales user created: ${salesEmail} / ${salesPassword}`);
   }
+
+  await seedSalesMaterialsFromReports();
 
   return { admin: admin.user, sales: sales.user };
 }

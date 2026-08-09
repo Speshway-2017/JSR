@@ -1,5 +1,0 @@
-JSR Desktop
-===========
-
-This software is provided for use as a local desktop application.
-Data is stored only on this computer.
