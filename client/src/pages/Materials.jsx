@@ -1,114 +1,257 @@
 import { useEffect, useState } from 'react';
-import { Plus, Package, X } from 'lucide-react';
+import { Plus, Package, X, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
-import { formatKg } from '../utils/format';
+import { formatCurrency } from '../utils/format';
+import { useTeluguPreview } from '../hooks/useTeluguPreview';
+
+const DEFAULT_RATE = '10';
 
 export default function Materials() {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [editing, setEditing] = useState(null);
+  const [name, setName] = useState('');
+  const [nameTelugu, setNameTelugu] = useState('');
+  const [ratePerKg, setRatePerKg] = useState(DEFAULT_RATE);
   const [saving, setSaving] = useState(false);
 
+  const { telugu: liveTelugu, loading: teluguLoading } = useTeluguPreview(
+    showForm ? name : ''
+  );
+
+  useEffect(() => {
+    if (!showForm) return;
+    if (!name.trim()) {
+      setNameTelugu('');
+      return;
+    }
+    if (teluguLoading && !liveTelugu) return;
+    setNameTelugu(liveTelugu);
+  }, [liveTelugu, teluguLoading, showForm, name]);
+
   const fetchMaterials = () => {
-    api.get('/materials').then((res) => {
-      setMaterials(res.data);
-    }).finally(() => setLoading(false));
+    api
+      .get('/materials')
+      .then((res) => setMaterials(res.data))
+      .catch(() => toast.error('Failed to load product list'))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     fetchMaterials();
   }, []);
 
-  const handleAdd = async (e) => {
+  const openAdd = () => {
+    setEditing(null);
+    setName('');
+    setNameTelugu('');
+    setRatePerKg(DEFAULT_RATE);
+    setShowForm(true);
+  };
+
+  const openEdit = (mat) => {
+    setEditing(mat);
+    setName(mat.name);
+    setNameTelugu(mat.nameTelugu || '');
+    setRatePerKg(
+      mat.sellingPricePerKg === undefined || mat.sellingPricePerKg === null
+        ? DEFAULT_RATE
+        : String(mat.sellingPricePerKg)
+    );
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditing(null);
+    setName('');
+    setNameTelugu('');
+    setRatePerKg(DEFAULT_RATE);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast.error('Product name is required');
+      return;
+    }
+
+    const rate = Number(ratePerKg);
+    if (!Number.isFinite(rate) || rate < 0) {
+      toast.error('Enter a valid rate per kg');
+      return;
+    }
+
+    const duplicate = materials.find(
+      (m) =>
+        m.name.trim().toLowerCase() === trimmed.toLowerCase() &&
+        (!editing || m._id !== editing._id)
+    );
+    if (duplicate) {
+      toast.error(`"${duplicate.name}" already exists`);
+      return;
+    }
+
+    const payload = {
+      name: trimmed,
+      nameTelugu: nameTelugu.trim(),
+      sellingPricePerKg: rate,
+    };
+
     setSaving(true);
     try {
-      await api.post('/materials', { name: newName });
-      toast.success('Material added!');
-      setNewName('');
-      setShowForm(false);
+      if (editing) {
+        await api.put(`/materials/${editing._id}`, payload);
+        toast.success('Product updated');
+      } else {
+        await api.post('/materials', payload);
+        toast.success('Product added');
+      }
+      closeForm();
       fetchMaterials();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to add material');
+      toast.error(err.response?.data?.message || 'Failed to save product');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleDelete = async (mat) => {
+    if (!window.confirm(`Delete product "${mat.name}"?`)) return;
+    try {
+      await api.delete(`/materials/${mat._id}`);
+      toast.success('Product deleted');
+      fetchMaterials();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete product');
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="page-title">Materials</h1>
-          <p className="text-primary-500 mt-1">View materials and available stock</p>
+          <h1 className="page-title">Product List</h1>
+          <p className="text-primary-400 text-sm mt-0.5">Add, edit, or delete products</p>
         </div>
-        <button type="button" onClick={() => setShowForm(true)} className="btn-primary">
-          <Plus className="w-5 h-5" /> Add Material
+        <button type="button" onClick={openAdd} className="btn-primary !py-2 !px-4 !text-sm">
+          <Plus className="w-4 h-4" /> Add
         </button>
       </div>
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="card w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-primary-800">Add Material</h2>
-              <button type="button" onClick={() => setShowForm(false)} className="p-2 hover:bg-primary-50 rounded-lg">
+          <form onSubmit={handleSubmit} className="card w-full max-w-md space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-primary-800">
+                {editing ? 'Edit Product' : 'Add Product'}
+              </h2>
+              <button type="button" onClick={closeForm} className="p-2 hover:bg-primary-50 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleAdd} className="space-y-4">
-              <div>
-                <label className="label">Material Name *</label>
-                <input
-                  className="input-field"
-                  placeholder="e.g. Mirchi"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary flex-1" disabled={saving}>
-                  {saving ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </form>
-          </div>
+            <div>
+              <label className="label">Name *</label>
+              <input
+                className="input-field"
+                placeholder="e.g. Tomato"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                autoFocus
+              />
+              <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
+                {name.trim()
+                  ? teluguLoading && !liveTelugu
+                    ? '…'
+                    : nameTelugu || liveTelugu || ''
+                  : ''}
+              </p>
+              <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
+            </div>
+            <div>
+              <label className="label">Rate / Kg *</label>
+              <input
+                className="input-field"
+                type="text"
+                inputMode="decimal"
+                value={ratePerKg}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^\d.]/g, '');
+                  setRatePerKg(raw);
+                }}
+                required
+              />
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={closeForm} className="btn-secondary flex-1">
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary flex-1" disabled={saving}>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
       {loading ? (
-        <div className="text-center py-20 text-primary-400">Loading materials...</div>
+        <div className="text-center py-20 text-primary-400">Loading products...</div>
       ) : materials.length === 0 ? (
         <div className="card text-center py-16">
           <Package className="w-12 h-12 text-primary-300 mx-auto mb-3" />
-          <p className="text-primary-500 text-lg">No materials yet</p>
-          <p className="text-primary-400 mt-2">Materials are auto-created when adding loads, or add them here</p>
+          <p className="text-primary-500 text-lg">No products yet</p>
+          <p className="text-primary-400 mt-2">Click Add to create a product</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {materials.map((mat) => {
-            const qty = mat.availableKg || 0;
-            return (
-              <div key={mat._id} className="card flex items-start gap-4">
-                <div className="w-11 h-11 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
-                  <Package className="w-5 h-5 text-primary-600" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-primary-800 text-lg truncate">{mat.name}</h3>
-                  <p className="text-sm text-primary-400 mt-0.5">Available quantity</p>
-                  <p className={`text-xl font-bold mt-1 ${qty > 0 ? 'text-primary-700' : 'text-red-500'}`}>
-                    {formatKg(qty)}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
+        <div className="card !p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-primary-100 bg-primary-50/50">
+                  <th className="text-left px-4 py-3 font-semibold text-primary-500">Item</th>
+                  <th className="text-left px-4 py-3 font-semibold text-primary-500">Rate/Kgs</th>
+                  <th className="text-right px-4 py-3 font-semibold text-primary-500">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {materials.map((mat) => (
+                    <tr key={mat._id} className="border-b border-primary-50 hover:bg-primary-50/40">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-primary-800">{mat.name}</p>
+                        {mat.nameTelugu ? (
+                          <p className="text-xs text-primary-500 mt-0.5">{mat.nameTelugu}</p>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-primary-700 font-semibold">
+                        {formatCurrency(mat.sellingPricePerKg ?? 10)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEdit(mat)}
+                            className="btn-secondary !py-1.5 !px-2.5 !text-xs"
+                          >
+                            <Pencil className="w-3.5 h-3.5" /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(mat)}
+                            className="btn-secondary !py-1.5 !px-2.5 !text-xs text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

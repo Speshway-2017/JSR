@@ -1,158 +1,97 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import {
+  TE,
+  esc,
+  fmtMoney,
+  brandHeaderHtml,
+  materialTeluguMap,
+  vendorMaterialsHtml,
+  resolvePartyTeluguName,
+  openRaituSheetPdf,
+} from './raituBillShared';
 
-const PAGE_LEFT = 40;
-const PAGE_RIGHT = 555;
-
-const formatMoney = (amount) => `Rs. ${Number(amount || 0).toLocaleString('en-IN')}`;
-
-const formatDateEn = (date) =>
-  new Date(date).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-const formatKg = (kg) => `${Number(kg || 0).toFixed(1)} kg`;
-
-/**
- * Opens vendor load bill as PDF in a new tab.
- * @param {object} bill - response from GET /loads/:id/bill
- * @param {Window|null} previewTab - optional pre-opened tab to avoid popup blockers
- */
-export function openVendorBillPdf(bill, previewTab) {
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-  const vendor = bill.vendor || {};
-  const load = bill.load || {};
-  const summary = bill.summary || {};
-  const d = summary.deductions || {};
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.text('Vendor Load Bill', PAGE_LEFT, 48);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.text('JSR — Sale settlement invoice', PAGE_LEFT, 68);
-
-  doc.setFontSize(10);
-  doc.text(`Bill Date: ${formatDateEn(new Date())}`, PAGE_RIGHT, 48, { align: 'right' });
-  doc.setFontSize(8);
-  doc.text(`Load ID: ${load._id || ''}`, PAGE_RIGHT, 64, { align: 'right', maxWidth: 220 });
-
-  doc.setDrawColor(205, 217, 208);
-  doc.line(PAGE_LEFT, 82, PAGE_RIGHT, 82);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text('Vendor Details', PAGE_LEFT, 108);
-  doc.text('Load Info', PAGE_RIGHT, 108, { align: 'right' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  const vendorLines = [vendor.name, vendor.mobile, vendor.city, vendor.address].filter(Boolean);
-  doc.text(vendorLines, PAGE_LEFT, 128);
-
-  doc.text(
-    [
-      `Load: ${formatDateEn(load.createdAt)}`,
-      `Status: ${load.status === 'sold_out' ? 'Sold out' : 'Pending'}`,
-      `Total: ${formatKg(load.totalWeight)}`,
-      `Sold: ${formatKg(load.soldWeight)}`,
-    ],
-    PAGE_RIGHT,
-    128,
-    { align: 'right' }
-  );
-
-  const tableBody = [];
+function collectRateLines(bill) {
+  if (bill.rateLines?.length) return bill.rateLines;
+  const lines = [];
   for (const mat of bill.materials || []) {
     for (const line of mat.lines || []) {
-      tableBody.push([
-        mat.materialName,
-        String(line.bagCount),
-        formatKg(line.totalKg),
-        formatMoney(line.ratePerKg),
-        formatMoney(line.totalAmount),
-      ]);
+      lines.push({
+        materialName: mat.materialName,
+        totalKg: line.totalKg,
+        ratePerKg: line.ratePerKg,
+        totalAmount: line.totalAmount,
+        bagCount: line.bagCount,
+        bags: line.bags || [],
+      });
     }
   }
+  return lines;
+}
 
-  autoTable(doc, {
-    startY: 200,
-    head: [['Material', 'Bags', 'Weight', 'Rate/Kg', 'Amount']],
-    body: tableBody.length
-      ? tableBody
-      : [['No sales yet', '-', '-', '-', formatMoney(0)]],
-    theme: 'grid',
-    headStyles: {
-      fillColor: [80, 102, 88],
-      textColor: 255,
-      fontStyle: 'bold',
-      halign: 'center',
-      fontSize: 10,
-    },
-    styles: {
-      fontSize: 10,
-      cellPadding: 8,
-      valign: 'middle',
-      lineColor: [205, 217, 208],
-      lineWidth: 0.5,
-    },
-    columnStyles: {
-      0: { cellWidth: 120, halign: 'left' },
-      1: { cellWidth: 50, halign: 'center' },
-      2: { cellWidth: 80, halign: 'right' },
-      3: { cellWidth: 90, halign: 'right' },
-      4: { cellWidth: 95, halign: 'right' },
-    },
-  });
+function buildVendorInner(bill, teluguMap, partyName) {
+  return (watermarkSrc) => {
+    const load = bill.load || {};
+    const summary = bill.summary || {};
+    const d = summary.deductions || {};
+    const loadDate = load.loadDate || load.createdAt || bill.date;
+    const rateLines = collectRateLines(bill);
+    const dedTotal = Number(d.total || 0);
+    const gross = Number(summary.grossTotal || 0);
+    const receivable = Number(summary.receivable || 0);
 
-  let y = (doc.lastAutoTable?.finalY || 200) + 28;
+    const deductionRows = [
+      [TE.kirayi || '\u0c15\u0c3f\u0c30\u0c3e\u0c2f\u0c3f', d.kirayi],
+      ['\u0c30\u0c3f\u0c15\u0c4d\u0c37\u0c3e', d.riksha],
+      [TE.cooly, d.cooly ?? Number(d.labour || 0) + Number(d.handlingCharges || 0)],
+      ['\u0c06\u0c36\u0c40\u0c32\u0c41', d.aaseelu],
+      ['\u0c15\u0c2e\u0c40\u0c37\u0c28\u0c4d', d.commission],
+      ['\u0c35\u0c21\u0c15\u0c02', d.vadakam],
+      ['\u0c30\u0c41\u0c38\u0c41\u0c2e\u0c41', d.rusumu ?? d.bill],
+      ['\u0c2f\u0c42\u0c28\u0c3f\u0c2f\u0c28\u0c4d', d.union ?? d.unionCharges],
+    ];
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text('Total Amount', PAGE_RIGHT - 140, y);
-  doc.text(formatMoney(summary.grossTotal), PAGE_RIGHT, y, { align: 'right' });
+    const materialsHtml = vendorMaterialsHtml(rateLines, teluguMap);
 
-  y += 22;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('Deductions', PAGE_LEFT, y);
+    const dedHtml = deductionRows
+      .map(([label, amount]) => {
+        const show = Number(amount) > 0 ? fmtMoney(amount) : '';
+        return `<div class="ded-row"><span>${esc(label)}</span><span class="ded-colon">:</span><span class="ded-val">${esc(show)}</span></div>`;
+      })
+      .join('');
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  const deductionRows = [
-    ['Handling Charges', d.handlingCharges],
-    [`Labour (${summary.totalBags || 0} bags)`, d.labour],
-    [`Aaseelu (${summary.totalBags || 0} bags)`, d.aaseelu],
-    [`Bill (${summary.totalBags || 0} bags)`, d.bill],
-    [`Union Charges (${summary.totalBags || 0} bags)`, d.unionCharges],
-    [`Commission (${d.commissionPercent || 0}%)`, d.commission],
-  ];
+    return `
+    ${brandHeaderHtml(watermarkSrc, loadDate)}
+    <div class="party-line">
+      <span>${esc(TE.sri)}</span>
+      <span class="party-name">${esc(partyName)}</span>
+      <span>${esc(TE.garu)}</span>
+    </div>
+    <div class="body vendor-bill">
+      <div class="calcs">
+        ${materialsHtml}
+        <div class="gross-box"><strong>${esc(fmtMoney(gross))}</strong></div>
+      </div>
+      <div class="deductions-section">
+        <h2 class="section-heading">${esc(TE.deductionsHeading)}</h2>
+        <div class="deductions">
+          ${dedHtml}
+          <div class="ded-total"><strong>${esc(fmtMoney(dedTotal))}</strong></div>
+        </div>
+      </div>
+      <div class="totals">
+        <div class="totals-box">
+          <div>${esc(fmtMoney(gross))} &minus; ${esc(fmtMoney(dedTotal))}</div>
+          <div class="net">${esc(TE.chellinchavali)} : <strong>${esc(fmtMoney(receivable))}</strong></div>
+        </div>
+      </div>
+    </div>`;
+  };
+}
 
-  for (const [label, amount] of deductionRows) {
-    y += 18;
-    doc.text(label, PAGE_LEFT, y);
-    doc.text(`- ${formatMoney(amount)}`, PAGE_RIGHT, y, { align: 'right' });
-  }
-
-  y += 28;
-  doc.setDrawColor(205, 217, 208);
-  doc.line(PAGE_LEFT, y - 12, PAGE_RIGHT, y - 12);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(159, 134, 104);
-  doc.text('Total Receivable', PAGE_LEFT, y);
-  doc.text(formatMoney(summary.receivable), PAGE_RIGHT, y, { align: 'right' });
-  doc.setTextColor(0, 0, 0);
-
-  const blobUrl = doc.output('bloburl');
-  if (previewTab) {
-    previewTab.location.href = blobUrl;
-  } else {
-    window.open(blobUrl, '_blank');
-  }
+/** Opens vendor రైతుపట్టి bill as PDF. */
+export async function openVendorBillPdf(bill, previewTab) {
+  const [teluguMap, partyName] = await Promise.all([
+    materialTeluguMap(),
+    resolvePartyTeluguName(bill.vendor || {}),
+  ]);
+  await openRaituSheetPdf(buildVendorInner(bill, teluguMap, partyName), previewTab);
 }

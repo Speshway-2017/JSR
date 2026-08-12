@@ -9,7 +9,6 @@ import VendorBill from './pages/VendorBill';
 import LoadBill from './pages/LoadBill';
 import Customers from './pages/Customers';
 import CustomerDetail from './pages/CustomerDetail';
-import AddLoad from './pages/AddLoad';
 import Sell from './pages/Sell';
 import Materials from './pages/Materials';
 import PriceSettings from './pages/PriceSettings';
@@ -18,6 +17,10 @@ import InventoryHistory from './pages/InventoryHistory';
 import SalesReport from './pages/SalesReport';
 import SalesOrders, { SalesBagReportsList } from './pages/SalesOrders';
 import SalesMaterials from './pages/SalesMaterials';
+import Schedules from './pages/Schedules';
+import CashEntry from './pages/CashEntry';
+import SalePatty from './pages/SalePatty';
+import Purchase from './pages/Purchase';
 import { useAuth, homePathForRole } from './context/AuthContext';
 
 function HomeRedirect() {
@@ -32,7 +35,7 @@ export default function App() {
       <Route element={<PrivateRoute />}>
         <Route path="/" element={<HomeRedirect />} />
 
-        <Route element={<RoleRoute roles={['sales', 'admin']} />}>
+        <Route element={<RoleRoute roles={['sales']} />}>
           <Route path="/sales-orders" element={<SalesOrders />} />
           <Route path="/sales-orders/previous" element={<SalesBagReportsList />} />
           <Route path="/sales-orders/:id" element={<SalesOrders />} />
@@ -47,7 +50,11 @@ export default function App() {
           <Route path="/loads/:loadId/bill" element={<LoadBill />} />
           <Route path="/customers" element={<Customers />} />
           <Route path="/customers/:id" element={<CustomerDetail />} />
-          <Route path="/loads" element={<AddLoad />} />
+          <Route path="/schedules" element={<Schedules />} />
+          <Route path="/cash-entry" element={<CashEntry />} />
+          <Route path="/purchase" element={<Purchase />} />
+          <Route path="/sale-patty" element={<SalePatty />} />
+          <Route path="/loads" element={<Navigate to="/sell" replace />} />
           <Route path="/sell" element={<Sell />} />
           <Route path="/materials" element={<Materials />} />
           <Route path="/settings" element={<PriceSettings />} />

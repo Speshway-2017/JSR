@@ -4,6 +4,7 @@ import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth, homePathForRole } from '../context/AuthContext';
 import BrandLogo from '../components/BrandLogo';
+import TitleBar from '../components/TitleBar';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -35,6 +36,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-cream to-accent-50 p-4">
+      <TitleBar standalone />
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4">
@@ -92,8 +94,8 @@ export default function Login() {
         </form>
 
         <div className="text-center text-primary-400 text-sm mt-6 space-y-1">
-          <p>Admin: admin@agritrades.com / admin123</p>
-          <p>Sales: sales@agritrades.com / sales123</p>
+          <p>Admin: admin@jsr.com / admin123</p>
+          <p>Sales: sales@jsr.com / sales123</p>
         </div>
       </div>
     </div>

@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Phone, MapPin, CreditCard, Pencil, X, Save, FileText, ChevronDown, Truck,
+  ArrowLeft, Phone, MapPin, CreditCard, Pencil, X, Save, FileText, Truck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDate, formatKg } from '../utils/format';
 import { openVendorBillPdf } from '../utils/vendorBillPdf';
 import { openCustomerSaleBillPdf } from '../utils/customerSaleBillPdf';
+import { openBillPreviewTab } from '../utils/raituBillShared';
+import { DEDUCTION_FIELDS, emptyRatesState, ratesPayload } from '../utils/deductionFields';
+import { useTeluguPreview } from '../hooks/useTeluguPreview';
 
 export default function VendorDetail() {
   const { id } = useParams();
@@ -18,30 +21,47 @@ export default function VendorDetail() {
   const [paymentDesc, setPaymentDesc] = useState('');
   const [paying, setPaying] = useState(false);
   const [activeTab, setActiveTab] = useState('loads');
-  const [expandedLoadId, setExpandedLoadId] = useState(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [billLoadingId, setBillLoadingId] = useState(null);
   const [billModal, setBillModal] = useState(null); // { loadId, defaults }
-  const [billForm, setBillForm] = useState({
-    labour: '',
-    aaseelu: '',
-    bill: '',
-    unionCharges: '',
-    commissionPercent: '',
-  });
+  const [billForm, setBillForm] = useState(() => emptyRatesState());
   const [generatingBill, setGeneratingBill] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', mobile: '', city: '', address: '' });
+  const [editForm, setEditForm] = useState({
+    name: '',
+    nameTelugu: '',
+    mobile: '',
+    city: '',
+    address: '',
+  });
+  const { telugu: liveTelugu, loading: teluguLoading } = useTeluguPreview(
+    editing ? editForm.name : ''
+  );
 
   const fetchData = () => {
     api.get(`/vendors/${id}`).then((res) => {
       setData(res.data);
       const v = res.data.vendor;
-      setEditForm({ name: v.name, mobile: v.mobile, city: v.city, address: v.address });
+      setEditForm({
+        name: v.name,
+        nameTelugu: v.nameTelugu || '',
+        mobile: v.mobile,
+        city: v.city,
+        address: v.address,
+      });
     }).finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchData(); }, [id]);
+
+  useEffect(() => {
+    if (!editing) return;
+    setEditForm((prev) => {
+      if (!prev.name.trim()) return { ...prev, nameTelugu: '' };
+      if (teluguLoading && !liveTelugu) return prev;
+      return { ...prev, nameTelugu: liveTelugu };
+    });
+  }, [liveTelugu, teluguLoading, editing]);
 
   const handlePayment = async (e) => {
     e.preventDefault();
@@ -85,8 +105,13 @@ export default function VendorDetail() {
     }
   };
 
-  const openBillPdf = (bill, previewTab) => {
-    openVendorBillPdf(bill, previewTab);
+  const openBillPdf = async (bill, previewTab) => {
+    try {
+      await openVendorBillPdf(bill, previewTab);
+    } catch (err) {
+      if (previewTab) previewTab.close();
+      toast.error(err.message || 'Failed to open Telugu bill PDF');
+    }
   };
 
   /** Open PDF with saved rates (bill already generated) */
@@ -96,11 +121,11 @@ export default function VendorDetail() {
       return;
     }
 
-    const previewTab = window.open('', '_blank');
+    const previewTab = openBillPreviewTab();
     setBillLoadingId(load._id);
     try {
       const res = await api.get(`/loads/${load._id}/bill`);
-      openBillPdf(res.data, previewTab);
+      await openBillPdf(res.data, previewTab);
     } catch (err) {
       if (previewTab) previewTab.close();
       toast.error(err.response?.data?.message || 'Failed to open bill');
@@ -114,22 +139,11 @@ export default function VendorDetail() {
     setBillLoadingId(load._id);
     try {
       const res = await api.get(`/loads/${load._id}/bill`);
-      const rates = load.billGenerated && res.data.ratesUsed
-        ? res.data.ratesUsed
-        : res.data.defaults || {
-          labour: 0,
-          aaseelu: 0,
-          bill: 0,
-          unionCharges: 0,
-          commissionPercent: 0,
-        };
-      setBillForm({
-        labour: rates.labour,
-        aaseelu: rates.aaseelu,
-        bill: rates.bill,
-        unionCharges: rates.unionCharges,
-        commissionPercent: rates.commissionPercent,
-      });
+      const rates =
+        load.billGenerated && res.data.ratesUsed
+          ? res.data.ratesUsed
+          : res.data.defaults || {};
+      setBillForm(emptyRatesState(rates));
       setBillModal({ loadId: load._id, regenerating: !!load.billGenerated });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to prepare bill');
@@ -142,18 +156,12 @@ export default function VendorDetail() {
     e.preventDefault();
     if (!billModal) return;
     setGeneratingBill(true);
-    const previewTab = window.open('', '_blank');
+    const previewTab = openBillPreviewTab();
     try {
-      const res = await api.post(`/loads/${billModal.loadId}/bill`, {
-        labour: Number(billForm.labour) || 0,
-        aaseelu: Number(billForm.aaseelu) || 0,
-        bill: Number(billForm.bill) || 0,
-        unionCharges: Number(billForm.unionCharges) || 0,
-        commissionPercent: Number(billForm.commissionPercent) || 0,
-      });
+      const res = await api.post(`/loads/${billModal.loadId}/bill`, ratesPayload(billForm));
       const regenerating = billModal.regenerating;
       setBillModal(null);
-      openBillPdf(res.data, previewTab);
+      await openBillPdf(res.data, previewTab);
       toast.success(regenerating ? 'Bill updated' : 'Bill generated');
       fetchData();
     } catch (err) {
@@ -182,7 +190,12 @@ export default function VendorDetail() {
             {!editing ? (
               <>
                 <div className="flex items-start justify-between gap-3">
-                  <h1 className="page-title">{vendor.name}</h1>
+                  <div>
+                    <h1 className="page-title">{vendor.name}</h1>
+                    {vendor.nameTelugu ? (
+                      <p className="text-sm text-primary-500 mt-0.5">{vendor.nameTelugu}</p>
+                    ) : null}
+                  </div>
                   <button type="button" onClick={() => setEditing(true)} className="btn-secondary !py-2 !px-3 !text-sm shrink-0">
                     <Pencil className="w-4 h-4" /> Edit
                   </button>
@@ -200,14 +213,27 @@ export default function VendorDetail() {
                   <button type="button" onClick={() => setEditing(false)}><X className="w-5 h-5 text-primary-400" /></button>
                 </div>
                 {['name', 'mobile', 'city', 'address'].map((field) => (
-                  <input
-                    key={field}
-                    className="input-field"
-                    placeholder={field}
-                    value={editForm[field]}
-                    onChange={(e) => setEditForm({ ...editForm, [field]: e.target.value })}
-                    required={field !== 'address' ? true : true}
-                  />
+                  <div key={field}>
+                    <input
+                      className="input-field"
+                      placeholder={field}
+                      value={editForm[field]}
+                      onChange={(e) => setEditForm({ ...editForm, [field]: e.target.value })}
+                      required
+                    />
+                    {field === 'name' ? (
+                      <>
+                        <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
+                          {editForm.name.trim()
+                            ? teluguLoading && !liveTelugu
+                              ? '…'
+                              : editForm.nameTelugu || liveTelugu || ''
+                            : ''}
+                        </p>
+                        <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
+                      </>
+                    ) : null}
+                  </div>
                 ))}
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex-1">Cancel</button>
@@ -264,30 +290,49 @@ export default function VendorDetail() {
             <p className="text-xs text-primary-400">
               {billModal.regenerating
                 ? 'Adjust deduction rates and regenerate the bill PDF for this load.'
-                : 'Confirm deduction rates (from Price Settings). You can change them later and regenerate.'}
+                : 'Confirm deduction rates (from Price Settings). Toggle Per bag for each field.'}
             </p>
-            {[
-              { key: 'labour', label: 'Labour', suffix: '₹ / bag' },
-              { key: 'aaseelu', label: 'Aaseelu', suffix: '₹ / bag' },
-              { key: 'bill', label: 'Bill', suffix: '₹ / bag' },
-              { key: 'unionCharges', label: 'Union Charges', suffix: '₹ / bag' },
-              { key: 'commissionPercent', label: 'Commission', suffix: '%' },
-            ].map(({ key, label, suffix }) => (
-              <div key={key}>
-                <label className="label">
-                  {label} <span className="font-normal text-primary-400">({suffix})</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max={key === 'commissionPercent' ? 100 : undefined}
-                  step="0.01"
-                  className="input-field"
-                  value={billForm[key]}
-                  onChange={(e) => setBillForm({ ...billForm, [key]: e.target.value })}
-                />
-              </div>
-            ))}
+            <div className="grid grid-cols-[1fr_90px_72px] gap-2 text-xs font-semibold text-primary-400 uppercase">
+              <span>Field</span>
+              <span>Amount</span>
+              <span className="text-center">Per bag</span>
+            </div>
+            {DEDUCTION_FIELDS.map((field) => {
+              const perBag = !!billForm[`${field.key}PerBag`];
+              const isPct = field.isCommission && !perBag;
+              return (
+                <div key={field.key} className="grid grid-cols-[1fr_90px_72px] gap-2 items-center">
+                  <div>
+                    <p className="text-sm font-medium text-primary-800">{field.telugu}</p>
+                    <p className="text-xs text-primary-400">{field.label}</p>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max={isPct ? 100 : undefined}
+                      step="0.01"
+                      className="input-field !py-2"
+                      value={billForm[field.key]}
+                      onChange={(e) => setBillForm({ ...billForm, [field.key]: e.target.value })}
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-primary-400">
+                      {isPct ? '%' : '₹'}
+                    </span>
+                  </div>
+                  <label className="flex justify-center">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 accent-primary-600"
+                      checked={perBag}
+                      onChange={(e) =>
+                        setBillForm({ ...billForm, [`${field.key}PerBag`]: e.target.checked })
+                      }
+                    />
+                  </label>
+                </div>
+              );
+            })}
             <div className="flex gap-3 pt-1">
               <button type="button" onClick={() => setBillModal(null)} className="btn-secondary flex-1">
                 Cancel
@@ -330,96 +375,56 @@ export default function VendorDetail() {
               <p className="text-center py-10 text-primary-400 text-sm">No loads yet</p>
             ) : (
               <div className="space-y-2">
-                {loads.map((load) => {
-                  const open = expandedLoadId === load._id;
-                  const soldOut = load.status === 'sold_out';
-                  return (
-                    <div key={load._id} className="border border-primary-100 rounded-xl overflow-hidden">
-                      <div className="flex items-center gap-2 p-3">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedLoadId(open ? null : load._id)}
-                          className="flex-1 flex items-center justify-between gap-3 hover:bg-primary-50 text-left rounded-lg -m-1 p-1"
-                        >
-                          <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                            <ChevronDown className={`w-4 h-4 text-primary-400 transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} />
-                            <Truck className="w-4 h-4 text-primary-500 shrink-0" />
-                            <span className="text-sm text-primary-600">{formatDate(load.createdAt)}</span>
-                            <span
-                              className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
-                                soldOut
-                                  ? 'bg-accent-100 text-accent-700'
-                                  : 'bg-primary-100 text-primary-600'
-                              }`}
-                            >
-                              {soldOut ? 'Sold out' : 'Pending load'}
-                            </span>
-                          </div>
-                          <span className="text-sm font-semibold text-primary-700 shrink-0">
-                            {formatKg(load.remainingWeight ?? load.totalWeight)}
-                            {!soldOut && load.soldWeight > 0 && (
-                              <span className="font-normal text-primary-400 text-xs ml-1">
-                                / {formatKg(load.totalWeight)}
-                              </span>
-                            )}
-                          </span>
-                        </button>
-                        {load.billGenerated ? (
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => handleViewBill(load)}
-                              disabled={billLoadingId === load._id}
-                              className="btn-secondary !py-1.5 !px-2.5 !text-xs disabled:opacity-50"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                              {billLoadingId === load._id ? '...' : 'View'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openBillChargesModal(load)}
-                              disabled={billLoadingId === load._id}
-                              className="btn-secondary !py-1.5 !px-2.5 !text-xs disabled:opacity-50"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              Modify
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => openBillChargesModal(load)}
-                            disabled={billLoadingId === load._id}
-                            className="btn-secondary !py-1.5 !px-2.5 !text-xs shrink-0 disabled:opacity-50"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            {billLoadingId === load._id ? '...' : 'Bill'}
-                          </button>
-                        )}
-                      </div>
-                      {open && (
-                        <div className="px-4 pb-3 border-t border-primary-100 space-y-2 pt-2">
-                          {load.handlingCharges > 0 && (
-                            <p className="text-sm text-accent-600">Handling: {formatCurrency(load.handlingCharges)}</p>
-                          )}
-                          {load.materials.map((mat, i) => (
-                            <div key={i} className="bg-primary-50 rounded-lg px-3 py-2 text-sm flex justify-between gap-2">
-                              <span>
-                                <span className="font-medium text-primary-700">{mat.materialName}</span>
-                                <span className="text-primary-500"> — {formatKg(mat.totalKg)}</span>
-                              </span>
-                              <span className="text-xs text-primary-400 shrink-0">
-                                {soldOut
-                                  ? 'Sold out'
-                                  : `${formatKg(mat.remainingKg ?? mat.totalKg)} left`}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                {loads.map((load) => (
+                  <div
+                    key={load._id}
+                    className="border border-primary-100 rounded-xl flex items-center gap-2 p-3"
+                  >
+                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                      <Truck className="w-4 h-4 text-primary-500 shrink-0" />
+                      <span className="text-sm font-medium text-primary-700">
+                        {formatDate(load.loadDate || load.createdAt)}
+                      </span>
+                      {load.billGenerated && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-accent-100 text-accent-700">
+                          Bill done
+                        </span>
                       )}
                     </div>
-                  );
-                })}
+                    {load.billGenerated ? (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleViewBill(load)}
+                          disabled={billLoadingId === load._id}
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs disabled:opacity-50"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          {billLoadingId === load._id ? '...' : 'View'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openBillChargesModal(load)}
+                          disabled={billLoadingId === load._id}
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs disabled:opacity-50"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          Modify
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openBillChargesModal(load)}
+                        disabled={billLoadingId === load._id}
+                        className="btn-secondary !py-1.5 !px-2.5 !text-xs shrink-0 disabled:opacity-50"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        {billLoadingId === load._id ? '...' : 'Bill'}
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             )
           )}
@@ -457,10 +462,10 @@ export default function VendorDetail() {
                       <button
                         type="button"
                         onClick={async () => {
-                          const previewTab = window.open('', '_blank');
+                          const previewTab = openBillPreviewTab();
                           try {
                             const res = await api.get(`/sales/${sale._id}`);
-                            openCustomerSaleBillPdf(res.data, previewTab);
+                            await openCustomerSaleBillPdf(res.data, previewTab);
                           } catch (err) {
                             if (previewTab) previewTab.close();
                             toast.error(err.response?.data?.message || 'Failed to generate bill');

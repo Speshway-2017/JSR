@@ -4,12 +4,19 @@ import Load from '../models/Load.js';
 import Sale from '../models/Sale.js';
 import Transaction from '../models/Transaction.js';
 import PriceSettings from '../models/PriceSettings.js';
-import { auth } from '../middleware/auth.js';
+import { auth, requireRole } from '../middleware/auth.js';
 import { getVendorStockMap, getAvailableKg } from '../utils/stock.js';
 import { enrichLoadsStatus } from '../utils/loadStock.js';
+import {
+  buildDeductionsFromRates,
+  emptyRatesFromSettings,
+  migrateLegacySettings,
+} from '../utils/deductionFields.js';
+import { groupSalesMaterials, extractSaleDetails } from '../utils/loadBill.js';
 
 const router = express.Router();
 router.use(auth);
+router.use(requireRole('admin'));
 
 router.get('/', async (_req, res) => {
   try {
@@ -22,11 +29,17 @@ router.get('/', async (_req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { name, mobile, city, address } = req.body;
+    const { name, nameTelugu, mobile, city, address } = req.body;
     if (!name || !mobile || !city || !address) {
       return res.status(400).json({ message: 'All fields are required' });
     }
-    const vendor = await Vendor.create({ name, mobile, city, address });
+    const vendor = await Vendor.create({
+      name,
+      nameTelugu: String(nameTelugu || '').trim(),
+      mobile,
+      city,
+      address,
+    });
     res.status(201).json(vendor);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -56,70 +69,10 @@ router.get('/:id/bill', async (req, res) => {
       PriceSettings.findOne(),
     ]);
 
-    // Group by materialName + ratePerKg
-    const groupMap = new Map();
-    for (const sale of sales) {
-      for (const line of sale.lines || []) {
-        const key = `${line.materialName}__${Number(line.ratePerKg)}`;
-        const existing = groupMap.get(key) || {
-          materialName: line.materialName,
-          ratePerKg: line.ratePerKg,
-          bagCount: 0,
-          totalKg: 0,
-          totalAmount: 0,
-        };
-        existing.bagCount += line.bagCount;
-        existing.totalKg += line.totalKg;
-        existing.totalAmount += line.totalAmount;
-        groupMap.set(key, existing);
-      }
-    }
-
-    const groups = Array.from(groupMap.values()).sort((a, b) =>
-      a.materialName.localeCompare(b.materialName) || a.ratePerKg - b.ratePerKg
-    );
-
-    // Nest under material for bill display
-    const byMaterial = [];
-    for (const g of groups) {
-      let mat = byMaterial.find((m) => m.materialName === g.materialName);
-      if (!mat) {
-        mat = { materialName: g.materialName, lines: [] };
-        byMaterial.push(mat);
-      }
-      mat.lines.push({
-        bagCount: g.bagCount,
-        totalKg: Number(g.totalKg.toFixed(1)),
-        ratePerKg: g.ratePerKg,
-        totalAmount: Number(g.totalAmount.toFixed(2)),
-      });
-    }
-
-    const grossTotal = groups.reduce((s, g) => s + g.totalAmount, 0);
-    const totalBags = groups.reduce((s, g) => s + g.bagCount, 0);
-    const handlingCharges = loads.reduce((s, l) => s + Number(l.handlingCharges || 0), 0);
-
-    const labour = Number(settings?.labour || 0);
-    const aaseelu = Number(settings?.aaseelu || 0);
-    const bill = Number(settings?.bill || 0);
-    const unionCharges = Number(settings?.unionCharges || 0);
-    const commissionPercent = Number(settings?.commissionPercent || 0);
-    const perBagTotal = labour + aaseelu + bill + unionCharges;
-    const bagChargesTotal = Number((perBagTotal * totalBags).toFixed(2));
-    const commission = Number(((grossTotal * commissionPercent) / 100).toFixed(2));
-
-    const deductions = {
-      handlingCharges: Number(handlingCharges.toFixed(2)),
-      labour: Number((labour * totalBags).toFixed(2)),
-      aaseelu: Number((aaseelu * totalBags).toFixed(2)),
-      bill: Number((bill * totalBags).toFixed(2)),
-      unionCharges: Number((unionCharges * totalBags).toFixed(2)),
-      commissionPercent,
-      commission,
-      perBagRates: { labour, aaseelu, bill, unionCharges },
-      bagChargesTotal,
-      total: Number((handlingCharges + bagChargesTotal + commission).toFixed(2)),
-    };
+    const { byMaterial, grossTotal, totalBags } = groupSalesMaterials(sales);
+    const { bagWeights, rateLines } = extractSaleDetails(sales);
+    const rates = emptyRatesFromSettings(migrateLegacySettings(settings));
+    const deductions = buildDeductionsFromRates({ grossTotal, totalBags, rates });
 
     const receivable = Number((grossTotal - deductions.total).toFixed(2));
 
@@ -127,6 +80,7 @@ router.get('/:id/bill', async (req, res) => {
       vendor: {
         _id: vendor._id,
         name: vendor.name,
+        nameTelugu: vendor.nameTelugu || '',
         mobile: vendor.mobile,
         city: vendor.city,
         address: vendor.address,
@@ -135,6 +89,8 @@ router.get('/:id/bill', async (req, res) => {
       startDate: startDate || null,
       endDate: endDate || null,
       materials: byMaterial,
+      bagWeights,
+      rateLines,
       summary: {
         totalBags,
         grossTotal: Number(grossTotal.toFixed(2)),
@@ -174,7 +130,7 @@ router.get('/:id', async (req, res) => {
     const enrichedLoads = await enrichLoadsStatus(loads);
 
     const sales = await Sale.find({ vendor: vendor._id })
-      .populate('customer', 'name city')
+      .populate('customer', 'name nameTelugu city')
       .populate('load', 'createdAt totalWeight')
       .sort({ createdAt: -1 });
 
@@ -188,9 +144,10 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const { name, mobile, city, address } = req.body;
+    const { name, nameTelugu, mobile, city, address } = req.body;
     const updates = {};
     if (name !== undefined) updates.name = name;
+    if (nameTelugu !== undefined) updates.nameTelugu = String(nameTelugu || '').trim();
     if (mobile !== undefined) updates.mobile = mobile;
     if (city !== undefined) updates.city = city;
     if (address !== undefined) updates.address = address;

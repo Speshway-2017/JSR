@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  Plus, Download, Package, X, ArrowLeft, Pencil, Trash2, Eye, History, FilePlus,
+  Plus, Download, Package, X, ArrowLeft, Pencil, Trash2, Eye, History, FilePlus, FileText, FileSpreadsheet,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatDate } from '../utils/format';
-import { buildMaterialColumns, BRAND } from '../utils/salesOrderExcel';
-import { exportBrandedBagBagPdf } from '../utils/salesOrderPdf';
+import { buildMaterialColumns, BRAND, exportBrandedBagBagExcel, exportIndividualBagReportExcel, listPersonNames } from '../utils/salesOrderExcel';
+import { exportBrandedBagBagPdf, exportIndividualBagReportPdf, PDF_PAPER_SIZES } from '../utils/salesOrderPdf';
 
 function toUiEntries(entries = []) {
   return entries.map((e, i) => ({
@@ -21,14 +21,22 @@ function toUiEntries(entries = []) {
 function rememberValue(list, value) {
   const trimmed = value.trim();
   if (!trimmed) return list;
-  const exists = list.some((item) => item.toLowerCase() === trimmed.toLowerCase());
-  if (exists) return list;
+  const existing = list.find((item) => item.toLowerCase() === trimmed.toLowerCase());
+  if (existing) return list;
   return [...list, trimmed].sort((a, b) => a.localeCompare(b));
 }
 
-function filterSuggestions(list, query) {
+/** Prefer existing catalog casing when names only differ by capitalization. */
+function canonicalizeName(list, value) {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  const existing = list.find((item) => item.toLowerCase() === trimmed.toLowerCase());
+  return existing || trimmed;
+}
+
+function filterSuggestions(list, query, { requireQuery = false } = {}) {
   const q = query.trim().toLowerCase();
-  if (!q) return list.slice(0, 8);
+  if (!q) return requireQuery ? [] : list.slice(0, 8);
   return list
     .filter((item) => item.toLowerCase().includes(q) && item.toLowerCase() !== q)
     .slice(0, 8);
@@ -158,6 +166,12 @@ export default function SalesOrders() {
   const [filterName, setFilterName] = useState('');
   const [filterMaterial, setFilterMaterial] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [showExportChooser, setShowExportChooser] = useState(false);
+  /** null | 'sheet' | 'individual' */
+  const [exportMode, setExportMode] = useState(null);
+  /** null | 'pdf-size' — second step after choosing PDF */
+  const [exportStep, setExportStep] = useState(null);
+  const [selectedExportNames, setSelectedExportNames] = useState([]);
   const [saveStatus, setSaveStatus] = useState('idle');
   const [loading, setLoading] = useState(!!id);
 
@@ -168,6 +182,7 @@ export default function SalesOrders() {
   const titleSaveTimer = useRef(null);
   const cellSaveTimer = useRef(null);
   const materialInputRef = useRef(null);
+  const quantityInputRef = useRef(null);
 
   useEffect(() => {
     reportIdRef.current = reportId;
@@ -180,15 +195,23 @@ export default function SalesOrders() {
   }, [entries]);
 
   const filterOptions = useMemo(() => {
-    const names = new Set();
-    const materials = new Set();
+    const names = new Map();
+    const materials = new Map();
     for (const e of entries) {
-      if (e.customerName?.trim()) names.add(e.customerName.trim());
-      if (e.materialName?.trim()) materials.add(e.materialName.trim());
+      const name = e.customerName?.trim();
+      const mat = e.materialName?.trim();
+      if (name) {
+        const key = name.toLowerCase();
+        if (!names.has(key)) names.set(key, name);
+      }
+      if (mat) {
+        const key = mat.toLowerCase();
+        if (!materials.has(key)) materials.set(key, mat);
+      }
     }
     return {
-      names: Array.from(names).sort((a, b) => a.localeCompare(b)),
-      materials: Array.from(materials).sort((a, b) => a.localeCompare(b)),
+      names: Array.from(names.values()).sort((a, b) => a.localeCompare(b)),
+      materials: Array.from(materials.values()).sort((a, b) => a.localeCompare(b)),
     };
   }, [entries]);
 
@@ -217,7 +240,7 @@ export default function SalesOrders() {
     [knownNames, personName]
   );
   const materialSuggestions = useMemo(
-    () => filterSuggestions(knownMaterials, materialName),
+    () => filterSuggestions(knownMaterials, materialName, { requireQuery: true }),
     [knownMaterials, materialName]
   );
 
@@ -345,7 +368,7 @@ export default function SalesOrders() {
     if (viewOnly) return;
 
     const name = personName.trim();
-    const material = materialName.trim();
+    const material = canonicalizeName(knownMaterials, materialName);
     const qty = parseInt(quantity, 10);
 
     if (!name) {
@@ -369,7 +392,11 @@ export default function SalesOrders() {
     let nextEntries;
     if (idx >= 0) {
       nextEntries = [...entries];
-      nextEntries[idx] = { ...nextEntries[idx], bags: nextEntries[idx].bags + qty };
+      nextEntries[idx] = {
+        ...nextEntries[idx],
+        materialName: nextEntries[idx].materialName || material,
+        bags: nextEntries[idx].bags + qty,
+      };
     } else {
       nextEntries = [
         ...entries,
@@ -384,21 +411,10 @@ export default function SalesOrders() {
 
     setEntries(nextEntries);
     setKnownNames((prev) => rememberValue(prev, name));
-    setKnownMaterials((prev) => rememberValue(prev, material));
     setMaterialName('');
     setQuantity('');
     setTimeout(() => materialInputRef.current?.focus(), 50);
 
-    // Keep sales materials catalog in sync when a new name is typed
-    api.post('/sales-materials', { name: material }).catch(() => {});
-
-    await persistEntries(nextEntries);
-  };
-
-  const removeEntry = async (entryId) => {
-    if (viewOnly || !entryId) return;
-    const nextEntries = entries.filter((row) => row.id !== entryId);
-    setEntries(nextEntries);
     await persistEntries(nextEntries);
   };
 
@@ -412,18 +428,24 @@ export default function SalesOrders() {
 
     if (cellSaveTimer.current) clearTimeout(cellSaveTimer.current);
     cellSaveTimer.current = setTimeout(() => {
+      // Keep rows even when quantity is temporarily cleared while editing
       const cleaned = entriesRef.current
         .map((row) => ({
           ...row,
           customerName: String(row.customerName || '').trim(),
-          bags: Number(row.bags) || 0,
+          bags: row.bags === '' || row.bags == null ? '' : Number(row.bags) || 0,
         }))
-        .filter((row) => row.customerName && row.materialName && row.bags > 0);
+        .filter((row) => row.customerName && row.materialName);
       if (cleaned.length !== entriesRef.current.length) {
         setEntries(cleaned);
         entriesRef.current = cleaned;
       }
-      persistEntries(cleaned);
+      persistEntries(
+        cleaned.map((row) => ({
+          ...row,
+          bags: Number(row.bags) || 0,
+        }))
+      );
     }, 500);
   };
 
@@ -455,7 +477,59 @@ export default function SalesOrders() {
     if (cellSaveTimer.current) clearTimeout(cellSaveTimer.current);
   }, []);
 
-  const handleExport = async () => {
+  const ensureExportable = () => {
+    if (filteredEntries.length === 0) {
+      toast.error(
+        entries.length === 0
+          ? 'Add at least one line first'
+          : 'No rows match the current filters'
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const openSheetExport = () => {
+    if (!ensureExportable()) return;
+    setExportMode('sheet');
+    setExportStep(null);
+    setShowExportChooser(true);
+  };
+
+  const openIndividualExport = () => {
+    if (!ensureExportable()) return;
+    setSelectedExportNames(listPersonNames(filteredEntries));
+    setExportMode('individual');
+    setExportStep(null);
+    setShowExportChooser(true);
+  };
+
+  const closeExportChooser = () => {
+    setShowExportChooser(false);
+    setExportMode(null);
+    setExportStep(null);
+  };
+
+  const toggleExportName = (name) => {
+    setSelectedExportNames((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
+
+  const exportPersonNames = useMemo(
+    () => listPersonNames(filteredEntries),
+    [filteredEntries]
+  );
+
+  const allExportNamesSelected =
+    exportPersonNames.length > 0 &&
+    exportPersonNames.every((n) => selectedExportNames.includes(n));
+
+  const toggleSelectAllExportNames = () => {
+    setSelectedExportNames(allExportNamesSelected ? [] : [...exportPersonNames]);
+  };
+
+  const handleExport = async (format, paperSize = 'a4') => {
     if (filteredEntries.length === 0) {
       toast.error(
         entries.length === 0
@@ -464,6 +538,9 @@ export default function SalesOrders() {
       );
       return;
     }
+    setShowExportChooser(false);
+    setExportMode(null);
+    setExportStep(null);
     setExporting(true);
     try {
       const filterNote = [
@@ -472,18 +549,83 @@ export default function SalesOrders() {
       ]
         .filter(Boolean)
         .join(' · ');
-      exportBrandedBagBagPdf(filteredEntries, {
-        title: title.trim() || undefined,
-        filterNote: filterNote || undefined,
-      });
-      toast.success(
-        filterName || filterMaterial
-          ? `PDF exported (${filteredEntries.length} lines)`
-          : 'PDF exported'
-      );
+
+      if (format === 'excel') {
+        const ok = await exportBrandedBagBagExcel(filteredEntries);
+        if (!ok) {
+          toast.error('Nothing to export');
+          return;
+        }
+        toast.success(
+          filterName || filterMaterial
+            ? `Excel exported (${filteredEntries.length} lines)`
+            : 'Excel exported'
+        );
+      } else {
+        const ok = exportBrandedBagBagPdf(filteredEntries, {
+          title: title.trim() || undefined,
+          filterNote: filterNote || undefined,
+          paperSize,
+        });
+        if (!ok) {
+          toast.error('Nothing to export');
+          return;
+        }
+        const sizeLabel = PDF_PAPER_SIZES.find((s) => s.id === paperSize)?.label || paperSize;
+        toast.success(
+          filterName || filterMaterial
+            ? `PDF (${sizeLabel}) exported · ${filteredEntries.length} lines`
+            : `PDF exported · ${sizeLabel}`
+        );
+      }
     } catch (err) {
       console.error(err);
-      toast.error('Failed to export PDF');
+      toast.error(format === 'excel' ? 'Failed to export Excel' : 'Failed to export PDF');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleIndividualExport = async (format, paperSize = 'a4') => {
+    if (selectedExportNames.length === 0) {
+      toast.error('Select at least one name');
+      return;
+    }
+    setShowExportChooser(false);
+    setExportMode(null);
+    setExportStep(null);
+    setExporting(true);
+    try {
+      const opts = { title: title.trim() || undefined, paperSize };
+      if (format === 'excel') {
+        const ok = await exportIndividualBagReportExcel(
+          filteredEntries,
+          selectedExportNames,
+          opts
+        );
+        if (!ok) {
+          toast.error('Nothing to export');
+          return;
+        }
+        toast.success(`Individual Excel exported (${selectedExportNames.length} names)`);
+      } else {
+        const ok = exportIndividualBagReportPdf(
+          filteredEntries,
+          selectedExportNames,
+          opts
+        );
+        if (!ok) {
+          toast.error('Nothing to export');
+          return;
+        }
+        const sizeLabel = PDF_PAPER_SIZES.find((s) => s.id === paperSize)?.label || paperSize;
+        toast.success(
+          `Individual PDF (${sizeLabel}) · ${selectedExportNames.length} names`
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(format === 'excel' ? 'Failed to export Excel' : 'Failed to export PDF');
     } finally {
       setExporting(false);
     }
@@ -571,15 +713,194 @@ export default function SalesOrders() {
           )}
           <button
             type="button"
-            onClick={handleExport}
+            onClick={openSheetExport}
             disabled={filteredEntries.length === 0 || exporting}
             className="btn-primary !py-2 !px-4 !text-sm disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
-            {exporting ? 'Exporting…' : 'Export'}
+            {exporting ? 'Exporting…' : 'Bag order'}
+          </button>
+          <button
+            type="button"
+            onClick={openIndividualExport}
+            disabled={filteredEntries.length === 0 || exporting}
+            className="btn-secondary !py-2 !px-4 !text-sm disabled:opacity-50"
+          >
+            <FileText className="w-4 h-4" />
+            Individual
           </button>
         </div>
       </div>
+
+      {showExportChooser && exportMode === 'sheet' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="card w-full max-w-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-primary-800">
+                {exportStep === 'pdf-size' ? 'PDF paper size' : 'Export bag order'}
+              </h2>
+              <button
+                type="button"
+                onClick={closeExportChooser}
+                className="p-2 rounded-lg hover:bg-primary-50 text-primary-500"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {exportStep === 'pdf-size' ? (
+              <>
+                <p className="text-sm text-primary-500">
+                  Choose paper size. A3 fits more materials per page; thermal prints a compact list for receipt printers.
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  {PDF_PAPER_SIZES.map((size) => (
+                    <button
+                      key={size.id}
+                      type="button"
+                      onClick={() => handleExport('pdf', size.id)}
+                      className="w-full rounded-xl border border-primary-200 bg-surface px-4 py-3 text-left hover:bg-primary-50 transition"
+                    >
+                      <span className="block font-semibold text-primary-800">{size.label}</span>
+                      <span className="block text-xs text-primary-400 mt-0.5">{size.description}</span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExportStep(null)}
+                  className="text-sm font-medium text-primary-500 hover:text-primary-700"
+                >
+                  ← Back
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-primary-500">
+                  Export the bag order sheet (materials as columns).
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExportStep('pdf-size')}
+                    className="btn-primary !py-3 justify-center"
+                  >
+                    <FileText className="w-4 h-4" /> PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExport('excel')}
+                    className="btn-secondary !py-3 justify-center"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" /> Excel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showExportChooser && exportMode === 'individual' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="card w-full max-w-md space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between shrink-0">
+              <h2 className="text-lg font-bold text-primary-800">
+                {exportStep === 'pdf-size' ? 'PDF paper size' : 'Export individual'}
+              </h2>
+              <button
+                type="button"
+                onClick={closeExportChooser}
+                className="p-2 rounded-lg hover:bg-primary-50 text-primary-500"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {exportStep === 'pdf-size' ? (
+              <>
+                <p className="text-sm text-primary-500">
+                  Choose paper size for the individual bag report.
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  {PDF_PAPER_SIZES.map((size) => (
+                    <button
+                      key={size.id}
+                      type="button"
+                      onClick={() => handleIndividualExport('pdf', size.id)}
+                      disabled={selectedExportNames.length === 0}
+                      className="w-full rounded-xl border border-primary-200 bg-surface px-4 py-3 text-left hover:bg-primary-50 transition disabled:opacity-50"
+                    >
+                      <span className="block font-semibold text-primary-800">{size.label}</span>
+                      <span className="block text-xs text-primary-400 mt-0.5">{size.description}</span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExportStep(null)}
+                  className="text-sm font-medium text-primary-500 hover:text-primary-700 shrink-0"
+                >
+                  ← Back
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-primary-500">
+                  Select names to include. Each person will list their materials and quantities.
+                </p>
+                <div className="flex items-center justify-between shrink-0">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-primary-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="rounded border-primary-300 text-primary-600 focus:ring-primary-500"
+                      checked={allExportNamesSelected}
+                      onChange={toggleSelectAllExportNames}
+                    />
+                    Select all
+                  </label>
+                  <span className="text-xs text-primary-500">
+                    {selectedExportNames.length} of {exportPersonNames.length} selected
+                  </span>
+                </div>
+                <ul className="flex-1 min-h-0 overflow-y-auto max-h-56 rounded-xl border border-primary-200 divide-y divide-primary-100">
+                  {exportPersonNames.map((name) => (
+                    <li key={name}>
+                      <label className="flex items-center gap-3 px-3 py-2.5 text-sm text-primary-800 hover:bg-primary-50/60 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="rounded border-primary-300 text-primary-600 focus:ring-primary-500"
+                          checked={selectedExportNames.includes(name)}
+                          onChange={() => toggleExportName(name)}
+                        />
+                        {name}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <div className="grid grid-cols-1 gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setExportStep('pdf-size')}
+                    disabled={selectedExportNames.length === 0}
+                    className="btn-primary !py-3 justify-center disabled:opacity-50"
+                  >
+                    <FileText className="w-4 h-4" /> PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleIndividualExport('excel')}
+                    disabled={selectedExportNames.length === 0}
+                    className="btn-secondary !py-3 justify-center disabled:opacity-50"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" /> Excel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {!viewOnly && (
         <form onSubmit={addEntry} className="card space-y-3 shrink-0 !p-4" autoComplete="off">
@@ -609,19 +930,21 @@ export default function SalesOrders() {
               label="Material *"
               value={materialName}
               onChange={setMaterialName}
-              placeholder="e.g. Mirchi"
+              placeholder="Type to search materials…"
               suggestions={materialSuggestions}
               inputRef={materialInputRef}
+              suggestOnType
+              onPick={() => quantityInputRef.current?.focus()}
             />
             <div>
               <label className="label">Quantity (bags) *</label>
               <input
-                type="number"
-                min="1"
-                step="1"
+                ref={quantityInputRef}
+                type="text"
+                inputMode="numeric"
                 className="input-field"
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                onChange={(e) => setQuantity(e.target.value.replace(/[^\d]/g, ''))}
                 placeholder="e.g. 10"
               />
             </div>
@@ -739,7 +1062,6 @@ export default function SalesOrders() {
                           <FragmentDataCells
                             key={`${mat}-${rowIdx}`}
                             entry={entry}
-                            onRemove={removeEntry}
                             onUpdate={updateEntryField}
                             viewOnly={viewOnly}
                           />
@@ -747,6 +1069,14 @@ export default function SalesOrders() {
                       })}
                     </tr>
                   ))}
+                  <tr style={{ backgroundColor: `#${BRAND.subHeaderBg}` }}>
+                    {filteredPreview.materials.map((mat) => (
+                      <FragmentTotalCells
+                        key={`total-${mat}`}
+                        total={filteredPreview.totals[mat] || 0}
+                      />
+                    ))}
+                  </tr>
                 </tbody>
               </table>
             )}
@@ -776,8 +1106,76 @@ function SuggestInput({
   inputRef,
   disabled,
   hideLabel,
+  /** Only show suggestion list while the user is typing (no open-on-focus dropdown). */
+  suggestOnType = false,
+  /** Called after a suggestion is chosen (Enter, click, etc.). */
+  onPick,
 }) {
   const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const listRef = useRef(null);
+
+  const showList =
+    !disabled &&
+    open &&
+    suggestions.length > 0 &&
+    (!suggestOnType || value.trim().length > 0);
+
+  useEffect(() => {
+    setHighlight(-1);
+  }, [value, suggestions]);
+
+  useEffect(() => {
+    if (!showList || highlight < 0 || !listRef.current) return;
+    const el = listRef.current.querySelector(`[data-idx="${highlight}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [highlight, showList]);
+
+  const pick = (item) => {
+    onChange(item);
+    setOpen(false);
+    setHighlight(-1);
+    onPick?.(item);
+  };
+
+  const onKeyDown = (e) => {
+    if (disabled) return;
+
+    if (e.key === 'ArrowDown') {
+      if (suggestions.length === 0) return;
+      e.preventDefault();
+      setOpen(true);
+      setHighlight((h) => (h < 0 ? 0 : Math.min(h + 1, suggestions.length - 1)));
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      if (suggestions.length === 0) return;
+      e.preventDefault();
+      setOpen(true);
+      setHighlight((h) => (h <= 0 ? 0 : h - 1));
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      // Material field: Enter selects match (highlighted or first) and advances via onPick
+      if (onPick && suggestions.length > 0 && (!suggestOnType || value.trim().length > 0)) {
+        e.preventDefault();
+        pick(highlight >= 0 ? suggestions[highlight] : suggestions[0]);
+        return;
+      }
+      if (showList && highlight >= 0 && suggestions[highlight]) {
+        e.preventDefault();
+        pick(suggestions[highlight]);
+        return;
+      }
+    }
+
+    if (e.key === 'Escape') {
+      setOpen(false);
+      setHighlight(-1);
+    }
+  };
 
   return (
     <div className="relative">
@@ -791,23 +1189,43 @@ function SuggestInput({
           onChange(e.target.value);
           setOpen(true);
         }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onFocus={() => {
+          if (!suggestOnType) setOpen(true);
+        }}
+        onBlur={() => setTimeout(() => {
+          setOpen(false);
+          setHighlight(-1);
+        }, 150)}
+        onKeyDown={onKeyDown}
         placeholder={placeholder}
         autoComplete="off"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={showList}
+        aria-activedescendant={
+          showList && highlight >= 0 ? `suggest-opt-${highlight}` : undefined
+        }
       />
-      {!disabled && open && suggestions.length > 0 && (
-        <ul className="absolute z-20 left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-xl border border-primary-200 bg-surface shadow-card">
-          {suggestions.map((item) => (
-            <li key={item}>
+      {showList && (
+        <ul
+          ref={listRef}
+          className="absolute z-20 left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+          role="listbox"
+        >
+          {suggestions.map((item, idx) => (
+            <li key={item} role="option" aria-selected={idx === highlight}>
               <button
                 type="button"
-                className="w-full text-left px-4 py-2.5 text-sm text-primary-700 hover:bg-primary-50"
+                id={`suggest-opt-${idx}`}
+                data-idx={idx}
+                className={`w-full text-left px-4 py-2.5 text-sm ${
+                  idx === highlight
+                    ? 'bg-primary-100 text-primary-900 font-medium'
+                    : 'text-primary-700 hover:bg-primary-50'
+                }`}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onChange(item);
-                  setOpen(false);
-                }}
+                onMouseEnter={() => setHighlight(idx)}
+                onClick={() => pick(item)}
               >
                 {item}
               </button>
@@ -846,7 +1264,7 @@ function FragmentSubHeaders() {
   );
 }
 
-function FragmentDataCells({ entry, onRemove, onUpdate, viewOnly }) {
+function FragmentDataCells({ entry, onUpdate, viewOnly }) {
   if (!entry) {
     return (
       <>
@@ -881,42 +1299,57 @@ function FragmentDataCells({ entry, onRemove, onUpdate, viewOnly }) {
         className="px-1.5 py-1 border align-middle"
         style={{ borderColor: `#${BRAND.border}` }}
       >
-        <div className="flex items-center gap-1 min-w-[7rem]">
-          <input
-            className="w-full min-w-0 bg-transparent border-0 px-1.5 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-300 rounded"
-            style={{ color: `#${BRAND.primaryDark}` }}
-            value={entry.customerName}
-            onChange={(e) => onUpdate(entry.id, { customerName: e.target.value })}
-          />
-          {entry.id && (
-            <button
-              type="button"
-              onClick={() => onRemove(entry.id)}
-              className="p-0.5 text-primary-300 hover:text-red-500 shrink-0"
-              title="Remove"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+        <input
+          className="w-full min-w-[7rem] bg-transparent border-0 px-1.5 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-300 rounded"
+          style={{ color: `#${BRAND.primaryDark}` }}
+          value={entry.customerName}
+          onChange={(e) => onUpdate(entry.id, { customerName: e.target.value })}
+        />
       </td>
       <td
         className="px-1.5 py-1 border text-center align-middle"
         style={{ borderColor: `#${BRAND.border}` }}
       >
         <input
-          type="number"
-          min="1"
-          step="1"
+          type="text"
+          inputMode="numeric"
           className="w-16 mx-auto bg-transparent border-0 px-1 py-1 text-sm text-center font-medium focus:outline-none focus:ring-1 focus:ring-primary-300 rounded"
           style={{ color: `#${BRAND.primaryDark}` }}
           value={entry.bags}
-          onChange={(e) =>
-            onUpdate(entry.id, {
-              bags: e.target.value === '' ? '' : Number(e.target.value),
-            })
-          }
+          onChange={(e) => {
+            const raw = e.target.value.replace(/[^\d]/g, '');
+            onUpdate(entry.id, { bags: raw === '' ? '' : Number(raw) });
+          }}
         />
+      </td>
+    </>
+  );
+}
+
+function FragmentTotalCells({ total }) {
+  return (
+    <>
+      <td
+        className="px-3 py-2.5 border align-middle text-sm"
+        style={{
+          borderColor: `#${BRAND.border}`,
+          color: `#${BRAND.primaryDark}`,
+          backgroundColor: `#${BRAND.subHeaderBg}`,
+          fontWeight: 800,
+        }}
+      >
+        Total
+      </td>
+      <td
+        className="px-3 py-2.5 border text-center align-middle text-sm"
+        style={{
+          borderColor: `#${BRAND.border}`,
+          color: `#${BRAND.primaryDark}`,
+          backgroundColor: `#${BRAND.subHeaderBg}`,
+          fontWeight: 800,
+        }}
+      >
+        {total}
       </td>
     </>
   );

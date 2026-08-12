@@ -1,20 +1,24 @@
 #!/usr/bin/env node
 /**
  * Smart Electron launcher for development.
- * Starts API + Vite if needed, then opens the desktop window.
+ * Starts embedded MongoDB (if needed) + API + Vite, then opens the desktop window.
  */
 const { spawn } = require('child_process');
 const http = require('http');
 const path = require('path');
+const os = require('os');
+const { createMongoManager, resolveMongodPath } = require('../electron/mongoManager.cjs');
 
 const ROOT = path.join(__dirname, '..');
 const SERVER_PORT = process.env.PORT || 5050;
 const CLIENT_PORT = process.env.CLIENT_PORT || 3000;
 const HEALTH = `http://127.0.0.1:${SERVER_PORT}/api/health`;
 const CLIENT_URL = `http://127.0.0.1:${CLIENT_PORT}`;
+const DEV_USER_DATA = path.join(os.homedir(), '.agriTrades-dev');
 
 const children = [];
 let shuttingDown = false;
+let mongoManager = null;
 
 function log(msg) {
   console.log(`[electron:dev] ${msg}`);
@@ -98,22 +102,61 @@ function shutdown(code = 0) {
       }
     }
   }
+  if (mongoManager) {
+    try {
+      mongoManager.stop();
+    } catch {
+      // ignore
+    }
+    mongoManager = null;
+  }
   setTimeout(() => process.exit(code), 300);
 }
 
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
+async function ensureMongo() {
+  const resourcesRoot = path.join(ROOT, 'resources');
+  const bundled = resolveMongodPath(resourcesRoot);
+
+  if (!bundled) {
+    log('No bundled MongoDB — using MONGODB_URI / system mongod on :27017');
+    return process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/agriTrades';
+  }
+
+  mongoManager = createMongoManager({
+    resourcesRoot,
+    userDataPath: DEV_USER_DATA,
+    log: {
+      log: (m) => console.log(m),
+      error: (m) => console.error(m),
+      warn: (m) => console.warn(m),
+    },
+  });
+
+  const mongo = await mongoManager.start();
+  return mongo.uri;
+}
+
 (async () => {
   try {
     const apiUp = await checkUrl(HEALTH);
     let clientUrl = await resolveClientUrl();
+    let mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/agriTrades';
 
     if (apiUp) {
       log(`API already running on :${SERVER_PORT}`);
     } else {
+      log('Ensuring MongoDB…');
+      mongoUri = await ensureMongo();
+      log(`MongoDB ready → ${mongoUri}`);
+
       log(`Starting API on :${SERVER_PORT}…`);
-      run('npm', ['run', 'dev', '--prefix', 'server'], 'server');
+      run('npm', ['run', 'dev', '--prefix', 'server'], 'server', {
+        PORT: String(SERVER_PORT),
+        MONGODB_URI: mongoUri,
+      });
       await waitForUrl(HEALTH, 'API');
       log('API ready');
     }
@@ -152,7 +195,10 @@ process.on('SIGTERM', () => shutdown(0));
     });
   } catch (err) {
     console.error(`\n[electron:dev] ${err.message}`);
-    console.error('Make sure MongoDB is running: mongodb://127.0.0.1:27017\n');
+    console.error(
+      'Tip: download bundled MongoDB with `npm run mongodb:download:mac` (or :win),\n' +
+        'or start system MongoDB and set MONGODB_URI in server/.env\n'
+    );
     shutdown(1);
   }
 })();

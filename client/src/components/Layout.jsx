@@ -1,29 +1,27 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Users,
-  UserRound,
-  Truck,
   Package,
-  ShoppingCart,
-  Receipt,
-  ClipboardList,
-  Settings,
   FileBarChart,
   LogOut,
   Menu,
   X,
-  ChevronDown,
   ClipboardPen,
+  ChevronDown,
+  KeyRound,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useIsElectron } from './TitleBar';
+import {
+  useIsElectron,
+  useElectronPlatform,
+  WindowControls,
+  dragRegion,
+  noDragRegion,
+  MAC_TRAFFIC_PAD,
+} from './TitleBar';
 import BrandLogo from './BrandLogo';
-
-const adminTopLinks = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
-];
+import ChangePasswordModal from './ChangePasswordModal';
+import { warmRaituBillAssets } from '../utils/raituBillShared';
 
 const salesTopLinks = [
   { to: '/sales-orders', icon: ClipboardPen, label: 'Sales Orders', end: true },
@@ -31,42 +29,54 @@ const salesTopLinks = [
   { to: '/sales-orders/previous', icon: FileBarChart, label: 'Previous Reports' },
 ];
 
-const adminNavSections = [
+/** Admin top menu — labels match the product menu bar */
+const adminTopMenus = [
   {
-    id: 'parties',
-    label: 'Parties',
+    id: 'master',
+    label: 'Master',
     items: [
-      { to: '/vendors', icon: Users, label: 'Vendors' },
-      { to: '/customers', icon: UserRound, label: 'Customers' },
+      { to: '/customers', label: 'Customer List' },
+      { to: '/vendors', label: 'Vendor List' },
+      { to: '/materials', label: 'Product List' },
+      { to: '/schedules', label: 'Schedule List' },
     ],
   },
   {
-    id: 'operations',
-    label: 'Operations',
+    id: 'inventory',
+    label: 'Inventory',
     items: [
-      { to: '/loads', icon: Truck, label: 'Add Load' },
-      { to: '/sell', icon: ShoppingCart, label: 'Sell' },
-      { to: '/sales-orders', icon: ClipboardPen, label: 'Sales Orders' },
-      { to: '/sales-materials', icon: Package, label: 'Sales Materials' },
-      { to: '/sales-orders/previous', icon: FileBarChart, label: 'Previous Reports' },
+      { to: '/cash-entry', label: 'Cash Entry' },
+      { to: '/sell', label: 'Sales' },
+      { to: '/purchase', label: 'Purchase' },
+      { to: '/sale-patty', label: 'Sale Patty' },
     ],
   },
   {
-    id: 'catalog',
-    label: 'Catalog',
+    id: 'finance',
+    label: 'Finance',
     items: [
-      { to: '/materials', icon: Package, label: 'Materials' },
-      { to: '/settings', icon: Settings, label: 'Price Settings' },
+      { to: '/transactions', label: 'Transactions' },
+      { to: '/inventory', label: 'Inventory History' },
     ],
   },
   {
     id: 'reports',
     label: 'Reports',
     items: [
-      { to: '/inventory', icon: ClipboardList, label: 'Inventory' },
-      { to: '/sales-report', icon: FileBarChart, label: 'Sales Report' },
-      { to: '/transactions', icon: Receipt, label: 'Transactions' },
+      { to: '/sales-report', label: 'Sales Report' },
     ],
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    items: [
+      { to: '/settings', label: 'Price Settings' },
+    ],
+  },
+  {
+    id: 'util',
+    label: 'Util',
+    items: [],
   },
 ];
 
@@ -75,13 +85,8 @@ function pathMatches(to, pathname, end = false) {
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
-function getActiveSectionId(sections, pathname) {
-  for (const section of sections) {
-    if (section.items.some((item) => pathMatches(item.to, pathname))) {
-      return section.id;
-    }
-  }
-  return null;
+function menuIsActive(menu, pathname) {
+  return menu.items.some((item) => pathMatches(item.to, pathname));
 }
 
 function linkClass(isActive) {
@@ -92,171 +97,448 @@ function linkClass(isActive) {
   }`;
 }
 
-export default function Layout({ children }) {
-  const { logout, user, role, isSales } = useAuth();
-  const navigate = useNavigate();
+function AdminTopNav({ onNavigate, user, onLogout, onChangePassword }) {
   const location = useLocation();
-  const isElectron = useIsElectron();
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  const topLinks = isSales ? salesTopLinks : adminTopLinks;
-  const navSections = useMemo(() => (isSales ? [] : adminNavSections), [isSales]);
-
-  const [openSections, setOpenSections] = useState(() => {
-    const activeId = getActiveSectionId(adminNavSections, location.pathname);
-    return Object.fromEntries(
-      adminNavSections.map((s) => [s.id, !activeId || s.id === activeId])
-    );
-  });
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const barRef = useRef(null);
+  const buttonRefs = useRef({});
 
   useEffect(() => {
-    const activeId = getActiveSectionId(navSections, location.pathname);
-    if (!activeId) return;
-    setOpenSections((prev) => (prev[activeId] ? prev : { ...prev, [activeId]: true }));
-  }, [location.pathname, navSections]);
+    setOpenMenuId(null);
+  }, [location.pathname]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!barRef.current?.contains(e.target)) setOpenMenuId(null);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpenMenuId(null);
+    };
+    const onScroll = () => setOpenMenuId(null);
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onScroll);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onScroll);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, []);
+
+  const toggleMenu = (id) => {
+    if (openMenuId === id) {
+      setOpenMenuId(null);
+      return;
+    }
+    const btn = buttonRefs.current[id];
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, left: rect.left });
+    }
+    setOpenMenuId(id);
   };
 
-  const toggleSection = (id) => {
-    setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
+  const openMenu = adminTopMenus.find((m) => m.id === openMenuId);
 
-  const closeMenu = () => setMenuOpen(false);
-  const roleLabel = role === 'sales' ? 'Sales' : 'Admin';
-
-  const NavContent = () => (
-    <>
-      <div className="flex items-center gap-3 px-4 py-6 border-b border-primary-100">
-        <BrandLogo className="w-10 h-10" />
-        <div>
-          <h1 className="font-bold text-primary-700 text-lg leading-tight">JSR</h1>
-          <p className="text-xs text-primary-400">{roleLabel}</p>
-        </div>
-      </div>
-
-      <nav className="flex-1 px-3 py-4 space-y-3 overflow-y-auto">
-        <div className="space-y-0.5">
-          {topLinks.map(({ to, icon: Icon, label, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              onClick={closeMenu}
-              className={({ isActive }) => linkClass(isActive)}
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {label}
-            </NavLink>
-          ))}
-        </div>
-
-        {navSections.map((section) => {
-          const isOpen = !!openSections[section.id];
-          const sectionActive = section.items.some((item) =>
-            pathMatches(item.to, location.pathname)
-          );
+  return (
+    <div ref={barRef} className="flex items-center gap-1 min-w-0 flex-1 overflow-visible">
+      <nav className="hidden md:flex items-center gap-0.5 min-w-0 flex-1 overflow-visible">
+        {adminTopMenus.map((menu) => {
+          const active = menuIsActive(menu, location.pathname);
+          const open = openMenuId === menu.id;
+          const hasItems = menu.items.length > 0;
 
           return (
-            <div key={section.id} className="space-y-0.5">
+            <div key={menu.id} className="relative shrink-0">
               <button
                 type="button"
-                onClick={() => toggleSection(section.id)}
-                className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition ${
-                  sectionActive
-                    ? 'text-primary-700'
-                    : 'text-primary-400 hover:text-primary-600 hover:bg-primary-50/80'
-                }`}
-                aria-expanded={isOpen}
+                ref={(el) => {
+                  buttonRefs.current[menu.id] = el;
+                }}
+                onClick={() => {
+                  if (!hasItems) return;
+                  toggleMenu(menu.id);
+                }}
+                style={noDragRegion}
+                className={`inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                  active || open
+                    ? 'text-primary-800 bg-primary-100'
+                    : 'text-primary-600 hover:bg-primary-50 hover:text-primary-800'
+                } ${!hasItems ? 'opacity-60 cursor-default' : ''}`}
+                aria-expanded={hasItems ? open : undefined}
+                aria-haspopup={hasItems ? 'menu' : undefined}
               >
-                <span>{section.label}</span>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                />
+                {menu.label}
+                {hasItems && (
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
+                  />
+                )}
               </button>
-
-              {isOpen && (
-                <div className="space-y-0.5 pl-0.5">
-                  {section.items.map(({ to, icon: Icon, label }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      onClick={closeMenu}
-                      className={({ isActive }) => linkClass(isActive)}
-                    >
-                      <Icon className="w-5 h-5 shrink-0" />
-                      {label}
-                    </NavLink>
-                  ))}
-                </div>
-              )}
             </div>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-primary-100">
-        <p className="text-xs text-primary-400 px-2 mb-2 truncate">{user?.email}</p>
+      {openMenu && openMenu.items.length > 0 && (
+        <div
+          role="menu"
+          className="fixed min-w-[12rem] rounded-xl border border-primary-200 bg-surface shadow-card py-1 z-[80]"
+          style={{ top: menuPos.top, left: menuPos.left, ...noDragRegion }}
+        >
+          {openMenu.items.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              role="menuitem"
+              onClick={() => {
+                setOpenMenuId(null);
+                onNavigate?.();
+              }}
+              className={({ isActive }) =>
+                `block px-4 py-2.5 text-sm transition ${
+                  isActive
+                    ? 'bg-primary-100 text-primary-800 font-semibold'
+                    : 'text-primary-700 hover:bg-primary-50'
+                }`
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
+
+      <div
+        className="hidden md:flex items-center gap-2 shrink-0 ml-2 pl-2 border-l border-primary-100"
+        style={noDragRegion}
+      >
+        <span className="text-xs text-primary-400 max-w-[10rem] truncate hidden lg:inline">
+          {user?.email}
+        </span>
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={onChangePassword}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-primary-600 hover:bg-primary-50 transition"
+          title="Change password"
+        >
+          <KeyRound className="w-4 h-4" />
+          Password
+        </button>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-red-500/90 hover:bg-red-50/60 transition"
+        >
+          <LogOut className="w-4 h-4" />
+          Logout
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AdminMobileMenu({ onClose, onLogout, onChangePassword, user }) {
+  const location = useLocation();
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-3 px-4 py-5 border-b border-primary-100">
+        <BrandLogo className="w-9 h-9" />
+        <div>
+          <h1 className="font-bold text-primary-700 text-lg leading-tight">JSR</h1>
+          <p className="text-xs text-primary-400">Admin</p>
+        </div>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+        {adminTopMenus.map((menu) => (
+          <div key={menu.id}>
+            <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary-400">
+              {menu.label}
+            </p>
+            {menu.items.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-primary-300">No items yet</p>
+            ) : (
+              <div className="space-y-0.5">
+                {menu.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={onClose}
+                    className={() =>
+                      linkClass(pathMatches(item.to, location.pathname))
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </nav>
+
+      <div className="p-4 border-t border-primary-100 space-y-2">
+        <p className="text-xs text-primary-400 px-2 truncate">{user?.email}</p>
+        <button
+          type="button"
+          onClick={() => {
+            onClose?.();
+            onChangePassword?.();
+          }}
+          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-primary-600 hover:bg-primary-50 font-medium transition"
+        >
+          <KeyRound className="w-5 h-5" />
+          Change password
+        </button>
+        <button
+          type="button"
+          onClick={onLogout}
           className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-red-500/90 hover:bg-red-50/60 font-medium transition"
         >
           <LogOut className="w-5 h-5" />
           Logout
         </button>
       </div>
-    </>
+    </div>
   );
+}
 
-  const topOffset = isElectron ? '2.5rem' : '0';
+function salesLinkIsActive(to, pathname, end = false) {
+  if (to === '/sales-orders' && end) {
+    if (pathname === '/sales-orders') return true;
+    if (pathname.startsWith('/sales-orders/') && !pathname.startsWith('/sales-orders/previous')) {
+      return true;
+    }
+    return false;
+  }
+  return pathMatches(to, pathname, end);
+}
+
+function SalesTopNav({ onNavigate, user, onLogout, onChangePassword }) {
+  const location = useLocation();
 
   return (
-    <div className="h-full min-h-0 flex bg-cream overflow-hidden">
-      <aside
-        className="hidden lg:flex lg:flex-col lg:w-64 bg-surface border-r border-primary-100 fixed z-30"
-        style={{ top: topOffset, bottom: 0 }}
-      >
-        <NavContent />
-      </aside>
+    <div className="flex items-center gap-1 min-w-0 flex-1 overflow-visible">
+      <nav className="hidden md:flex items-center gap-0.5 min-w-0 flex-1 overflow-visible">
+        {salesTopLinks.map(({ to, label, end }) => {
+          const active = salesLinkIsActive(to, location.pathname, end);
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              onClick={() => onNavigate?.()}
+              style={noDragRegion}
+              className={`inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                active
+                  ? 'text-primary-800 bg-primary-100'
+                  : 'text-primary-600 hover:bg-primary-50 hover:text-primary-800'
+              }`}
+            >
+              {label}
+            </NavLink>
+          );
+        })}
+      </nav>
 
       <div
-        className="lg:hidden fixed left-0 right-0 z-40 bg-surface border-b border-primary-100 px-4 py-3 flex items-center justify-between"
-        style={{ top: topOffset }}
+        className="hidden md:flex items-center gap-2 shrink-0 ml-2 pl-2 border-l border-primary-100"
+        style={noDragRegion}
       >
-        <div className="flex items-center gap-2">
-          <BrandLogo className="w-8 h-8" />
-          <span className="font-bold text-primary-700">JSR</span>
-        </div>
+        <span className="text-xs text-primary-400 max-w-[10rem] truncate hidden lg:inline">
+          {user?.email}
+        </span>
         <button
           type="button"
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="p-2 rounded-lg hover:bg-primary-50 text-primary-700"
-          aria-label="Toggle menu"
+          onClick={onChangePassword}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-primary-600 hover:bg-primary-50 transition"
+          title="Change password"
         >
-          {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          <KeyRound className="w-4 h-4" />
+          Password
+        </button>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-red-500/90 hover:bg-red-50/60 transition"
+        >
+          <LogOut className="w-4 h-4" />
+          Logout
         </button>
       </div>
+    </div>
+  );
+}
+
+function SalesMobileMenu({ onClose, onLogout, onChangePassword, user }) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-3 px-4 py-5 border-b border-primary-100">
+        <BrandLogo className="w-9 h-9" />
+        <div>
+          <h1 className="font-bold text-primary-700 text-lg leading-tight">JSR</h1>
+          <p className="text-xs text-primary-400">Sales</p>
+        </div>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+        {salesTopLinks.map(({ to, icon: Icon, label, end }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            onClick={onClose}
+            className={({ isActive }) => linkClass(isActive)}
+          >
+            <Icon className="w-5 h-5 shrink-0" />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
+
+      <div className="p-4 border-t border-primary-100 space-y-2">
+        <p className="text-xs text-primary-400 px-2 truncate">{user?.email}</p>
+        <button
+          type="button"
+          onClick={() => {
+            onClose?.();
+            onChangePassword?.();
+          }}
+          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-primary-600 hover:bg-primary-50 font-medium transition"
+        >
+          <KeyRound className="w-5 h-5" />
+          Change password
+        </button>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-red-500/90 hover:bg-red-50/60 font-medium transition"
+        >
+          <LogOut className="w-5 h-5" />
+          Logout
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function Layout({ children }) {
+  const { logout, user, isSales } = useAuth();
+  const navigate = useNavigate();
+  const isElectron = useIsElectron();
+  const platform = useElectronPlatform();
+  const isMacElectron = isElectron && platform === 'darwin';
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+
+  useEffect(() => {
+    warmRaituBillAssets();
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const openChangePassword = () => setPasswordOpen(true);
+  const closeMenu = () => setMenuOpen(false);
+  const headerPadLeft = isMacElectron ? MAC_TRAFFIC_PAD : undefined;
+  const chromeStyle = isElectron ? dragRegion : undefined;
+  const homeTo = isSales ? '/sales-orders' : '/dashboard';
+  const roleLabel = isSales ? 'Sales' : 'Admin';
+
+  return (
+    <div className="h-full min-h-0 flex flex-col bg-cream overflow-hidden">
+      <header
+        className="fixed left-0 right-0 top-0 z-40 bg-surface border-b border-primary-200 overflow-visible"
+        style={chromeStyle}
+      >
+        <div
+          className="flex items-center gap-3 px-3 md:px-4 h-12 overflow-visible"
+          style={headerPadLeft ? { paddingLeft: headerPadLeft } : undefined}
+        >
+          <NavLink
+            to={homeTo}
+            className="flex items-center gap-2 shrink-0"
+            title={roleLabel}
+            style={noDragRegion}
+          >
+            <BrandLogo className="w-8 h-8" />
+            <div className="hidden sm:block leading-tight">
+              <p className="font-bold text-primary-700 text-sm">JSR</p>
+              <p className="text-[10px] text-primary-400 -mt-0.5">{roleLabel}</p>
+            </div>
+          </NavLink>
+
+          {isSales ? (
+            <SalesTopNav
+              onNavigate={closeMenu}
+              user={user}
+              onLogout={handleLogout}
+              onChangePassword={openChangePassword}
+            />
+          ) : (
+            <AdminTopNav
+              onNavigate={closeMenu}
+              user={user}
+              onLogout={handleLogout}
+              onChangePassword={openChangePassword}
+            />
+          )}
+
+          <button
+            type="button"
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={noDragRegion}
+            className="md:hidden p-2 rounded-lg hover:bg-primary-50 text-primary-700 shrink-0"
+            aria-label="Toggle menu"
+          >
+            {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+
+          <WindowControls className="h-12 -mr-3 md:-mr-4" />
+        </div>
+        <div className="h-0.5 bg-primary-700/80" />
+      </header>
 
       {menuOpen && (
         <>
-          <div className="lg:hidden fixed inset-0 bg-black/20 z-40" onClick={closeMenu} />
-          <aside
-            className="lg:hidden fixed left-0 bottom-0 w-72 bg-surface z-50 flex flex-col shadow-xl"
-            style={{ top: topOffset }}
-          >
-            <NavContent />
+          <div className="md:hidden fixed inset-0 bg-black/20 z-40" onClick={closeMenu} />
+          <aside className="md:hidden fixed right-0 top-0 bottom-0 w-72 bg-surface z-50 flex flex-col shadow-xl">
+            <div style={noDragRegion} className="flex flex-col h-full">
+              {isSales ? (
+                <SalesMobileMenu
+                  onClose={closeMenu}
+                  onLogout={handleLogout}
+                  onChangePassword={openChangePassword}
+                  user={user}
+                />
+              ) : (
+                <AdminMobileMenu
+                  onClose={closeMenu}
+                  onLogout={handleLogout}
+                  onChangePassword={openChangePassword}
+                  user={user}
+                />
+              )}
+            </div>
           </aside>
         </>
       )}
 
-      <main className="flex-1 lg:ml-64 pt-16 lg:pt-0 h-full min-h-0 overflow-hidden flex flex-col">
+      <main className="flex-1 min-h-0 overflow-hidden flex flex-col pt-[3.125rem]">
         <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full flex flex-col">
           {children}
         </div>
       </main>
+
+      <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
     </div>
   );
 }
+

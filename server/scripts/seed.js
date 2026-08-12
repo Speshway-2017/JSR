@@ -9,8 +9,8 @@ const seed = async () => {
   await ensureDefaultUsers();
 
   console.log('Seed complete.');
-  console.log('Admin:', process.env.ADMIN_EMAIL || 'admin@agritrades.com', '/', process.env.ADMIN_PASSWORD || 'admin123');
-  console.log('Sales:', process.env.SALES_EMAIL || 'sales@agritrades.com', '/', process.env.SALES_PASSWORD || 'sales123');
+  console.log('Admin:', process.env.ADMIN_EMAIL || 'admin@jsr.com', '/', process.env.ADMIN_PASSWORD || 'admin123');
+  console.log('Sales:', process.env.SALES_EMAIL || 'sales@jsr.com', '/', process.env.SALES_PASSWORD || 'sales123');
   process.exit(0);
 };
 

@@ -1,63 +1,136 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Users, X } from 'lucide-react';
+import { Plus, Users, X, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import Toggle from '../components/Toggle';
-import { STATE_NAMES, getCitiesForState } from '../data/indiaLocations';
 import { formatCurrency } from '../utils/format';
+import { useTeluguPreview } from '../hooks/useTeluguPreview';
 
 const emptyForm = {
   name: '',
+  nameTelugu: '',
   mobile: '',
-  state: '',
-  city: '',
-  address: '',
+  schedule: '',
+  credit: '',
   handlingCharges: false,
 };
 
 export default function Customers() {
   const [customers, setCustomers] = useState([]);
+  const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const { telugu: liveTelugu, loading: teluguLoading } = useTeluguPreview(
+    showForm ? form.name : ''
+  );
 
-  const fetchCustomers = () => {
-    api.get('/customers').then((res) => setCustomers(res.data)).finally(() => setLoading(false));
+  useEffect(() => {
+    if (!showForm) return;
+    setForm((prev) => {
+      if (!prev.name.trim()) return { ...prev, nameTelugu: '' };
+      if (teluguLoading && !liveTelugu) return prev;
+      return { ...prev, nameTelugu: liveTelugu };
+    });
+  }, [liveTelugu, teluguLoading, showForm]);
+
+  const fetchAll = () => {
+    Promise.all([api.get('/customers'), api.get('/schedules')])
+      .then(([custRes, schedRes]) => {
+        setCustomers(custRes.data);
+        setSchedules(schedRes.data);
+      })
+      .catch(() => toast.error('Failed to load customer list'))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    fetchCustomers();
+    fetchAll();
   }, []);
 
-  const cities = getCitiesForState(form.state);
+  const openAdd = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setShowForm(true);
+  };
+
+  const openEdit = (c) => {
+    setEditing(c);
+    setForm({
+      name: c.name || '',
+      nameTelugu: c.nameTelugu || '',
+      mobile: c.mobile || '',
+      schedule: c.schedule?._id || c.schedule || '',
+      credit: '',
+      handlingCharges: !!c.handlingCharges,
+    });
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditing(null);
+    setForm(emptyForm);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.name.trim()) {
+      toast.error('Name is required');
+      return;
+    }
+    if (!form.schedule) {
+      toast.error('Select a schedule');
+      return;
+    }
     setSaving(true);
     try {
-      await api.post('/customers', form);
-      toast.success('Customer added');
-      setForm(emptyForm);
-      setShowForm(false);
-      fetchCustomers();
+      if (editing) {
+        const { credit, ...rest } = form;
+        await api.put(`/customers/${editing._id}`, rest);
+        toast.success('Customer updated');
+      } else {
+        const creditAmount = form.credit === '' ? 0 : Number(form.credit);
+        await api.post('/customers', {
+          ...form,
+          credit: Number.isFinite(creditAmount) ? Math.max(0, creditAmount) : 0,
+        });
+        toast.success('Customer added');
+      }
+      closeForm();
+      fetchAll();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to add customer');
+      toast.error(err.response?.data?.message || 'Failed to save customer');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleDelete = async (c) => {
+    if (!window.confirm(`Delete customer "${c.name}"?`)) return;
+    try {
+      await api.delete(`/customers/${c._id}`);
+      toast.success('Customer deleted');
+      fetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete customer');
+    }
+  };
+
+  const scheduleName = (c) => c.schedule?.name || '—';
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="page-title">Customers</h1>
-          <p className="text-primary-400 text-sm mt-0.5">Buyers who purchase on credit</p>
+          <h1 className="page-title">Customer List</h1>
+          <p className="text-primary-400 text-sm mt-0.5">Add, edit, or delete customers</p>
         </div>
-        <button type="button" onClick={() => setShowForm(true)} className="btn-primary !py-2 !px-4 !text-sm">
-          <Plus className="w-4 h-4" /> Add Customer
+        <button type="button" onClick={openAdd} className="btn-primary !py-2 !px-4 !text-sm">
+          <Plus className="w-4 h-4" /> Add
         </button>
       </div>
 
@@ -65,60 +138,90 @@ export default function Customers() {
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <form onSubmit={handleSubmit} className="card w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-primary-700">Add Customer</h2>
-              <button type="button" onClick={() => setShowForm(false)} className="p-2 hover:bg-primary-50 rounded-lg">
+              <h2 className="text-lg font-bold text-primary-700">
+                {editing ? 'Edit Customer' : 'Add Customer'}
+              </h2>
+              <button type="button" onClick={closeForm} className="p-2 hover:bg-primary-50 rounded-lg">
                 <X className="w-5 h-5 text-primary-500" />
               </button>
             </div>
             <div>
               <label className="label">Name *</label>
-              <input className="input-field" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+              <input
+                className="input-field"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+                autoFocus
+              />
+              <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
+                {form.name.trim()
+                  ? teluguLoading && !liveTelugu
+                    ? '…'
+                    : form.nameTelugu || liveTelugu || ''
+                  : ''}
+              </p>
+              <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
             </div>
             <div>
-              <label className="label">Mobile</label>
-              <input className="input-field" type="tel" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} />
+              <label className="label">Phone</label>
+              <input
+                className="input-field"
+                type="tel"
+                value={form.mobile}
+                onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+              />
             </div>
             <div>
-              <label className="label">State *</label>
+              <label className="label">Schedule *</label>
               <select
                 className="input-field"
-                value={form.state}
-                onChange={(e) => setForm({ ...form, state: e.target.value, city: '' })}
+                value={form.schedule}
+                onChange={(e) => setForm({ ...form, schedule: e.target.value })}
                 required
               >
-                <option value="">Select state</option>
-                {STATE_NAMES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                <option value="">Select schedule</option>
+                {schedules.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name}
+                  </option>
                 ))}
               </select>
+              {schedules.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Create a schedule under Master → Schedule List first.
+                </p>
+              )}
             </div>
-            <div>
-              <label className="label">City *</label>
-              <select
-                className="input-field"
-                value={form.city}
-                onChange={(e) => setForm({ ...form, city: e.target.value })}
-                required
-                disabled={!form.state}
-              >
-                <option value="">Select city</option>
-                {cities.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">Address</label>
-              <textarea className="input-field min-h-[72px] resize-none" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-            </div>
+            {!editing && (
+              <div>
+                <label className="label">Credit</label>
+                <input
+                  className="input-field"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={form.credit}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^\d.]/g, '');
+                    setForm({ ...form, credit: raw });
+                  }}
+                />
+                <p className="text-xs text-primary-400 mt-1">
+                  If entered, this becomes the customer’s credit balance.
+                </p>
+              </div>
+            )}
             <Toggle
               checked={form.handlingCharges}
               onChange={(v) => setForm({ ...form, handlingCharges: v })}
-              label="Handling Charges Applicable"
+              label="Cooly"
             />
             <div className="flex gap-3">
-              <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">Cancel</button>
-              <button type="submit" className="btn-primary flex-1" disabled={saving}>
+              <button type="button" onClick={closeForm} className="btn-secondary flex-1">
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary flex-1" disabled={saving || schedules.length === 0}>
                 {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
@@ -134,18 +237,62 @@ export default function Customers() {
           <p className="text-primary-400 text-sm">No customers yet</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {customers.map((c) => (
-            <Link key={c._id} to={`/customers/${c._id}`} className="card hover:border-primary-200 transition group">
-              <h3 className="font-semibold text-primary-700 group-hover:text-primary-600">{c.name}</h3>
-              <p className="text-sm text-primary-400 mt-1">{c.city}, {c.state}</p>
-              {c.mobile && <p className="text-sm text-primary-500 mt-0.5">{c.mobile}</p>}
-              <p className="mt-3 text-sm">
-                <span className="text-primary-400">Credit: </span>
-                <span className="font-semibold text-accent-600">{formatCurrency(c.creditBalance)}</span>
-              </p>
-            </Link>
-          ))}
+        <div className="card !p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-primary-100 bg-primary-50/50">
+                  <th className="text-left px-4 py-3 font-semibold text-primary-500">Name</th>
+                  <th className="text-left px-4 py-3 font-semibold text-primary-500">Schedule</th>
+                  <th className="text-left px-4 py-3 font-semibold text-primary-500">Mobile</th>
+                  <th className="text-left px-4 py-3 font-semibold text-primary-500">Credit</th>
+                  <th className="text-right px-4 py-3 font-semibold text-primary-500">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers.map((c) => (
+                  <tr key={c._id} className="border-b border-primary-50 hover:bg-primary-50/40">
+                    <td className="px-4 py-3">
+                      <Link
+                        to={`/customers/${c._id}`}
+                        className="font-medium text-primary-800 hover:text-primary-600"
+                      >
+                        {c.name}
+                      </Link>
+                      {c.nameTelugu ? (
+                        <p className="text-xs text-primary-500 mt-0.5">{c.nameTelugu}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-primary-600">{scheduleName(c)}</td>
+                    <td className="px-4 py-3 text-primary-500">{c.mobile || '—'}</td>
+                    <td className="px-4 py-3 font-semibold text-accent-600">
+                      {formatCurrency(c.creditBalance)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(c)}
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs"
+                          title="Edit"
+                        >
+                          <Pencil className="w-3.5 h-3.5" /> Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(c)}
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs text-red-600 hover:bg-red-50"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

@@ -1,10 +1,11 @@
 import express from 'express';
 import SalesBagReport from '../models/SalesBagReport.js';
-import { auth } from '../middleware/auth.js';
+import { auth, requireRole } from '../middleware/auth.js';
 import { apiErrorMessage } from '../utils/apiError.js';
 
 const router = express.Router();
 router.use(auth);
+router.use(requireRole('sales'));
 
 function normalizeEntries(entries = []) {
   return entries

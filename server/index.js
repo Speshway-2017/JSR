@@ -17,6 +17,10 @@ import customerRoutes from './routes/customers.js';
 import settingsRoutes from './routes/settings.js';
 import salesBagReportRoutes from './routes/salesBagReports.js';
 import salesMaterialRoutes from './routes/salesMaterials.js';
+import scheduleRoutes from './routes/schedules.js';
+import transliterateRoutes from './routes/transliterate.js';
+import purchaseRoutes from './routes/purchases.js';
+import dashboardRoutes from './routes/dashboard.js';
 
 dotenv.config();
 
@@ -57,13 +61,17 @@ app.use('/api', (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/schedules', scheduleRoutes);
+app.use('/api/transliterate', transliterateRoutes);
 app.use('/api/materials', materialRoutes);
 app.use('/api/loads', loadRoutes);
+app.use('/api/purchases', purchaseRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/sales-bag-reports', salesBagReportRoutes);
 app.use('/api/sales-materials', salesMaterialRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/settings', settingsRoutes);
 
 // Serve React build for Electron / production desktop

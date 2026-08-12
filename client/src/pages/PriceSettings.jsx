@@ -3,64 +3,31 @@ import { Save, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency } from '../utils/format';
-
-const BAG_FIELDS = [
-  { key: 'labour', label: 'Labour', hint: 'Per bag' },
-  { key: 'aaseelu', label: 'Aaseelu', hint: 'Per bag' },
-  { key: 'bill', label: 'Bill', hint: 'Per bag' },
-  { key: 'unionCharges', label: 'Union Charges', hint: 'Per bag' },
-];
+import { DEDUCTION_FIELDS, emptyRatesState, ratesPayload } from '../utils/deductionFields';
 
 export default function PriceSettings() {
-  const [form, setForm] = useState({
-    labour: '',
-    aaseelu: '',
-    bill: '',
-    unionCharges: '',
-    commissionPercent: '',
-  });
+  const [form, setForm] = useState(() => emptyRatesState());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api
       .get('/settings')
-      .then((res) => {
-        setForm({
-          labour: res.data.labour ?? 0,
-          aaseelu: res.data.aaseelu ?? 0,
-          bill: res.data.bill ?? 0,
-          unionCharges: res.data.unionCharges ?? 0,
-          commissionPercent: res.data.commissionPercent ?? 0,
-        });
-      })
+      .then((res) => setForm(emptyRatesState(res.data)))
+      .catch(() => toast.error('Failed to load settings'))
       .finally(() => setLoading(false));
   }, []);
 
-  const perBagTotal =
-    (Number(form.labour) || 0) +
-    (Number(form.aaseelu) || 0) +
-    (Number(form.bill) || 0) +
-    (Number(form.unionCharges) || 0);
+  const perBagTotal = DEDUCTION_FIELDS.filter(
+    (f) => form[`${f.key}PerBag`] && !(f.isCommission && !form[`${f.key}PerBag`])
+  ).reduce((s, f) => s + (Number(form[f.key]) || 0), 0);
 
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await api.put('/settings', {
-        labour: Number(form.labour) || 0,
-        aaseelu: Number(form.aaseelu) || 0,
-        bill: Number(form.bill) || 0,
-        unionCharges: Number(form.unionCharges) || 0,
-        commissionPercent: Number(form.commissionPercent) || 0,
-      });
-      setForm({
-        labour: res.data.labour,
-        aaseelu: res.data.aaseelu,
-        bill: res.data.bill,
-        unionCharges: res.data.unionCharges,
-        commissionPercent: res.data.commissionPercent,
-      });
+      const res = await api.put('/settings', ratesPayload(form));
+      setForm(emptyRatesState(res.data));
       toast.success('Price settings saved');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save');
@@ -74,58 +41,81 @@ export default function PriceSettings() {
   }
 
   return (
-    <div className="space-y-4 max-w-xl">
+    <div className="space-y-4 max-w-2xl">
       <div>
         <h1 className="page-title flex items-center gap-2">
           <Settings className="w-7 h-7 text-primary-500" /> Price Settings
         </h1>
         <p className="text-primary-400 text-sm mt-0.5">
-          Charges deducted on vendor load bills
+          రైతుపట్టి deductions — toggle Per bag for each charge
         </p>
       </div>
 
-      <form onSubmit={handleSave} className="card space-y-4">
-        {BAG_FIELDS.map(({ key, label, hint }) => (
-          <div key={key}>
-            <label className="label">
-              {label} <span className="font-normal text-primary-400">({hint})</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400">₹</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                className="input-field pl-8"
-                value={form[key]}
-                onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-              />
-            </div>
-          </div>
-        ))}
-
-        <div className="bg-primary-50 rounded-xl px-4 py-3 flex justify-between items-center">
-          <span className="text-sm text-primary-500">Total per bag</span>
-          <span className="font-semibold text-primary-700">{formatCurrency(perBagTotal)}</span>
+      <form onSubmit={handleSave} className="card space-y-3">
+        <div className="hidden sm:grid grid-cols-[1fr_120px_100px] gap-3 px-1 text-xs font-semibold text-primary-400 uppercase tracking-wide">
+          <span>Charge</span>
+          <span>Amount</span>
+          <span className="text-center">Per bag</span>
         </div>
 
-        <div className="border-t border-primary-100 pt-4">
-          <label className="label">
-            Commission <span className="font-normal text-primary-400">(% of sale value)</span>
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              className="input-field pr-10"
-              value={form.commissionPercent}
-              onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })}
-            />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-primary-400">%</span>
-          </div>
-          <p className="text-xs text-primary-400 mt-1">Deducted from total sale amount on the vendor bill</p>
+        {DEDUCTION_FIELDS.map((field) => {
+          const perBag = !!form[`${field.key}PerBag`];
+          const isPct = field.isCommission && !perBag;
+          return (
+            <div
+              key={field.key}
+              className="grid grid-cols-1 sm:grid-cols-[1fr_120px_100px] gap-2 sm:gap-3 items-center border-b border-primary-50 pb-3"
+            >
+              <div>
+                <p className="font-medium text-primary-800">{field.label}</p>
+                <p className="text-sm text-primary-500">{field.telugu}</p>
+              </div>
+              <div className="relative">
+                {!isPct && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400 text-sm">
+                    ₹
+                  </span>
+                )}
+                <input
+                  type="number"
+                  min="0"
+                  max={isPct ? 100 : undefined}
+                  step="0.01"
+                  className={`input-field !py-2 ${isPct ? 'pr-8' : 'pl-7'}`}
+                  value={form[field.key]}
+                  onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
+                />
+                {isPct && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-primary-400 text-sm">
+                    %
+                  </span>
+                )}
+              </div>
+              <label className="flex items-center justify-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-primary-600"
+                  checked={perBag}
+                  onChange={(e) =>
+                    setForm({ ...form, [`${field.key}PerBag`]: e.target.checked })
+                  }
+                />
+                <span className="text-sm text-primary-600 sm:hidden">Per bag</span>
+              </label>
+              {field.isCommission && (
+                <p className="sm:col-span-3 text-xs text-primary-400 -mt-1">
+                  {perBag
+                    ? 'Per bag: ₹ × bags'
+                    : 'Off = % of sale value (default for commission)'}
+                </p>
+              )}
+            </div>
+          );
+        })}
+
+        <div className="bg-primary-50 rounded-xl px-4 py-3 flex justify-between items-center">
+          <span className="text-sm text-primary-500">Sum of per-bag rates</span>
+          <span className="font-semibold text-primary-700">{formatCurrency(perBagTotal)}</span>
         </div>
 
         <button type="submit" className="btn-primary w-full" disabled={saving}>

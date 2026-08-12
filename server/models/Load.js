@@ -1,11 +1,11 @@
 import mongoose from 'mongoose';
 
-/** Incoming stock from vendor — material + total weight; handling entered per load */
+/** Incoming arrival from vendor — materials optional (sales drive the bill) */
 const loadMaterialSchema = new mongoose.Schema(
   {
     material: { type: mongoose.Schema.Types.ObjectId, ref: 'Material' },
-    materialName: { type: String, required: true, trim: true },
-    totalKg: { type: Number, required: true, min: 0.1 },
+    materialName: { type: String, trim: true },
+    totalKg: { type: Number, default: 0, min: 0 },
   },
   { _id: true }
 );
@@ -13,21 +13,19 @@ const loadMaterialSchema = new mongoose.Schema(
 const loadSchema = new mongoose.Schema(
   {
     vendor: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
-    materials: [loadMaterialSchema],
-    totalWeight: { type: Number, required: true, min: 0.1 },
+    /** Calendar day the vendor brought the load */
+    loadDate: { type: Date, required: true },
+    materials: { type: [loadMaterialSchema], default: [] },
+    totalWeight: { type: Number, default: 0, min: 0 },
     handlingCharges: { type: Number, default: 0, min: 0 },
     notes: { type: String, default: '' },
-    /** Locked price-settings rates used when bill was first generated */
-    billSnapshot: {
-      labour: { type: Number, default: 0 },
-      aaseelu: { type: Number, default: 0 },
-      bill: { type: Number, default: 0 },
-      unionCharges: { type: Number, default: 0 },
-      commissionPercent: { type: Number, default: 0 },
-    },
+    /** Saved deduction rates used when generating/modifying the vendor bill */
+    billSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
     billGeneratedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
+
+loadSchema.index({ vendor: 1, loadDate: 1 });
 
 export default mongoose.model('Load', loadSchema);

@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const vendorSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
+    nameTelugu: { type: String, default: '', trim: true },
     mobile: { type: String, required: true, trim: true },
     city: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },

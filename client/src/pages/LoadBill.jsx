@@ -16,7 +16,7 @@ export default function LoadBill() {
       .get(`/loads/${loadId}/bill`)
       .then((res) => {
         setBill(res.data);
-        openVendorBillPdf(res.data);
+        openVendorBillPdf(res.data).catch(() => toast.error('Failed to open Telugu bill PDF'));
       })
       .catch(() => {
         setBill(null);
@@ -53,7 +53,13 @@ export default function LoadBill() {
           )}
         </div>
         {bill && (
-          <button type="button" onClick={() => openVendorBillPdf(bill)} className="btn-primary !py-2 !px-4 !text-sm">
+          <button
+            type="button"
+            onClick={() =>
+              openVendorBillPdf(bill).catch(() => toast.error('Failed to open Telugu bill PDF'))
+            }
+            className="btn-primary !py-2 !px-4 !text-sm"
+          >
             <FileText className="w-4 h-4" /> Open PDF
           </button>
         )}

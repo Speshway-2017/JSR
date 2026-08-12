@@ -5,25 +5,32 @@ import Customer from '../models/Customer.js';
 import Vendor from '../models/Vendor.js';
 import Load from '../models/Load.js';
 import Transaction from '../models/Transaction.js';
-import { auth } from '../middleware/auth.js';
+import { auth, requireRole } from '../middleware/auth.js';
 import { getAvailableKg, getLoadStockMap } from '../utils/loadStock.js';
+import { findOrCreateDayLoad, dayRange } from '../utils/loadBill.js';
 
 const router = express.Router();
 router.use(auth);
+router.use(requireRole('admin'));
 
 router.get('/', async (req, res) => {
   try {
-    const { customerId, vendorId, loadId } = req.query;
+    const { customerId, vendorId, loadId, date } = req.query;
     const filter = {};
     if (customerId) filter.customer = customerId;
     if (vendorId) filter.vendor = vendorId;
     if (loadId) filter.load = loadId;
 
+    if (date && !loadId) {
+      const { start, end } = dayRange(date);
+      filter.createdAt = { $gte: start, $lte: end };
+    }
+
     const sales = await Sale.find(filter)
-      .populate('customer', 'name city state creditBalance')
-      .populate('vendor', 'name city')
-      .populate('load', 'createdAt totalWeight')
-      .sort({ createdAt: -1 });
+      .populate('customer', 'name nameTelugu city state creditBalance')
+      .populate('vendor', 'name nameTelugu city')
+      .populate('load', 'createdAt loadDate totalWeight')
+      .sort({ createdAt: 1 });
     res.json(sales);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -53,7 +60,7 @@ router.get('/report', async (req, res) => {
     if (customerId) filter.customer = customerId;
 
     const sales = await Sale.find(filter)
-      .populate('customer', 'name city state')
+      .populate('customer', 'name nameTelugu city state')
       .sort({ createdAt: -1 });
 
     const rows = [];
@@ -119,23 +126,32 @@ router.get('/report', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { customerId, loadId, lines, handlingCharges } = req.body;
+    const { customerId, loadId, vendorId, date, lines, handlingCharges } = req.body;
 
-    if (!customerId || !loadId || !lines?.length) {
-      return res.status(400).json({ message: 'Customer, load, and sale lines are required' });
+    if (!customerId || !lines?.length) {
+      return res.status(400).json({ message: 'Customer and sale lines are required' });
+    }
+    if (!loadId && !vendorId) {
+      return res.status(400).json({ message: 'Vendor is required' });
     }
 
-    const [customer, load] = await Promise.all([
-      Customer.findById(customerId),
-      Load.findById(loadId),
-    ]);
+    const customer = await Customer.findById(customerId);
     if (!customer) return res.status(404).json({ message: 'Customer not found' });
-    if (!load) return res.status(404).json({ message: 'Load not found' });
+
+    const saleDate = date || new Date().toISOString().slice(0, 10);
+    let load = null;
+    if (loadId) {
+      load = await Load.findById(loadId);
+      if (!load) return res.status(404).json({ message: 'Load not found' });
+    } else {
+      load = await findOrCreateDayLoad(vendorId, saleDate);
+    }
 
     const vendor = await Vendor.findById(load.vendor);
     if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
 
-    const stockMap = await getLoadStockMap(loadId);
+    const stockMap = await getLoadStockMap(load._id);
+    const arrivalOnly = !(load.materials || []).length;
     const requestedByMaterial = new Map();
     const processedLines = [];
     let materialsTotal = 0;
@@ -143,10 +159,7 @@ router.post('/', async (req, res) => {
     let totalWeight = 0;
 
     for (const line of lines) {
-      const { materialId, materialName, ratePerKg, bags } = line;
-      if (!bags?.length) {
-        return res.status(400).json({ message: 'Each line needs at least one bag weight' });
-      }
+      const { materialId, materialName, ratePerKg, bags, bagCount, totalKg } = line;
 
       let material = materialId ? await Material.findById(materialId) : null;
       if (!material && materialName) {
@@ -156,36 +169,58 @@ router.post('/', async (req, res) => {
         return res.status(404).json({ message: `Material not found: ${materialName || materialId}` });
       }
 
-      const onLoad = load.materials.some(
-        (m) => m.material?.toString() === material._id.toString()
-      );
-      if (!onLoad) {
-        return res.status(400).json({ message: `${material.name} is not on this load` });
+      if (!arrivalOnly) {
+        const onLoad = load.materials.some(
+          (m) => m.material?.toString() === material._id.toString()
+        );
+        if (!onLoad) {
+          return res.status(400).json({ message: `${material.name} is not on this load` });
+        }
       }
 
-      const bagEntries = bags.map((b) => ({ kgs: Number(b.kgs) })).filter((b) => b.kgs > 0);
-      if (!bagEntries.length) {
-        return res.status(400).json({ message: 'Enter valid bag weights' });
+      let bagEntries = [];
+      let lineBagCount = 0;
+      let lineKg = 0;
+
+      if (bags?.length) {
+        bagEntries = bags.map((b) => ({ kgs: Number(b.kgs) })).filter((b) => b.kgs > 0);
+        lineBagCount = bagEntries.length;
+        lineKg = bagEntries.reduce((s, b) => s + b.kgs, 0);
+      } else if (totalKg != null && Number(totalKg) > 0) {
+        // Desktop-style entry: Bags count + Qty (kg)
+        lineKg = Number(totalKg);
+        lineBagCount = Math.max(1, Math.floor(Number(bagCount) || 1));
+        const each = Number((lineKg / lineBagCount).toFixed(3));
+        bagEntries = Array.from({ length: lineBagCount }, (_, i) =>
+          i === lineBagCount - 1
+            ? { kgs: Number((lineKg - each * (lineBagCount - 1)).toFixed(3)) }
+            : { kgs: each }
+        );
       }
 
-      const lineKg = bagEntries.reduce((s, b) => s + b.kgs, 0);
+      if (!bagEntries.length || lineKg <= 0) {
+        return res.status(400).json({ message: 'Enter bags and quantity (kg)' });
+      }
+
       const rate = Number(ratePerKg);
       if (rate < 0 || Number.isNaN(rate)) {
         return res.status(400).json({ message: 'Enter a valid rate per kg' });
       }
 
-      const nextRequested = (requestedByMaterial.get(material._id.toString()) || 0) + lineKg;
-      requestedByMaterial.set(material._id.toString(), nextRequested);
-      const available = getAvailableKg(stockMap, material._id);
-      if (nextRequested > available) {
-        return res.status(400).json({
-          message: `${material.name} has only ${available} kg left on this load`,
-        });
+      if (!arrivalOnly) {
+        const nextRequested = (requestedByMaterial.get(material._id.toString()) || 0) + lineKg;
+        requestedByMaterial.set(material._id.toString(), nextRequested);
+        const available = getAvailableKg(stockMap, material._id);
+        if (nextRequested > available) {
+          return res.status(400).json({
+            message: `${material.name} has only ${available} kg left on this load`,
+          });
+        }
       }
 
       const totalAmount = Number((lineKg * rate).toFixed(2));
       materialsTotal += totalAmount;
-      totalBags += bagEntries.length;
+      totalBags += lineBagCount;
       totalWeight += lineKg;
 
       processedLines.push({
@@ -193,7 +228,7 @@ router.post('/', async (req, res) => {
         materialName: material.name,
         ratePerKg: rate,
         bags: bagEntries,
-        bagCount: bagEntries.length,
+        bagCount: lineBagCount,
         totalKg: lineKg,
         totalAmount,
       });
@@ -203,15 +238,22 @@ router.post('/', async (req, res) => {
     const handlingAmount = customerHasHandling ? Math.max(0, Number(handlingCharges) || 0) : 0;
     const saleTotal = Number((materialsTotal + handlingAmount).toFixed(2));
 
+    const when = new Date(saleDate);
+    if (!Number.isNaN(when.getTime())) {
+      const now = new Date();
+      when.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    }
+
     const sale = await Sale.create({
       customer: customerId,
       vendor: vendor._id,
-      load: loadId,
+      load: load._id,
       lines: processedLines,
       handlingCharges: handlingAmount,
       totalAmount: saleTotal,
       totalBags,
       totalWeight,
+      createdAt: Number.isNaN(when.getTime()) ? undefined : when,
     });
 
     customer.creditBalance += saleTotal;
@@ -239,8 +281,8 @@ router.post('/', async (req, res) => {
     });
 
     const populated = await Sale.findById(sale._id)
-      .populate('customer', 'name city state mobile address creditBalance')
-      .populate('vendor', 'name city creditBalance')
+      .populate('customer', 'name nameTelugu city state mobile address creditBalance')
+      .populate('vendor', 'name nameTelugu city creditBalance')
       .populate('load', 'createdAt totalWeight');
 
     res.status(201).json(populated);
@@ -252,8 +294,8 @@ router.post('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const sale = await Sale.findById(req.params.id)
-      .populate('customer', 'name city state mobile address')
-      .populate('vendor', 'name city mobile')
+      .populate('customer', 'name nameTelugu city state mobile address')
+      .populate('vendor', 'name nameTelugu city mobile')
       .populate('load', 'createdAt totalWeight handlingCharges');
     if (!sale) return res.status(404).json({ message: 'Sale not found' });
     res.json(sale);

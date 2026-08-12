@@ -2,10 +2,16 @@ import { useEffect, useState, useCallback } from 'react';
 import { ClipboardList, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../api';
-import { formatDate } from '../utils/format';
+import { formatCurrency, formatDate } from '../utils/format';
 
 function formatWeight(kg) {
-  return `${Number(kg).toFixed(1)} kg`;
+  return `${Number(kg || 0).toFixed(1)} kg`;
+}
+
+function sourceLabel(source) {
+  if (source === 'purchase') return 'Purchase';
+  if (source === 'load') return 'Load';
+  return source || '—';
 }
 
 export default function InventoryHistory() {
@@ -36,7 +42,7 @@ export default function InventoryHistory() {
     api
       .get(`/inventory/history?${params}`)
       .then((res) => setData(res.data))
-      .catch(() => setData({ rows: [], summary: { totalWeight: 0 } }))
+      .catch(() => setData({ rows: [], summary: { totalWeight: 0, totalAmount: 0 } }))
       .finally(() => setLoading(false));
   }, [startDate, endDate, vendorId, materialId]);
 
@@ -48,9 +54,12 @@ export default function InventoryHistory() {
     if (!data?.rows?.length) return;
     const sheetRows = data.rows.map((row) => ({
       Date: formatDate(row.date),
+      Source: sourceLabel(row.source),
       Material: row.materialName,
       Vendor: row.vendorName,
-      'Total Weight (kg)': row.totalWeight,
+      'Weight (kg)': row.totalWeight,
+      'Rate / kg': row.ratePerKg || 0,
+      Amount: row.amount || 0,
       'Handling (₹)': row.handlingCharges || 0,
     }));
     const ws = XLSX.utils.json_to_sheet(sheetRows);
@@ -67,7 +76,9 @@ export default function InventoryHistory() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="page-title">Inventory History</h1>
-          <p className="text-primary-400 text-sm mt-0.5">Incoming stock by date range</p>
+          <p className="text-primary-400 text-sm mt-0.5">
+            Purchases + vendor loads from sales (same as Sale Patty)
+          </p>
         </div>
         <button
           onClick={exportExcel}
@@ -82,27 +93,66 @@ export default function InventoryHistory() {
         <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
           <div className="flex items-center gap-2">
             <label className="text-xs text-primary-400 w-9">From</label>
-            <input type="date" className="input-field !py-2 !text-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <input
+              type="date"
+              className="input-field !py-2 !text-sm"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
           </div>
           <div className="flex items-center gap-2">
             <label className="text-xs text-primary-400 w-9">To</label>
-            <input type="date" className="input-field !py-2 !text-sm" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
+            <input
+              type="date"
+              className="input-field !py-2 !text-sm"
+              value={endDate}
+              min={startDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
           </div>
-          <select className="input-field !py-2 !text-sm w-40" value={materialId} onChange={(e) => setMaterialId(e.target.value)}>
+          <select
+            className="input-field !py-2 !text-sm w-40"
+            value={materialId}
+            onChange={(e) => setMaterialId(e.target.value)}
+          >
             <option value="">All materials</option>
-            {materials.map((m) => <option key={m._id} value={m._id}>{m.name}</option>)}
+            {materials.map((m) => (
+              <option key={m._id} value={m._id}>
+                {m.name}
+              </option>
+            ))}
           </select>
-          <select className="input-field !py-2 !text-sm w-40" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+          <select
+            className="input-field !py-2 !text-sm w-40"
+            value={vendorId}
+            onChange={(e) => setVendorId(e.target.value)}
+          >
             <option value="">All vendors</option>
-            {vendors.map((v) => <option key={v._id} value={v._id}>{v.name}</option>)}
+            {vendors.map((v) => (
+              <option key={v._id} value={v._id}>
+                {v.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
       {hasRows && (
-        <div className="card !py-3 !px-4 flex justify-between text-sm">
-          <span className="text-primary-400">Total Weight</span>
-          <span className="font-semibold text-primary-700">{formatWeight(data.summary.totalWeight)}</span>
+        <div className="card !py-3 !px-4 flex flex-wrap gap-4 justify-between text-sm">
+          <div className="flex gap-6">
+            <span>
+              <span className="text-primary-400">Total Weight </span>
+              <span className="font-semibold text-primary-700">
+                {formatWeight(data.summary.totalWeight)}
+              </span>
+            </span>
+            <span>
+              <span className="text-primary-400">Total Amount </span>
+              <span className="font-semibold text-primary-700">
+                {formatCurrency(data.summary.totalAmount || 0)}
+              </span>
+            </span>
+          </div>
         </div>
       )}
 
@@ -114,7 +164,7 @@ export default function InventoryHistory() {
         ) : !data?.rows?.length ? (
           <div className="text-center py-12">
             <ClipboardList className="w-10 h-10 text-primary-300 mx-auto mb-2" />
-            <p className="text-primary-400 text-sm">No records for this range</p>
+            <p className="text-primary-400 text-sm">No purchase or load (sales) records for this range</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -122,20 +172,40 @@ export default function InventoryHistory() {
               <thead>
                 <tr className="bg-primary-50/80 border-b border-primary-100">
                   <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Date</th>
+                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Source</th>
                   <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Material</th>
                   <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Vendor</th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase text-right">Weight</th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase text-right">Handling</th>
+                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase text-right">
+                    Weight
+                  </th>
+                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase text-right">
+                    Rate
+                  </th>
+                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase text-right">
+                    Amount
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((row) => (
                   <tr key={row.id} className="border-b border-primary-50">
-                    <td className="py-2.5 px-4 text-sm text-primary-600 whitespace-nowrap">{formatDate(row.date)}</td>
-                    <td className="py-2.5 px-4 text-sm font-medium text-primary-700">{row.materialName}</td>
+                    <td className="py-2.5 px-4 text-sm text-primary-600 whitespace-nowrap">
+                      {formatDate(row.date)}
+                    </td>
+                    <td className="py-2.5 px-4 text-sm text-primary-600">{sourceLabel(row.source)}</td>
+                    <td className="py-2.5 px-4 text-sm font-medium text-primary-700">
+                      {row.materialName}
+                    </td>
                     <td className="py-2.5 px-4 text-sm text-primary-600">{row.vendorName}</td>
-                    <td className="py-2.5 px-4 text-sm text-primary-600 text-right">{formatWeight(row.totalWeight)}</td>
-                    <td className="py-2.5 px-4 text-sm text-primary-600 text-right">₹{row.handlingCharges || 0}</td>
+                    <td className="py-2.5 px-4 text-sm text-primary-600 text-right">
+                      {formatWeight(row.totalWeight)}
+                    </td>
+                    <td className="py-2.5 px-4 text-sm text-primary-600 text-right">
+                      {row.ratePerKg ? formatCurrency(row.ratePerKg) : '—'}
+                    </td>
+                    <td className="py-2.5 px-4 text-sm text-primary-600 text-right">
+                      {row.amount ? formatCurrency(row.amount) : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

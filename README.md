@@ -59,7 +59,7 @@ Optional no-install build: `npm run dist:win:portable` → `JSR-Portable-1.0.0.e
 1. Run `JSR-Setup-1.0.0.exe`  
 2. If SmartScreen appears: **More info** → **Run anyway** (unsigned build is normal)  
 3. Finish the installer, open **JSR**  
-4. Login: `admin@agritrades.com` / `admin123`  
+4. Login: `admin@jsr.com` / `admin123`  
 
 ### If Setup won’t install / hangs
 
@@ -132,8 +132,10 @@ Copy `server/.env.example` to `server/.env` (or use the included defaults):
 PORT=5050
 MONGODB_URI=mongodb://127.0.0.1:27017/agriTrades
 JWT_SECRET=your_secret_key
-ADMIN_EMAIL=admin@agritrades.com
+ADMIN_EMAIL=admin@jsr.com
 ADMIN_PASSWORD=admin123
+SALES_EMAIL=sales@jsr.com
+SALES_PASSWORD=sales123
 ```
 
 ### 2. Backend (server)
@@ -161,8 +163,8 @@ App: http://localhost:3000
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@agritrades.com | admin123 |
-| Sales | sales@agritrades.com | sales123 |
+| Admin | admin@jsr.com | admin123 |
+| Sales | sales@jsr.com | sales123 |
 
 Sales users only see **Sales Orders** (customer + material bag list → Excel export). Admin keeps full access.
 

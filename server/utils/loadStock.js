@@ -35,6 +35,24 @@ export function getAvailableKg(stockMap, materialId) {
 /** Attach sold/remaining/status to a load document */
 export async function enrichLoadStatus(load) {
   const loadObj = load.toObject ? load.toObject() : { ...load };
+  const hasMaterials = (loadObj.materials || []).length > 0;
+
+  // Arrival-only loads (no materials): status from whether bill exists / sales linked
+  if (!hasMaterials) {
+    const sales = await Sale.find({ load: loadObj._id }).select('totalWeight');
+    const soldWeight = Number(
+      sales.reduce((s, sale) => s + (Number(sale.totalWeight) || 0), 0).toFixed(1)
+    );
+    return {
+      ...loadObj,
+      materials: [],
+      remainingWeight: 0,
+      soldWeight,
+      status: 'pending',
+      billGenerated: !!loadObj.billGeneratedAt,
+    };
+  }
+
   const stockMap = await getLoadStockMap(loadObj._id);
 
   let remainingWeight = 0;

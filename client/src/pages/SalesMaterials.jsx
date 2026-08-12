@@ -43,13 +43,29 @@ export default function SalesMaterials() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      toast.error('Material name is required');
+      return;
+    }
+
+    const duplicate = materials.find(
+      (m) =>
+        m.name.trim().toLowerCase() === trimmed.toLowerCase() &&
+        (!editing || m._id !== editing._id)
+    );
+    if (duplicate) {
+      toast.error(`"${duplicate.name}" already exists (capitalization ignored)`);
+      return;
+    }
+
     setSaving(true);
     try {
       if (editing) {
-        await api.put(`/sales-materials/${editing._id}`, { name: newName });
+        await api.put(`/sales-materials/${editing._id}`, { name: trimmed });
         toast.success('Material updated');
       } else {
-        await api.post('/sales-materials', { name: newName });
+        await api.post('/sales-materials', { name: trimmed });
         toast.success('Material added');
       }
       closeForm();

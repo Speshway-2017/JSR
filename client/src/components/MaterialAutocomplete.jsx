@@ -39,7 +39,11 @@ export default function MaterialAutocomplete({
   const showAddOption = trimmed.length > 0 && !exactMatch;
 
   const selectMaterial = (mat) => {
-    onChange({ materialId: mat._id, materialName: mat.name });
+    onChange({
+      materialId: mat._id,
+      materialName: mat.name,
+      sellingPricePerKg: mat.sellingPricePerKg,
+    });
     setQuery(mat.name);
     setOpen(false);
   };

@@ -45,4 +45,34 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
+router.post('/change-password', auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current and new password are required' });
+    }
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    }
+    if (String(newPassword) === String(currentPassword)) {
+      return res.status(400).json({ message: 'New password must be different from current' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const ok = await user.comparePassword(currentPassword);
+    if (!ok) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    user.password = String(newPassword);
+    await user.save();
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: apiErrorMessage(error) });
+  }
+});
+
 export default router;

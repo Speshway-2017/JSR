@@ -4,13 +4,15 @@ import { ArrowLeft, CreditCard, Pencil, X, Save, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import Toggle from '../components/Toggle';
-import { STATE_NAMES, getCitiesForState } from '../data/indiaLocations';
 import { formatCurrency, formatDate, formatKg } from '../utils/format';
 import { openCustomerSaleBillPdf } from '../utils/customerSaleBillPdf';
+import { openBillPreviewTab } from '../utils/raituBillShared';
+import { useTeluguPreview } from '../hooks/useTeluguPreview';
 
 export default function CustomerDetail() {
   const { id } = useParams();
   const [data, setData] = useState(null);
+  const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -20,25 +22,26 @@ export default function CustomerDetail() {
   const [paying, setPaying] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
+    nameTelugu: '',
     mobile: '',
-    state: '',
-    city: '',
-    address: '',
+    schedule: '',
     handlingCharges: false,
   });
+  const { telugu: liveTelugu, loading: teluguLoading } = useTeluguPreview(
+    editing ? editForm.name : ''
+  );
 
   const fetchData = () => {
-    api
-      .get(`/customers/${id}`)
-      .then((res) => {
+    Promise.all([api.get(`/customers/${id}`), api.get('/schedules')])
+      .then(([res, schedRes]) => {
         setData(res.data);
+        setSchedules(schedRes.data);
         const c = res.data.customer;
         setEditForm({
           name: c.name,
+          nameTelugu: c.nameTelugu || '',
           mobile: c.mobile || '',
-          state: c.state,
-          city: c.city,
-          address: c.address || '',
+          schedule: c.schedule?._id || c.schedule || '',
           handlingCharges: !!c.handlingCharges,
         });
       })
@@ -48,6 +51,15 @@ export default function CustomerDetail() {
   useEffect(() => {
     fetchData();
   }, [id]);
+
+  useEffect(() => {
+    if (!editing) return;
+    setEditForm((prev) => {
+      if (!prev.name.trim()) return { ...prev, nameTelugu: '' };
+      if (teluguLoading && !liveTelugu) return prev;
+      return { ...prev, nameTelugu: liveTelugu };
+    });
+  }, [liveTelugu, teluguLoading, editing]);
 
   const handlePayment = async (e) => {
     e.preventDefault();
@@ -101,7 +113,7 @@ export default function CustomerDetail() {
   };
 
   const handleViewSaleBill = async (sale) => {
-    const previewTab = window.open('', '_blank');
+    const previewTab = openBillPreviewTab();
     try {
       let billSale = sale;
       if (!sale.customer?.name || !sale.lines?.length) {
@@ -110,7 +122,7 @@ export default function CustomerDetail() {
       } else {
         billSale = { ...sale, customer: data.customer };
       }
-      openCustomerSaleBillPdf(billSale, previewTab);
+      await openCustomerSaleBillPdf(billSale, previewTab);
     } catch (err) {
       if (previewTab) previewTab.close();
       toast.error(err.response?.data?.message || 'Failed to generate bill');
@@ -121,12 +133,12 @@ export default function CustomerDetail() {
   if (!data) return <div className="text-center py-20 text-primary-400">Customer not found</div>;
 
   const { customer, sales, transactions } = data;
-  const cities = getCitiesForState(editForm.state);
+  const scheduleLabel = customer.schedule?.name || '—';
 
   return (
     <div className="space-y-4">
       <Link to="/customers" className="inline-flex items-center gap-2 text-primary-500 hover:text-primary-700 font-medium text-sm">
-        <ArrowLeft className="w-4 h-4" /> Back to Customers
+        <ArrowLeft className="w-4 h-4" /> Back to Customer List
       </Link>
 
       <div className="card">
@@ -135,19 +147,23 @@ export default function CustomerDetail() {
             {!editing ? (
               <>
                 <div className="flex items-start justify-between gap-3">
-                  <h1 className="page-title">{customer.name}</h1>
+                  <div>
+                    <h1 className="page-title">{customer.name}</h1>
+                    {customer.nameTelugu ? (
+                      <p className="text-sm text-primary-500 mt-0.5">{customer.nameTelugu}</p>
+                    ) : null}
+                  </div>
                   <button type="button" onClick={() => setEditing(true)} className="btn-secondary !py-2 !px-3 !text-sm">
                     <Pencil className="w-4 h-4" /> Edit
                   </button>
                 </div>
-                <p className="text-primary-500 mt-2">{customer.city}, {customer.state}</p>
+                <p className="text-primary-500 mt-2">Schedule: {scheduleLabel}</p>
                 {customer.mobile && <p className="text-primary-500 text-sm mt-1">{customer.mobile}</p>}
-                {customer.address && <p className="text-primary-400 text-sm mt-1">{customer.address}</p>}
                 <div className="mt-4 pt-4 border-t border-primary-100">
                   <Toggle
                     checked={!!customer.handlingCharges}
                     onChange={handleToggleHandling}
-                    label="Handling Charges Applicable"
+                    label="Cooly"
                   />
                 </div>
               </>
@@ -157,17 +173,30 @@ export default function CustomerDetail() {
                   <h2 className="font-bold text-primary-700">Edit Customer</h2>
                   <button type="button" onClick={() => setEditing(false)} className="p-1"><X className="w-5 h-5 text-primary-400" /></button>
                 </div>
-                <input className="input-field" placeholder="Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
+                <div>
+                  <input className="input-field" placeholder="Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
+                  <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
+                    {editForm.name.trim()
+                      ? teluguLoading && !liveTelugu
+                        ? '…'
+                        : editForm.nameTelugu || liveTelugu || ''
+                      : ''}
+                  </p>
+                  <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
+                </div>
                 <input className="input-field" placeholder="Mobile" value={editForm.mobile} onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })} />
-                <select className="input-field" value={editForm.state} onChange={(e) => setEditForm({ ...editForm, state: e.target.value, city: '' })} required>
-                  {STATE_NAMES.map((s) => <option key={s} value={s}>{s}</option>)}
+                <select
+                  className="input-field"
+                  value={editForm.schedule}
+                  onChange={(e) => setEditForm({ ...editForm, schedule: e.target.value })}
+                  required
+                >
+                  <option value="">Select schedule</option>
+                  {schedules.map((s) => (
+                    <option key={s._id} value={s._id}>{s.name}</option>
+                  ))}
                 </select>
-                <select className="input-field" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} required>
-                  <option value="">City</option>
-                  {cities.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <textarea className="input-field min-h-[64px] resize-none" placeholder="Address" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
-                <Toggle checked={editForm.handlingCharges} onChange={(v) => setEditForm({ ...editForm, handlingCharges: v })} label="Handling Charges Applicable" />
+                <Toggle checked={editForm.handlingCharges} onChange={(v) => setEditForm({ ...editForm, handlingCharges: v })} label="Cooly" />
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex-1">Cancel</button>
                   <button type="submit" className="btn-primary flex-1" disabled={saving}><Save className="w-4 h-4" /> Save</button>

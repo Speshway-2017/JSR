@@ -1,9 +1,15 @@
 import express from 'express';
 import PriceSettings from '../models/PriceSettings.js';
-import { auth } from '../middleware/auth.js';
+import { auth, requireRole } from '../middleware/auth.js';
+import {
+  DEDUCTION_FIELDS,
+  emptyRatesFromSettings,
+  migrateLegacySettings,
+} from '../utils/deductionFields.js';
 
 const router = express.Router();
 router.use(auth);
+router.use(requireRole('admin'));
 
 async function getOrCreateSettings() {
   let settings = await PriceSettings.findOne();
@@ -13,10 +19,15 @@ async function getOrCreateSettings() {
   return settings;
 }
 
+function settingsResponse(doc) {
+  const migrated = migrateLegacySettings(doc);
+  return emptyRatesFromSettings(migrated);
+}
+
 router.get('/', async (_req, res) => {
   try {
     const settings = await getOrCreateSettings();
-    res.json(settings);
+    res.json(settingsResponse(settings));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -24,19 +35,24 @@ router.get('/', async (_req, res) => {
 
 router.put('/', async (req, res) => {
   try {
-    const { labour, aaseelu, bill, unionCharges, commissionPercent } = req.body;
     const settings = await getOrCreateSettings();
 
-    if (labour !== undefined) settings.labour = Math.max(0, Number(labour) || 0);
-    if (aaseelu !== undefined) settings.aaseelu = Math.max(0, Number(aaseelu) || 0);
-    if (bill !== undefined) settings.bill = Math.max(0, Number(bill) || 0);
-    if (unionCharges !== undefined) settings.unionCharges = Math.max(0, Number(unionCharges) || 0);
-    if (commissionPercent !== undefined) {
-      settings.commissionPercent = Math.min(100, Math.max(0, Number(commissionPercent) || 0));
+    for (const field of DEDUCTION_FIELDS) {
+      if (req.body[field.key] !== undefined) {
+        let val = Math.max(0, Number(req.body[field.key]) || 0);
+        if (field.isCommission && req.body[`${field.key}PerBag`] !== true) {
+          val = Math.min(100, val);
+        }
+        settings[field.key] = val;
+      }
+      const flag = `${field.key}PerBag`;
+      if (req.body[flag] !== undefined) {
+        settings[flag] = !!req.body[flag];
+      }
     }
 
     await settings.save();
-    res.json(settings);
+    res.json(settingsResponse(settings));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

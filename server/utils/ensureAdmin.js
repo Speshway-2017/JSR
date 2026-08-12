@@ -2,6 +2,26 @@ import User from '../models/User.js';
 import SalesMaterial from '../models/SalesMaterial.js';
 import SalesBagReport from '../models/SalesBagReport.js';
 
+const LEGACY_ADMIN_EMAIL = 'admin@agritrades.com';
+const LEGACY_SALES_EMAIL = 'sales@agritrades.com';
+
+async function migrateEmail(fromEmail, toEmail) {
+  const from = fromEmail.toLowerCase().trim();
+  const to = toEmail.toLowerCase().trim();
+  if (from === to) return null;
+
+  const already = await User.findOne({ email: to });
+  if (already) return already;
+
+  const legacy = await User.findOne({ email: from });
+  if (!legacy) return null;
+
+  legacy.email = to;
+  await legacy.save();
+  console.log(`Migrated login email ${from} → ${to}`);
+  return legacy;
+}
+
 async function ensureUser({ email, password, name, role }) {
   const normalized = email.toLowerCase().trim();
   let user = await User.findOne({ email: normalized });
@@ -54,10 +74,14 @@ export async function ensureDefaultUsers() {
     { $set: { role: 'admin' } }
   );
 
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@agritrades.com';
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@jsr.com';
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-  const salesEmail = process.env.SALES_EMAIL || 'sales@agritrades.com';
+  const salesEmail = process.env.SALES_EMAIL || 'sales@jsr.com';
   const salesPassword = process.env.SALES_PASSWORD || 'sales123';
+
+  // Move legacy agritrades.com accounts to jsr.com when present
+  await migrateEmail(LEGACY_ADMIN_EMAIL, adminEmail);
+  await migrateEmail(LEGACY_SALES_EMAIL, salesEmail);
 
   const admin = await ensureUser({
     email: adminEmail,
