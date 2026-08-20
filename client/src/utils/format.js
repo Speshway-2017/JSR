@@ -16,6 +16,14 @@ export function formatDate(date) {
   });
 }
 
+export function formatDateOnly(date) {
+  return new Date(date).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 export function formatKg(kg) {
   return `${Number(kg).toFixed(1)} kg`;
 }

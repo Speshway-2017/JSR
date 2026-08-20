@@ -21,6 +21,13 @@ api.interceptors.response.use(
       err.response.data.message =
         'Database connection lost. Close JSR fully, wait a few seconds, then open it again.';
     }
+    if (err.response?.data?.code === 'LICENSE_EXPIRED') {
+      window.dispatchEvent(
+        new CustomEvent('jsr-license-expired', {
+          detail: err.response.data.message,
+        })
+      );
+    }
     if (err.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');

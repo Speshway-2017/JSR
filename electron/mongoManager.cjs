@@ -25,7 +25,7 @@ function resolveMongodPath(resourcesRoot) {
 function portOpen(port, host = '127.0.0.1') {
   return new Promise((resolve) => {
     const socket = net.connect({ port, host }, () => {
-      socket.end();
+      socket.destroy();
       resolve(true);
     });
     socket.on('error', () => {
@@ -146,8 +146,19 @@ function killProcessOnPort(port, log) {
   }
 
   try {
-    const out = execFileSync('lsof', ['-ti', `tcp:${port}`], { encoding: 'utf8' });
+    // Only the listener (mongod). Client connections include this Node process
+    // after portOpen(), and SIGTERM would kill electron:dev itself.
+    let out = '';
+    try {
+      out = execFileSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], {
+        encoding: 'utf8',
+      });
+    } catch {
+      out = execFileSync('lsof', ['-ti', `tcp:${port}`], { encoding: 'utf8' });
+    }
+    const self = new Set([String(process.pid), String(process.ppid || '')]);
     for (const pid of out.split(/\s+/).filter(Boolean)) {
+      if (self.has(pid)) continue;
       try {
         process.kill(Number(pid), 'SIGTERM');
         log.log(`[mongo] Sent SIGTERM to PID ${pid} on port ${port}`);
@@ -231,7 +242,11 @@ function createMongoManager({ resourcesRoot, userDataPath, log = console }) {
     if (await portOpen(MONGO_PORT)) {
       log.log(`[mongo] Port ${MONGO_PORT} busy — clearing leftover process`);
       killProcessOnPort(MONGO_PORT, log);
-      await sleep(800);
+      await sleep(1500);
+      if (await portOpen(MONGO_PORT)) {
+        killProcessOnPort(MONGO_PORT, log);
+        await sleep(800);
+      }
     }
 
     if (!(await portOpen(MONGO_PORT))) {

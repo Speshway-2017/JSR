@@ -110,21 +110,19 @@ export function vendorMaterialsHtml(lines, teluguMap) {
     .map((line) => {
       const name = displayMaterialName(line.materialName, teluguMap) || '—';
       const bags = line.bags || [];
-      const bagsHtml = bags.length
-        ? `<div class="bag-row">${bags
-            .map(
-              (b, i) =>
-                `<span class="bag-line">${esc(TE.bag)} ${esc(b.bagNo || i + 1)}: <strong>${esc(
-                  fmtNum(b.billKg)
-                )}</strong></span>`
-            )
-            .join('')}</div>`
-        : '';
+      const weights = bags.map((b) => fmtNum(b.billKg));
+      const title = bags
+        .map((b, i) => `${TE.bag} ${b.bagNo || i + 1}: ${fmtNum(b.billKg)}`)
+        .join(', ');
 
-      return `<div class="mat-block">
-        <div class="mat-name">${esc(name)}</div>
-        ${bagsHtml}
-      </div>`;
+      return `<div class="mat-row">
+        <span class="mat-name">${esc(name)}${
+          bags.length ? `<span class="bag-n">${bags.length}</span>` : ''
+        }</span>${
+          weights.length
+            ? `<span class="bag-list" title="${esc(title)}">${esc(weights.join(', '))}</span>`
+            : ''
+        }</div>`;
     })
     .join('');
 
@@ -212,8 +210,8 @@ export const BILL_CSS = `
 * { box-sizing: border-box; }
 .sheet {
   width: 794px;
-  min-height: 1123px;
-  padding: 12px 28px 28px;
+  min-height: 0;
+  padding: 8px 24px 20px;
   background: #e7f3e6;
   color: #14532d;
   position: relative;
@@ -239,45 +237,58 @@ export const BILL_CSS = `
   user-select: none;
 }
 .sheet > *:not(.watermark-wrap) { position: relative; z-index: 1; }
-.top-center { text-align: center; margin-bottom: 2px; }
+.sheet-header {
+  position: relative;
+  padding-right: 128px;
+  margin-bottom: 2px;
+}
+.sheet-header .staff {
+  position: absolute;
+  top: 0;
+  right: 0;
+  text-align: right;
+  font-size: 11px;
+  line-height: 1.28;
+  color: #14532d;
+}
+.top-center { text-align: center; margin-bottom: 0; }
 .invocation {
-  font-size: 14px;
-  letter-spacing: 0.3px;
-  margin: 0 0 2px;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  margin: 0;
   color: #166534;
 }
-.prop-line { font-size: 12px; margin: 0; color: #14532d; }
+.prop-line { font-size: 11px; margin: 0; color: #14532d; }
 .header-row {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  margin-top: 2px;
+  margin-top: 0;
 }
-.date-line { font-size: 14px; white-space: nowrap; }
-.staff { text-align: right; font-size: 12px; line-height: 1.45; color: #14532d; }
-.staff-name { display: inline-block; min-width: 72px; text-align: left; }
-.biz-block { text-align: center; margin: 4px 0 2px; }
+.date-line { font-size: 13px; white-space: nowrap; text-align: right; margin-top: 2px; }
+.staff-name { display: inline-block; min-width: 68px; text-align: left; }
+.biz-block { text-align: center; margin: 1px 0 0; }
 .biz-name {
   margin: 0;
-  font-size: 24px;
-  line-height: 1.25;
+  font-size: 21px;
+  line-height: 1.15;
   color: #166534;
   font-weight: 400;
 }
-.biz-addr { margin: 2px 0 0; font-size: 13px; color: #15803d; }
+.biz-addr { margin: 0; font-size: 12px; color: #15803d; }
 .party-line {
   display: flex;
   align-items: baseline;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 10px;
   width: fit-content;
   max-width: 100%;
-  margin: 8px auto;
-  padding: 0 4px 6px;
+  margin: 4px auto 6px;
+  padding: 0 4px 4px;
   font-family: '${RAMABHADRA}', 'Noto Sans Telugu', sans-serif;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 400;
   border-bottom: 1px solid #86efac;
 }
@@ -285,10 +296,10 @@ export const BILL_CSS = `
   flex: 0 1 auto;
   text-align: left;
   font-family: inherit;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 400;
   color: #14532d;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 .body {
   display: grid;
@@ -306,13 +317,13 @@ export const BILL_CSS = `
   width: 100%;
 }
 .body.vendor-bill .deductions-section {
-  margin-top: 18px;
-  padding-top: 12px;
+  margin-top: 12px;
+  padding-top: 8px;
   border-top: 1px solid #86efac;
 }
 .body.vendor-bill .section-heading {
-  margin: 0 0 10px;
-  font-size: 17px;
+  margin: 0 0 6px;
+  font-size: 16px;
   font-weight: 400;
   color: #166534;
   letter-spacing: 0.3px;
@@ -332,37 +343,47 @@ export const BILL_CSS = `
 .body.vendor-bill .totals-box {
   min-width: 280px;
 }
-.calcs { padding: 4px 0; }
-.mat-block {
-  margin-bottom: 14px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #bbf7d0;
-}
-.mat-block:last-of-type { border-bottom: none; }
-.mat-name {
-  font-size: 16px;
-  color: #14532d;
-  margin-bottom: 4px;
-}
-.bag-row {
+.calcs { padding: 2px 0; }
+.mat-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 14px;
   align-items: baseline;
+  gap: 6px 12px;
+  margin-bottom: 3px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #bbf7d0;
+  line-height: 1.35;
 }
-.bag-line {
+.mat-row:last-of-type { border-bottom: none; margin-bottom: 0; }
+.mat-row .mat-name {
+  flex: 0 0 auto;
   font-size: 14px;
-  line-height: 1.55;
+  color: #14532d;
+  font-weight: 400;
+}
+.mat-row .bag-n {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 11px;
+  color: #15803d;
+  opacity: 0.85;
+}
+.mat-row .bag-n::before { content: '('; }
+.mat-row .bag-n::after { content: ')'; }
+.mat-row .bag-list {
+  flex: 1 1 12rem;
+  font-size: 13px;
   color: #166534;
-  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 .mat-eq {
-  margin-top: 6px;
-  font-size: 15px;
+  margin-top: 4px;
+  font-size: 14px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.mat-table-wrap { margin-top: 12px; }
+.mat-table-wrap { margin-top: 8px; }
 .items-table {
   width: 100%;
   border-collapse: collapse;
@@ -480,7 +501,7 @@ body.bill-preview {
   color: #166534;
 }
 .preview-stage {
-  padding: 16px;
+  padding: 8px;
   display: flex;
   justify-content: center;
 }
@@ -517,20 +538,16 @@ export function brandHeaderHtml(watermarkSrc, dateValue) {
         ? `<div class="watermark-wrap"><img class="watermark" src="${watermarkSrc}" alt="" /></div>`
         : ''
     }
-    <div class="top-center">
-      <p class="invocation">${esc(TE.om)}</p>
-      <p class="prop-line">${esc(TE.prop)} &nbsp;&nbsp; ${esc(TE.cell)}</p>
-    </div>
-    <div class="header-row">
-      <div></div>
+    <div class="sheet-header">
       <div class="staff">${staffHtml}</div>
-    </div>
-    <div class="biz-block">
-      <h1 class="biz-name">${esc(TE.biz)}</h1>
-      <p class="biz-addr">${esc(TE.addr)}</p>
-    </div>
-    <div class="header-row" style="margin-top:0">
-      <div></div>
+      <div class="top-center">
+        <p class="invocation">${esc(TE.om)}</p>
+        <p class="prop-line">${esc(TE.prop)} &nbsp;&nbsp; ${esc(TE.cell)}</p>
+      </div>
+      <div class="biz-block">
+        <h1 class="biz-name">${esc(TE.biz)}</h1>
+        <p class="biz-addr">${esc(TE.addr)}</p>
+      </div>
       <div class="date-line">${esc(TE.tedi)} : ${esc(fmtDateShort(dateValue))}</div>
     </div>
   `;

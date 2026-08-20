@@ -15,6 +15,10 @@ import PriceSettings from './pages/PriceSettings';
 import Transactions from './pages/Transactions';
 import InventoryHistory from './pages/InventoryHistory';
 import SalesReport from './pages/SalesReport';
+import SalesReport2 from './pages/SalesReport2';
+import Ledger from './pages/Ledger';
+import Outstanding from './pages/Outstanding';
+import BillPrint from './pages/BillPrint';
 import SalesOrders, { SalesBagReportsList } from './pages/SalesOrders';
 import SalesMaterials from './pages/SalesMaterials';
 import Schedules from './pages/Schedules';
@@ -60,7 +64,11 @@ export default function App() {
           <Route path="/settings" element={<PriceSettings />} />
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/inventory" element={<InventoryHistory />} />
+          <Route path="/ledger" element={<Ledger />} />
+          <Route path="/outstanding" element={<Outstanding />} />
+          <Route path="/bill-print" element={<BillPrint />} />
           <Route path="/sales-report" element={<SalesReport />} />
+          <Route path="/sales-report-2" element={<SalesReport2 />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

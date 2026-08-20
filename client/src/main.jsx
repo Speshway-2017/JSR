@@ -4,17 +4,20 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
+import LicenseGate from './components/LicenseGate';
 import './index.css';
 
 function Root() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <LicenseGate>
         <div className="h-[100dvh] box-border flex flex-col overflow-hidden">
           <div className="flex-1 min-h-0 overflow-hidden">
             <App />
           </div>
         </div>
+        </LicenseGate>
         <Toaster
           position="top-center"
           toastOptions={{

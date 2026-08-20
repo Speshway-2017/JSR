@@ -21,11 +21,15 @@ import scheduleRoutes from './routes/schedules.js';
 import transliterateRoutes from './routes/transliterate.js';
 import purchaseRoutes from './routes/purchases.js';
 import dashboardRoutes from './routes/dashboard.js';
-
-dotenv.config();
+import reportRoutes from './routes/reports.js';
+import utilRoutes from './routes/util.js';
+import licenseRoutes from './routes/license.js';
+import { licenseLockMiddleware, refreshLicense } from './utils/license.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, 'atlas.env') });
 const clientDist = process.env.CLIENT_DIST
   ? path.resolve(process.env.CLIENT_DIST)
   : path.join(__dirname, '../client/dist');
@@ -58,6 +62,8 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
+app.use('/api', licenseLockMiddleware);
+app.use('/api/license', licenseRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/customers', customerRoutes);
@@ -72,6 +78,8 @@ app.use('/api/sales-materials', salesMaterialRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/util', utilRoutes);
 app.use('/api/settings', settingsRoutes);
 
 // Serve React build for Electron / production desktop
@@ -106,6 +114,7 @@ const PORT = process.env.PORT || 5000;
 const start = async () => {
   await connectDB();
   await ensureDefaultUsers();
+  refreshLicense().catch((err) => console.error('License check:', err.message));
   const server = app.listen(PORT, '127.0.0.1', () => console.log(`Server running on port ${PORT}`));
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {

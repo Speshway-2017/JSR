@@ -22,6 +22,7 @@ import {
 import BrandLogo from './BrandLogo';
 import ChangePasswordModal from './ChangePasswordModal';
 import { warmRaituBillAssets } from '../utils/raituBillShared';
+import { runAtlasUtilAction } from '../utils/atlasNetwork';
 
 const salesTopLinks = [
   { to: '/sales-orders', icon: ClipboardPen, label: 'Sales Orders', end: true },
@@ -63,7 +64,11 @@ const adminTopMenus = [
     id: 'reports',
     label: 'Reports',
     items: [
+      { to: '/ledger', label: 'Ledger' },
+      { to: '/outstanding', label: 'Outstanding' },
+      { to: '/bill-print', label: 'Bill Print' },
       { to: '/sales-report', label: 'Sales Report' },
+      { to: '/sales-report-2', label: 'Sale Report 2' },
     ],
   },
   {
@@ -76,7 +81,10 @@ const adminTopMenus = [
   {
     id: 'util',
     label: 'Util',
-    items: [],
+    items: [
+      { action: 'backup', label: 'Backup' },
+      { action: 'restore', label: 'Restore' },
+    ],
   },
 ];
 
@@ -86,7 +94,7 @@ function pathMatches(to, pathname, end = false) {
 }
 
 function menuIsActive(menu, pathname) {
-  return menu.items.some((item) => pathMatches(item.to, pathname));
+  return menu.items.some((item) => item.to && pathMatches(item.to, pathname));
 }
 
 function linkClass(isActive) {
@@ -97,7 +105,7 @@ function linkClass(isActive) {
   }`;
 }
 
-function AdminTopNav({ onNavigate, user, onLogout, onChangePassword }) {
+function AdminTopNav({ onNavigate, user, onLogout, onChangePassword, onUtilAction }) {
   const location = useLocation();
   const [openMenuId, setOpenMenuId] = useState(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
@@ -189,26 +197,42 @@ function AdminTopNav({ onNavigate, user, onLogout, onChangePassword }) {
           className="fixed min-w-[12rem] rounded-xl border border-primary-200 bg-surface shadow-card py-1 z-[80]"
           style={{ top: menuPos.top, left: menuPos.left, ...noDragRegion }}
         >
-          {openMenu.items.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              role="menuitem"
-              onClick={() => {
-                setOpenMenuId(null);
-                onNavigate?.();
-              }}
-              className={({ isActive }) =>
-                `block px-4 py-2.5 text-sm transition ${
-                  isActive
-                    ? 'bg-primary-100 text-primary-800 font-semibold'
-                    : 'text-primary-700 hover:bg-primary-50'
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
+          {openMenu.items.map((item) =>
+            item.action ? (
+              <button
+                key={item.action}
+                type="button"
+                role="menuitem"
+                className="block w-full text-left px-4 py-2.5 text-sm text-primary-700 hover:bg-primary-50"
+                onClick={() => {
+                  setOpenMenuId(null);
+                  onNavigate?.();
+                  onUtilAction?.(item.action);
+                }}
+              >
+                {item.label}
+              </button>
+            ) : (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                role="menuitem"
+                onClick={() => {
+                  setOpenMenuId(null);
+                  onNavigate?.();
+                }}
+                className={({ isActive }) =>
+                  `block px-4 py-2.5 text-sm transition ${
+                    isActive
+                      ? 'bg-primary-100 text-primary-800 font-semibold'
+                      : 'text-primary-700 hover:bg-primary-50'
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            )
+          )}
         </div>
       )}
 
@@ -241,7 +265,7 @@ function AdminTopNav({ onNavigate, user, onLogout, onChangePassword }) {
   );
 }
 
-function AdminMobileMenu({ onClose, onLogout, onChangePassword, user }) {
+function AdminMobileMenu({ onClose, onLogout, onChangePassword, user, onUtilAction }) {
   const location = useLocation();
 
   return (
@@ -264,18 +288,30 @@ function AdminMobileMenu({ onClose, onLogout, onChangePassword, user }) {
               <p className="px-3 py-2 text-sm text-primary-300">No items yet</p>
             ) : (
               <div className="space-y-0.5">
-                {menu.items.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    onClick={onClose}
-                    className={() =>
-                      linkClass(pathMatches(item.to, location.pathname))
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
+                {menu.items.map((item) =>
+                  item.action ? (
+                    <button
+                      key={item.action}
+                      type="button"
+                      className={linkClass(false)}
+                      onClick={() => {
+                        onClose?.();
+                        onUtilAction?.(item.action);
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ) : (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={onClose}
+                      className={() => linkClass(pathMatches(item.to, location.pathname))}
+                    >
+                      {item.label}
+                    </NavLink>
+                  )
+                )}
               </div>
             )}
           </div>
@@ -430,6 +466,8 @@ function SalesMobileMenu({ onClose, onLogout, onChangePassword, user }) {
 export default function Layout({ children }) {
   const { logout, user, isSales } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const sellPage = location.pathname === '/sell';
   const isElectron = useIsElectron();
   const platform = useElectronPlatform();
   const isMacElectron = isElectron && platform === 'darwin';
@@ -447,6 +485,15 @@ export default function Layout({ children }) {
 
   const openChangePassword = () => setPasswordOpen(true);
   const closeMenu = () => setMenuOpen(false);
+  const atlasBusyRef = useRef(false);
+
+  const handleUtilAction = (action) => {
+    if (atlasBusyRef.current) return;
+    atlasBusyRef.current = true;
+    runAtlasUtilAction(action).finally(() => {
+      atlasBusyRef.current = false;
+    });
+  };
   const headerPadLeft = isMacElectron ? MAC_TRAFFIC_PAD : undefined;
   const chromeStyle = isElectron ? dragRegion : undefined;
   const homeTo = isSales ? '/sales-orders' : '/dashboard';
@@ -488,6 +535,7 @@ export default function Layout({ children }) {
               user={user}
               onLogout={handleLogout}
               onChangePassword={openChangePassword}
+              onUtilAction={handleUtilAction}
             />
           )}
 
@@ -524,6 +572,7 @@ export default function Layout({ children }) {
                   onLogout={handleLogout}
                   onChangePassword={openChangePassword}
                   user={user}
+                  onUtilAction={handleUtilAction}
                 />
               )}
             </div>
@@ -532,7 +581,13 @@ export default function Layout({ children }) {
       )}
 
       <main className="flex-1 min-h-0 overflow-hidden flex flex-col pt-[3.125rem]">
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full flex flex-col">
+        <div
+          className={
+            sellPage
+              ? 'flex-1 min-h-0 overflow-hidden px-2 py-2 w-full flex flex-col'
+              : 'flex-1 min-h-0 overflow-y-auto p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full flex flex-col'
+          }
+        >
           {children}
         </div>
       </main>

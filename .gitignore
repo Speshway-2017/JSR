@@ -8,6 +8,8 @@ client/node_modules/
 .env
 .env.local
 server/.env
+server/atlas.env
+atlas-credentials.env
 out/
 release/
 *.exe

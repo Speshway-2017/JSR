@@ -28,6 +28,9 @@ const saleSchema = new mongoose.Schema(
     load: { type: mongoose.Schema.Types.ObjectId, ref: 'Load', required: true },
     lines: [saleLineSchema],
     handlingCharges: { type: Number, default: 0, min: 0 },
+    /** Rate entered on sale (per bag or overall). handlingCharges is the applied total. */
+    coolyRate: { type: Number, default: 0, min: 0 },
+    coolyPerBag: { type: Boolean, default: false },
     totalAmount: { type: Number, required: true },
     totalBags: { type: Number, default: 0 },
     totalWeight: { type: Number, default: 0 },

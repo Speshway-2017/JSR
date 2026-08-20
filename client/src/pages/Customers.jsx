@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Users, X, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Users, X, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import Toggle from '../components/Toggle';
@@ -16,6 +16,8 @@ const emptyForm = {
   handlingCharges: false,
 };
 
+const PAGE_SIZE = 20;
+
 export default function Customers() {
   const [customers, setCustomers] = useState([]);
   const [schedules, setSchedules] = useState([]);
@@ -24,6 +26,10 @@ export default function Customers() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [query, setQuery] = useState('');
+  const [scheduleFilter, setScheduleFilter] = useState('');
+  const [coolyFilter, setCoolyFilter] = useState('');
+  const [page, setPage] = useState(1);
   const { telugu: liveTelugu, loading: teluguLoading } = useTeluguPreview(
     showForm ? form.name : ''
   );
@@ -121,6 +127,37 @@ export default function Customers() {
   };
 
   const scheduleName = (c) => c.schedule?.name || '—';
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return customers.filter((c) => {
+      if (scheduleFilter) {
+        const sid = String(c.schedule?._id || c.schedule || '');
+        if (sid !== scheduleFilter) return false;
+      }
+      if (coolyFilter === 'on' && !c.handlingCharges) return false;
+      if (coolyFilter === 'off' && c.handlingCharges) return false;
+      if (!q) return true;
+      const name = (c.name || '').toLowerCase();
+      const te = (c.nameTelugu || '').toLowerCase();
+      const mobile = (c.mobile || '').toLowerCase();
+      return name.includes(q) || te.includes(q) || mobile.includes(q);
+    });
+  }, [customers, query, scheduleFilter, coolyFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, scheduleFilter, coolyFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const pageButtons = () => {
+    if (pageCount <= 7) return Array.from({ length: pageCount }, (_, i) => i + 1);
+    const nums = new Set([1, pageCount, safePage - 1, safePage, safePage + 1]);
+    return [...nums].filter((n) => n >= 1 && n <= pageCount).sort((a, b) => a - b);
+  };
 
   return (
     <div className="space-y-4">
@@ -229,6 +266,43 @@ export default function Customers() {
         </div>
       )}
 
+      {customers.length > 0 && (
+        <div className="card !p-3 sm:!p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[12rem]">
+              <Search className="w-4 h-4 text-primary-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                className="input-field !pl-9 !h-12"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name, తెలుగు or mobile..."
+              />
+            </div>
+            <select
+              className="input-field !h-12 !py-0 w-full sm:w-44"
+              value={scheduleFilter}
+              onChange={(e) => setScheduleFilter(e.target.value)}
+            >
+              <option value="">All schedules</option>
+              {schedules.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input-field !h-12 !py-0 w-full sm:w-36"
+              value={coolyFilter}
+              onChange={(e) => setCoolyFilter(e.target.value)}
+            >
+              <option value="">All cooly</option>
+              <option value="on">Cooly on</option>
+              <option value="off">Cooly off</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-12 text-primary-400">Loading...</div>
       ) : customers.length === 0 ? (
@@ -238,6 +312,9 @@ export default function Customers() {
         </div>
       ) : (
         <div className="card !p-0 overflow-hidden">
+          {filtered.length === 0 ? (
+            <p className="px-4 py-10 text-center text-sm text-primary-400">No customers match this search</p>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -250,7 +327,7 @@ export default function Customers() {
                 </tr>
               </thead>
               <tbody>
-                {customers.map((c) => (
+                {paged.map((c) => (
                   <tr key={c._id} className="border-b border-primary-50 hover:bg-primary-50/40">
                     <td className="px-4 py-3">
                       <Link
@@ -293,6 +370,51 @@ export default function Customers() {
               </tbody>
             </table>
           </div>
+          )}
+          {filtered.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-primary-100 bg-primary-50/40">
+              <p className="text-xs text-primary-400">
+                {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of{' '}
+                {filtered.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className="btn-secondary !py-1.5 !px-2 disabled:opacity-40"
+                  disabled={safePage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {pageButtons().map((n, i, arr) => (
+                  <span key={n} className="inline-flex items-center">
+                    {i > 0 && arr[i - 1] !== n - 1 ? (
+                      <span className="px-1 text-primary-300">…</span>
+                    ) : null}
+                    <button
+                      type="button"
+                      className={
+                        n === safePage
+                          ? 'btn-primary !py-1.5 !px-2.5 !text-xs min-w-[2rem] justify-center'
+                          : 'btn-secondary !py-1.5 !px-2.5 !text-xs min-w-[2rem] justify-center'
+                      }
+                      onClick={() => setPage(n)}
+                    >
+                      {n}
+                    </button>
+                  </span>
+                ))}
+                <button
+                  type="button"
+                  className="btn-secondary !py-1.5 !px-2 disabled:opacity-40"
+                  disabled={safePage >= pageCount}
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
