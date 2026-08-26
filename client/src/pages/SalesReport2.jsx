@@ -66,7 +66,7 @@ export default function SalesReport2() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
-          <h1 className="page-title">Sale Report 2</h1>
+          <h1 className="page-title">Day wise sale report</h1>
           <p className="text-primary-400 text-sm mt-0.5">
             Product columns — customer and bag weights, grouped by rate
           </p>

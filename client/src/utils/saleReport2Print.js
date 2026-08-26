@@ -103,7 +103,7 @@ export async function openSaleReport2Print(data, previewTab) {
 <html lang="te">
 <head>
   <meta charset="utf-8" />
-  <title>Sale Report 2</title>
+  <title>Day wise sale report</title>
   <style>
 ${fontCss}
 * { box-sizing: border-box; }

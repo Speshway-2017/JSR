@@ -68,7 +68,7 @@ const adminTopMenus = [
       { to: '/outstanding', label: 'Outstanding' },
       { to: '/bill-print', label: 'Bill Print' },
       { to: '/sales-report', label: 'Sales Report' },
-      { to: '/sales-report-2', label: 'Sale Report 2' },
+      { to: '/sales-report-2', label: 'Day wise sale report' },
     ],
   },
   {
