@@ -91,7 +91,7 @@ export default function SalesReport() {
       Item: row.materialName,
       Rate: row.ratePerKg,
       Bags: row.bagCount,
-      'Weight (kg)': row.totalWeight,
+      'Weight (kg)': row.saleType === 'by_bag' || !row.totalWeight ? '—' : row.totalWeight,
       'Total Price (₹)': row.totalAmount,
     }));
 
@@ -277,7 +277,7 @@ export default function SalesReport() {
                       <td className="py-2.5 px-4 text-sm text-primary-600">{row.materialName}</td>
                       <td className="py-2.5 px-4 text-sm text-primary-600 text-right tabular-nums">{row.ratePerKg}</td>
                       <td className="py-2.5 px-4 text-sm text-primary-600 text-right">{row.bagCount}</td>
-                      <td className="py-2.5 px-4 text-sm text-primary-600 text-right">{formatWeight(row.totalWeight)}</td>
+                      <td className="py-2.5 px-4 text-sm text-primary-600 text-right">{row.saleType === 'by_bag' || !row.totalWeight ? '—' : formatWeight(row.totalWeight)}</td>
                       <td className="py-2.5 px-4 text-sm font-semibold text-primary-700 text-right">
                         {formatCurrency(row.totalAmount)}
                       </td>

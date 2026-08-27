@@ -10,6 +10,14 @@ const os = require('os');
 const { createMongoManager, resolveMongodPath } = require('../electron/mongoManager.cjs');
 
 const ROOT = path.join(__dirname, '..');
+
+try {
+  const dotenv = require(path.join(ROOT, 'server', 'node_modules', 'dotenv'));
+  dotenv.config({ path: path.join(ROOT, 'server', '.env') });
+} catch {
+  // ignore
+}
+
 const SERVER_PORT = process.env.PORT || 5050;
 const CLIENT_PORT = process.env.CLIENT_PORT || 3000;
 const HEALTH = `http://127.0.0.1:${SERVER_PORT}/api/health`;
@@ -81,7 +89,7 @@ function run(command, args, name, env = {}) {
     cwd: ROOT,
     env: mergedEnv,
     stdio: 'inherit',
-    shell: false,
+    shell: process.platform === 'win32',
   });
   children.push({ child, name, owned: true });
   child.on('error', (err) => {

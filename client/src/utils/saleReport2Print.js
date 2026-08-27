@@ -16,7 +16,13 @@ function fmtDate(d) {
 }
 
 function fmtBags(bags) {
-  return (bags || []).map((n) => (Number.isInteger(Number(n)) ? String(n) : Number(n).toFixed(1))).join(', ');
+  return (bags || [])
+    .map((n) => {
+      if (typeof n === 'string') return n;
+      const v = Number(n);
+      return Number.isInteger(v) ? String(v) : v.toFixed(1);
+    })
+    .join(', ');
 }
 
 function fmtRate(n) {
@@ -44,47 +50,85 @@ export function saleReport2InnerHtml(data) {
 
   return `<div class="sheet">
     <div class="when">${esc(fmtDate(data?.date))}</div>
-    ${blocks || '<p class="empty">No sales</p>'}
+    <div class="materials-columns">
+      ${blocks || '<p class="empty">No sales</p>'}
+    </div>
   </div>`;
 }
 
 export const SALE_REPORT_2_CSS = `
 .sheet {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  align-items: start;
+  width: 100%;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  background: #ffffff;
+  color: #000000;
+  font-family: '${RAMABHADRA}', 'Noto Sans Telugu', system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  box-sizing: border-box;
 }
+
 .when {
-  grid-column: 1 / -1;
-  font-size: 14px;
-  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  padding-bottom: 4px;
+  border-bottom: 1.5px solid #111111;
 }
+
+.materials-columns {
+  columns: 5;
+  column-gap: 20px;
+  column-rule: 1px solid #111111;
+  column-fill: auto;
+  height: 175mm;
+  width: 100%;
+}
+
 .mat {
-  border-left: 1px solid #111;
-  padding: 0 8px 12px;
-  min-width: 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  padding: 0 4px 10px;
+  margin-bottom: 14px;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
 }
-.mat:nth-child(5n+2) { border-left: 0; }
+
 .mat .head {
   text-align: center;
-  font-size: 13px;
-  border-bottom: 1px solid #111;
-  margin-bottom: 6px;
-  padding-bottom: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  border-bottom: 1px solid #111111;
+  margin-bottom: 8px;
+  padding-bottom: 3px;
 }
-.mat .head .te { font-size: 12px; }
-.group { margin-bottom: 4px; }
+
+.mat .head .te {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.group {
+  margin-bottom: 8px;
+}
+
 .line {
-  font-size: 11px;
-  line-height: 1.4;
-  margin-bottom: 3px;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-bottom: 4px;
   overflow-wrap: break-word;
 }
-.line .who { font-weight: 400; }
+
+.line .who {
+  font-weight: 700;
+}
+
 .rate {
   width: 2.4em;
   height: 2.4em;
-  margin: 8px auto 10px;
+  margin: 6px auto 10px;
   border: 1.5px solid #b91c1c;
   border-radius: 50%;
   color: #b91c1c;
@@ -92,8 +136,44 @@ export const SALE_REPORT_2_CSS = `
   align-items: center;
   justify-content: center;
   font-size: 12px;
+  font-weight: 700;
 }
-.empty { font-size: 12px; grid-column: 1 / -1; }
+
+.empty {
+  font-size: 13px;
+  color: #666666;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  html, body {
+    background: #ffffff !important;
+  }
+  .preview-toolbar {
+    display: none !important;
+  }
+  .stage {
+    padding: 0 !important;
+  }
+  .sheet {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  .materials-columns {
+    height: 175mm;
+    columns: 5;
+    column-gap: 16px;
+    column-rule: 1px solid #111111;
+    column-fill: auto;
+  }
+  .mat {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
 `;
 
 export async function openSaleReport2Print(data, previewTab) {
@@ -107,28 +187,26 @@ export async function openSaleReport2Print(data, previewTab) {
   <style>
 ${fontCss}
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+html, body { margin: 0; padding: 0; background: #f3f4f6; color: #111827; }
 body {
-  font-family: '${RAMABHADRA}', 'Noto Sans Telugu', sans-serif;
+  font-family: '${RAMABHADRA}', 'Noto Sans Telugu', system-ui, -apple-system, sans-serif;
   font-weight: 400;
 }
 .preview-toolbar {
   position: sticky; top: 0; z-index: 5;
-  display: flex; justify-content: flex-end; gap: 8px;
-  padding: 8px 12px; background: #f4f4f4; border-bottom: 1px solid #ccc;
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 10px 16px; background: #ffffff; border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 .preview-toolbar button {
-  font: inherit; padding: 6px 12px; cursor: pointer;
-  border: 1px solid #333; background: #fff;
+  font: inherit; font-size: 14px; font-weight: 500;
+  padding: 8px 16px; cursor: pointer; border-radius: 6px;
+  border: 1px solid #d1d5db; background: #ffffff; color: #374151;
 }
-.preview-toolbar button.primary { background: #111; color: #fff; }
-.stage { padding: 10px 12px 16px; }
+.preview-toolbar button.primary { background: #166534; border-color: #166534; color: #ffffff; }
+.preview-toolbar button.primary:hover { background: #15803d; }
+.stage { padding: 20px 16px; display: flex; justify-content: center; }
 ${SALE_REPORT_2_CSS}
-@media print {
-  .preview-toolbar { display: none !important; }
-  .stage { padding: 0; }
-  @page { size: A4 portrait; margin: 8mm; }
-}
   </style>
 </head>
 <body>

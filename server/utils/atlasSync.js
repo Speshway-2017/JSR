@@ -1,4 +1,11 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
+
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+} catch {
+  /* ignore */
+}
 
 const { MongoClient } = mongoose.mongo;
 
@@ -74,20 +81,39 @@ async function copyAll(fromDb, toDb) {
   }
 }
 
+const DIRECT_ATLAS_URI =
+  'mongodb://pcharan214_db_user:qOLV8MIpPentmdhI@ac-yesfnsx-shard-00-00.imzyidq.mongodb.net:27017,ac-yesfnsx-shard-00-01.imzyidq.mongodb.net:27017,ac-yesfnsx-shard-00-02.imzyidq.mongodb.net:27017/agriTrades?ssl=true&replicaSet=atlas-13bvev-shard-0&authSource=admin&retryWrites=true&w=majority';
+
 async function withAtlas(fn, action) {
-  const client = new MongoClient(atlasMongoUri(), {
+  const primaryUri = atlasMongoUri();
+  let client = new MongoClient(primaryUri, {
     serverSelectionTimeoutMS: 12000,
     connectTimeoutMS: 12000,
   });
   try {
     await client.connect();
     return await fn(client.db());
-  } catch (error) {
-    if (isAtlasNetworkError(error)) throw atlasOfflineError(action);
-    throw error;
+  } catch (primaryError) {
+    if (primaryUri.startsWith('mongodb+srv://') && /querySrv|ECONNREFUSED/i.test(primaryError.message)) {
+      try {
+        console.log(`[atlasSync] SRV DNS failed for ${action}, trying direct cluster seedlist...`);
+        client = new MongoClient(DIRECT_ATLAS_URI, {
+          serverSelectionTimeoutMS: 12000,
+          connectTimeoutMS: 12000,
+        });
+        await client.connect();
+        return await fn(client.db());
+      } catch (fallbackError) {
+        if (isAtlasNetworkError(fallbackError)) throw atlasOfflineError(action);
+        throw fallbackError;
+      }
+    }
+
+    if (isAtlasNetworkError(primaryError)) throw atlasOfflineError(action);
+    throw primaryError;
   } finally {
     try {
-      await client.close();
+      if (client) await client.close();
     } catch {
       /* ignore */
     }

@@ -38,6 +38,8 @@ export default function Sell() {
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
 
+  const [saleType, setSaleType] = useState('by_weight');
+  const [directBagCount, setDirectBagCount] = useState('');
   const [bagWeights, setBagWeights] = useState(['']);
   const [focusBagIdx, setFocusBagIdx] = useState(null);
   const [rate, setRate] = useState('');
@@ -47,7 +49,9 @@ export default function Sell() {
   const [detail, setDetail] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingRowId, setSavingRowId] = useState('');
-  const [customerFilter, setCustomerFilter] = useState('');
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterVendor, setFilterVendor] = useState('');
+  const [filterItem, setFilterItem] = useState('');
   const [sortKey, setSortKey] = useState('');
   const [sortDir, setSortDir] = useState('asc');
   const [printOpen, setPrintOpen] = useState(false);
@@ -62,10 +66,13 @@ export default function Sell() {
   const customer = customers.find((c) => c._id === customerId);
   const customerCoolyDefault = !!customer?.handlingCharges;
 
+  const isByBag = saleType === 'by_bag';
   const filledBags = bagWeights.map(Number).filter((n) => n > 0);
-  const bagCount = filledBags.length;
-  const qty = filledBags.reduce((s, n) => s + n, 0);
-  const materialsAmount = Number((qty * (Number(rate) || 0)).toFixed(2));
+  const bagCount = isByBag ? Math.max(0, Math.floor(Number(directBagCount) || 0)) : filledBags.length;
+  const qty = isByBag ? 0 : filledBags.reduce((s, n) => s + n, 0);
+  const materialsAmount = isByBag
+    ? Number((bagCount * (Number(rate) || 0)).toFixed(2))
+    : Number((qty * (Number(rate) || 0)).toFixed(2));
   const coolyApplied = coolyOn ? appliedCooly(cooly, bagCount, coolyPerBag) : 0;
   const amount = Number((materialsAmount + coolyApplied).toFixed(2));
 
@@ -85,6 +92,9 @@ export default function Sell() {
     const rows = [];
     for (const sale of sales) {
       for (const line of sale.lines || []) {
+        const isByBag =
+          line.saleType === 'by_bag' ||
+          (line.bagCount > 0 && (!line.bags || line.bags.length === 0) && Number(line.totalKg) === 0);
         rows.push({
           saleId: sale._id,
           lineIndex: sale.lines.indexOf(line),
@@ -98,6 +108,7 @@ export default function Sell() {
           bags: line.bagCount,
           qty: line.totalKg,
           rate: line.ratePerKg,
+          isByBag,
           cooly: sale.handlingCharges || 0,
           coolyRate: sale.coolyRate != null ? sale.coolyRate : sale.handlingCharges || 0,
           coolyPerBag: !!sale.coolyPerBag,
@@ -110,15 +121,70 @@ export default function Sell() {
     return rows;
   }, [sales]);
 
+  const availableCustomers = useMemo(() => {
+    const map = new Map();
+    for (const r of flatRows) {
+      if (r.customerId && !map.has(r.customerId)) {
+        const fullObj = customers.find((c) => c._id === r.customerId);
+        map.set(r.customerId, {
+          _id: r.customerId,
+          name: r.name,
+          nameTelugu: fullObj?.nameTelugu || '',
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [flatRows, customers]);
+
+  const availableVendors = useMemo(() => {
+    const map = new Map();
+    for (const r of flatRows) {
+      if (r.vendorId && !map.has(r.vendorId)) {
+        const fullObj = vendors.find((v) => v._id === r.vendorId);
+        map.set(r.vendorId, {
+          _id: r.vendorId,
+          name: r.vendor,
+          city: fullObj?.city || '',
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [flatRows, vendors]);
+
+  const availableItems = useMemo(() => {
+    const map = new Map();
+    for (const r of flatRows) {
+      if (r.materialId && !map.has(r.materialId)) {
+        const fullObj = materials.find((m) => m._id === r.materialId);
+        map.set(r.materialId, {
+          _id: r.materialId,
+          name: r.item,
+          nameTelugu: fullObj?.nameTelugu || '',
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [flatRows, materials]);
+
+  useEffect(() => {
+    if (filterCustomer && !availableCustomers.some((c) => c._id === filterCustomer)) {
+      setFilterCustomer('');
+    }
+    if (filterVendor && !availableVendors.some((v) => v._id === filterVendor)) {
+      setFilterVendor('');
+    }
+    if (filterItem && !availableItems.some((m) => m._id === filterItem)) {
+      setFilterItem('');
+    }
+  }, [availableCustomers, availableVendors, availableItems, filterCustomer, filterVendor, filterItem]);
+
   const displayedRows = useMemo(() => {
-    const q = customerFilter.trim().toLowerCase();
-    let rows = q
-      ? flatRows.filter((r) => {
-          const name = (r.name || '').toLowerCase();
-          const te = (r.sale?.customer?.nameTelugu || '').toLowerCase();
-          return name.includes(q) || te.includes(q);
-        })
-      : [...flatRows];
+    let rows = flatRows.filter((r) => {
+      if (filterCustomer && r.customerId !== filterCustomer) return false;
+      if (filterVendor && r.vendorId !== filterVendor) return false;
+      if (filterItem && r.materialId !== filterItem) return false;
+      return true;
+    });
     if (sortKey) {
       const dir = sortDir === 'desc' ? -1 : 1;
       rows.sort((a, b) => {
@@ -129,7 +195,9 @@ export default function Sell() {
       });
     }
     return rows;
-  }, [flatRows, customerFilter, sortKey, sortDir]);
+  }, [flatRows, filterCustomer, filterVendor, filterItem, sortKey, sortDir]);
+
+  const hasActiveFilters = !!(filterCustomer || filterVendor || filterItem);
 
   const totals = useMemo(
     () =>
@@ -195,8 +263,18 @@ export default function Sell() {
     if (line) {
       setMaterialId(line.material?._id || line.material || '');
       setRate(String(line.ratePerKg ?? ''));
-      const bags = (line.bags || []).map((b) => String(b.kgs ?? ''));
-      setBagWeights(bags.length ? bags : ['']);
+      const lineIsByBag =
+        line.saleType === 'by_bag' ||
+        (line.bagCount > 0 && (!line.bags || line.bags.length === 0) && Number(line.totalKg) === 0);
+      setSaleType(lineIsByBag ? 'by_bag' : 'by_weight');
+      if (lineIsByBag) {
+        setDirectBagCount(String(line.bagCount || ''));
+        setBagWeights(['']);
+      } else {
+        const bags = (line.bags || []).map((b) => String(b.kgs ?? ''));
+        setBagWeights(bags.length ? bags : ['']);
+        setDirectBagCount('');
+      }
     }
     setCoolyPerBag(!!sale.coolyPerBag);
     setCooly(String(sale.coolyRate != null && sale.coolyRate !== '' ? sale.coolyRate : sale.handlingCharges || 0));
@@ -359,14 +437,26 @@ export default function Sell() {
       toast.error('Type and select a customer');
       return;
     }
-    const bags = bagWeights.map((kgs) => ({ kgs: Number(kgs) })).filter((b) => b.kgs > 0);
-    if (!bags.length) {
-      toast.error('Enter bag weights');
-      return;
+    const isByBag = saleType === 'by_bag';
+    let bags = [];
+    let lineBagCount = 0;
+    if (isByBag) {
+      lineBagCount = Math.max(1, Math.floor(Number(directBagCount) || 0));
+      if (!lineBagCount) {
+        toast.error('Enter valid number of bags');
+        return;
+      }
+    } else {
+      bags = bagWeights.map((kgs) => ({ kgs: Number(kgs) })).filter((b) => b.kgs > 0);
+      if (!bags.length) {
+        toast.error('Enter bag weights');
+        return;
+      }
+      lineBagCount = bags.length;
     }
     const ratePerKg = Number(rate);
     if (rate === '' || Number.isNaN(ratePerKg) || ratePerKg < 0) {
-      toast.error('Enter rate');
+      toast.error(isByBag ? 'Enter rate per bag' : 'Enter rate per kg');
       return;
     }
 
@@ -382,8 +472,11 @@ export default function Sell() {
         lines: [
           {
             materialId,
+            saleType: isByBag ? 'by_bag' : 'by_weight',
             ratePerKg,
             bags,
+            bagCount: lineBagCount,
+            totalKg: isByBag ? 0 : qty,
           },
         ],
       };
@@ -422,8 +515,10 @@ export default function Sell() {
 
     const lines = (sale.lines || []).map((l, i) => {
       const materialId = l.material?._id || l.material;
+      const isByBag = l.saleType === 'by_bag' || (l.bagCount > 0 && (!l.bags || l.bags.length === 0) && Number(l.totalKg) === 0);
       const base = {
         materialId,
+        saleType: isByBag ? 'by_bag' : 'by_weight',
         ratePerKg: l.ratePerKg,
         bags: l.bags,
         bagCount: l.bagCount,
@@ -442,12 +537,17 @@ export default function Sell() {
         base.ratePerKg = ratePerKg;
       }
       if (patch.qty !== undefined || patch.bags !== undefined) {
-        const qty = patch.qty !== undefined ? Number(patch.qty) : Number(l.totalKg);
         const bags = patch.bags !== undefined ? Math.floor(Number(patch.bags)) : Number(l.bagCount) || 1;
-        if (!qty || qty <= 0) throw new Error('Enter quantity (kg)');
         if (!bags || bags < 1) throw new Error('Enter bags');
-        base.totalKg = qty;
-        base.bagCount = bags;
+        if (isByBag) {
+          base.totalKg = 0;
+          base.bagCount = bags;
+        } else {
+          const qty = patch.qty !== undefined ? Number(patch.qty) : Number(l.totalKg);
+          if (!qty || qty <= 0) throw new Error('Enter quantity (kg)');
+          base.totalKg = qty;
+          base.bagCount = bags;
+        }
         delete base.bags;
       }
       return base;
@@ -551,6 +651,30 @@ export default function Sell() {
         className="card border-2 border-primary-200 w-full lg:w-[26rem] xl:w-[28rem] shrink-0 min-h-0 max-h-[48vh] lg:max-h-none lg:h-full flex flex-col overflow-hidden"
       >
         <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-0.5">
+        <div className="flex items-center gap-4 bg-primary-50/70 px-3 py-2 rounded-xl border border-primary-100 mb-1">
+          <span className="text-xs font-semibold text-primary-600">Sale Type:</span>
+          <label className="inline-flex items-center gap-1.5 text-xs text-primary-700 font-medium cursor-pointer">
+            <input
+              type="radio"
+              name="saleType"
+              value="by_weight"
+              checked={saleType === 'by_weight'}
+              onChange={() => setSaleType('by_weight')}
+            />
+            By Weight (kg)
+          </label>
+          <label className="inline-flex items-center gap-1.5 text-xs text-primary-700 font-medium cursor-pointer">
+            <input
+              type="radio"
+              name="saleType"
+              value="by_bag"
+              checked={saleType === 'by_bag'}
+              onChange={() => setSaleType('by_bag')}
+            />
+            By Bag (Fixed Rate)
+          </label>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Serial</label>
@@ -649,19 +773,36 @@ export default function Sell() {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label">Bags</label>
-              <input className="input-field bg-primary-50" value={bagCount || ''} readOnly />
+              <label className="label">{isByBag ? 'Bags *' : 'Bags'}</label>
+              {isByBag ? (
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="input-field"
+                  placeholder="Bags"
+                  value={directBagCount}
+                  onChange={(e) => setDirectBagCount(e.target.value.replace(/[^\d]/g, ''))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      rateRef.current?.focus();
+                    }
+                  }}
+                />
+              ) : (
+                <input className="input-field bg-primary-50" value={bagCount || ''} readOnly />
+              )}
             </div>
             <div>
               <label className="label">Qty (kg)</label>
               <input
                 className="input-field bg-primary-50"
-                value={qty ? qty.toFixed(1) : ''}
+                value={isByBag ? '—' : qty ? qty.toFixed(1) : ''}
                 readOnly
               />
             </div>
             <div>
-              <label className="label">Rate *</label>
+              <label className="label">{isByBag ? 'Rate/bag *' : 'Rate/kg *'}</label>
               <input
                 ref={rateRef}
                 type="text"
@@ -681,30 +822,32 @@ export default function Sell() {
           </div>
         </div>
 
-        <div>
-          <label className="label">Bag weights (kg) *</label>
-          <p className="text-xs text-primary-400 mb-2">
-            Type weight and press Enter for the next bag — empty Enter moves to Rate
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {bagWeights.map((bag, idx) => (
-              <input
-                key={idx}
-                ref={(el) => {
-                  bagInputRefs.current[idx] = el;
-                }}
-                type="text"
-                inputMode="decimal"
-                autoComplete="off"
-                className="input-field !w-24 !py-2"
-                placeholder={`Bag ${idx + 1}`}
-                value={bag}
-                onChange={(e) => updateBag(idx, e.target.value.replace(/[^\d.]/g, ''))}
-                onKeyDown={(e) => handleBagEnter(e, idx)}
-              />
-            ))}
+        {!isByBag && (
+          <div>
+            <label className="label">Bag weights (kg) *</label>
+            <p className="text-xs text-primary-400 mb-2">
+              Type weight and press Enter for the next bag — empty Enter moves to Rate
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {bagWeights.map((bag, idx) => (
+                <input
+                  key={idx}
+                  ref={(el) => {
+                    bagInputRefs.current[idx] = el;
+                  }}
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  className="input-field !w-24 !py-2"
+                  placeholder={`Bag ${idx + 1}`}
+                  value={bag}
+                  onChange={(e) => updateBag(idx, e.target.value.replace(/[^\d.]/g, ''))}
+                  onKeyDown={(e) => handleBagEnter(e, idx)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -784,17 +927,29 @@ export default function Sell() {
       </form>
 
       <div className="card p-0 w-full min-w-0 flex-1 min-h-0 flex flex-col overflow-hidden">
-        <div className="flex flex-wrap items-center gap-2 border-b border-primary-100 px-3 py-2 bg-accent-50 shrink-0">
-          <input
-            className="input-field !py-1.5 max-w-xs"
-            value={customerFilter}
-            onChange={(e) => setCustomerFilter(e.target.value)}
-            placeholder="Filter by customer..."
-          />
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary-100 px-3 py-2 bg-accent-50 shrink-0">
+          {hasActiveFilters ? (
+            <div className="flex items-center gap-2 text-xs text-primary-600 bg-surface px-2.5 py-1 rounded-lg border border-primary-200">
+              <span className="font-medium">Filters active</span>
+              <button
+                type="button"
+                className="text-accent-700 font-semibold hover:underline"
+                onClick={() => {
+                  setFilterCustomer('');
+                  setFilterVendor('');
+                  setFilterItem('');
+                }}
+              >
+                Clear all
+              </button>
+            </div>
+          ) : (
+            <div />
+          )}
           <button
             type="button"
             className="btn-primary inline-flex items-center gap-1.5 !py-1.5 !px-3 text-sm ml-auto"
-            disabled={!displayedRows.length || printing}
+            disabled={!flatRows.length || printing}
             onClick={() => setPrintOpen(true)}
           >
             <Printer className="h-4 w-4" />
@@ -828,8 +983,8 @@ export default function Sell() {
             {displayedRows.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-3 py-8 text-center text-primary-400">
-                  {flatRows.length && customerFilter
-                    ? 'No sales match this customer'
+                  {flatRows.length && hasActiveFilters
+                    ? 'No sales match the selected filters'
                     : `No sales for this date yet`}
                 </td>
               </tr>
@@ -914,42 +1069,53 @@ export default function Sell() {
                       />
                     </td>
                     <td className="px-2 py-1.5 w-24">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        disabled={busy}
-                        defaultValue={Number(r.qty).toFixed(1)}
-                        key={`${r.saleId}-${r.lineIndex}-qty-${r.qty}`}
-                        className={`${cell} text-right tabular-nums`}
-                        onBlur={(e) => {
-                          const qty = Number(e.target.value);
-                          if (qty === Number(r.qty)) return;
-                          persistTableRow(r, { qty }).catch((err) => toast.error(err.message));
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') e.currentTarget.blur();
-                        }}
-                      />
+                      {r.isByBag ? (
+                        <div className="text-right text-primary-400 font-medium py-1">—</div>
+                      ) : (
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          disabled={busy}
+                          defaultValue={r.qty != null ? Number(r.qty).toFixed(1) : ''}
+                          key={`${r.saleId}-${r.lineIndex}-qty-${r.qty}`}
+                          className={`${cell} text-right tabular-nums`}
+                          onBlur={(e) => {
+                            const qty = Number(e.target.value);
+                            if (qty === Number(r.qty)) return;
+                            persistTableRow(r, { qty }).catch((err) => toast.error(err.message));
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur();
+                          }}
+                        />
+                      )}
                     </td>
                     <td className="px-2 py-1.5 w-24">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        disabled={busy}
-                        defaultValue={r.rate}
-                        key={`${r.saleId}-${r.lineIndex}-rate-${r.rate}`}
-                        className={`${cell} text-right tabular-nums`}
-                        onBlur={(e) => {
-                          const rate = Number(e.target.value);
-                          if (rate === Number(r.rate)) return;
-                          persistTableRow(r, { rate }).catch((err) => toast.error(err.message));
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') e.currentTarget.blur();
-                        }}
-                      />
+                      <div className="flex flex-col items-end">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          disabled={busy}
+                          defaultValue={r.rate}
+                          key={`${r.saleId}-${r.lineIndex}-rate-${r.rate}`}
+                          className={`${cell} text-right tabular-nums`}
+                          onBlur={(e) => {
+                            const rate = Number(e.target.value);
+                            if (rate === Number(r.rate)) return;
+                            persistTableRow(r, { rate }).catch((err) => toast.error(err.message));
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur();
+                          }}
+                        />
+                        {r.isByBag && (
+                          <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-accent-100 text-accent-800 border border-accent-200/80 leading-none mt-0.5 whitespace-nowrap shadow-2xs">
+                            per bag
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-2 py-1.5 w-28">
                       <div className="flex flex-col items-end gap-0.5">
@@ -1020,32 +1186,110 @@ export default function Sell() {
 
       {printOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="card w-full max-w-sm space-y-4">
-            <h2 className="text-lg font-bold text-primary-800">Print bills</h2>
-            <p className="text-sm text-primary-500">
-              Same layout as Bill Print — opening, sales, జమ, and closing
-              {customerFilter.trim() ? ' for filtered customers' : ''}.
-            </p>
-            <div className="grid grid-cols-1 gap-2">
-              {[2, 4, 6].map((n) => (
+          <div className="card w-full max-w-md space-y-4">
+            <div className="flex items-center justify-between border-b border-primary-100 pb-2">
+              <h2 className="text-lg font-bold text-primary-800">Print bills</h2>
+              {hasActiveFilters && (
                 <button
-                  key={n}
                   type="button"
-                  className={n === 6 ? 'btn-primary !py-3 justify-center' : 'btn-secondary !py-3 justify-center'}
-                  disabled={printing}
-                  onClick={() => printNUp(n)}
+                  className="text-xs font-semibold text-accent-700 hover:underline"
+                  onClick={() => {
+                    setFilterCustomer('');
+                    setFilterVendor('');
+                    setFilterItem('');
+                  }}
                 >
-                  {n} per page
+                  Clear filters
                 </button>
-              ))}
+              )}
             </div>
-            <button
-              type="button"
-              className="text-sm font-medium text-primary-500"
-              onClick={() => setPrintOpen(false)}
-            >
-              Cancel
-            </button>
+
+            <p className="text-xs text-primary-500">
+              Filter sales by customer, vendor, or item. Unselected filters fetch all records.
+            </p>
+
+            <div className="space-y-3 bg-primary-50/50 p-3 rounded-xl border border-primary-100">
+              <div>
+                <label className="label text-xs">Filter by Customer</label>
+                <select
+                  className="input-field text-sm"
+                  value={filterCustomer}
+                  onChange={(e) => setFilterCustomer(e.target.value)}
+                >
+                  <option value="">All customers</option>
+                  {availableCustomers.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.name} {c.nameTelugu ? `· ${c.nameTelugu}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label text-xs">Filter by Vendor</label>
+                <select
+                  className="input-field text-sm"
+                  value={filterVendor}
+                  onChange={(e) => setFilterVendor(e.target.value)}
+                >
+                  <option value="">All vendors</option>
+                  {availableVendors.map((v) => (
+                    <option key={v._id} value={v._id}>
+                      {v.name} {v.city ? `· ${v.city}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label text-xs">Filter by Item</label>
+                <select
+                  className="input-field text-sm"
+                  value={filterItem}
+                  onChange={(e) => setFilterItem(e.target.value)}
+                >
+                  <option value="">All items</option>
+                  {availableItems.map((m) => (
+                    <option key={m._id} value={m._id}>
+                      {m.name} {m.nameTelugu ? `· ${m.nameTelugu}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="pt-1 space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-primary-500 font-medium">
+                <span>Print layout ({displayedRows.length} {displayedRows.length === 1 ? 'record' : 'records'})</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[2, 4, 6].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={
+                      n === 6
+                        ? 'btn-primary !py-2 !px-1.5 text-xs font-semibold justify-center whitespace-nowrap'
+                        : 'btn-secondary !py-2 !px-1.5 text-xs font-semibold justify-center whitespace-nowrap'
+                    }
+                    disabled={printing || !displayedRows.length}
+                    onClick={() => printNUp(n)}
+                  >
+                    {n} per page
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                className="text-sm font-medium text-primary-500 hover:text-primary-800"
+                onClick={() => setPrintOpen(false)}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

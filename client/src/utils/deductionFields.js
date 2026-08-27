@@ -18,6 +18,14 @@ export function emptyRatesState(source = {}) {
     state[`${f.key}PerBag`] =
       source[`${f.key}PerBag`] !== undefined ? !!source[`${f.key}PerBag`] : f.defaultPerBag;
   }
+  state.bagLessUnder50 =
+    source.bagLessUnder50 !== undefined && source.bagLessUnder50 !== null
+      ? String(source.bagLessUnder50)
+      : '1';
+  state.bagLessOver50 =
+    source.bagLessOver50 !== undefined && source.bagLessOver50 !== null
+      ? String(source.bagLessOver50)
+      : '2';
   return state;
 }
 
@@ -30,5 +38,7 @@ export function ratesPayload(state) {
     body[f.key] = val;
     body[`${f.key}PerBag`] = perBag;
   }
+  body.bagLessUnder50 = Math.max(0, Number(state.bagLessUnder50) || 0);
+  body.bagLessOver50 = Math.max(0, Number(state.bagLessOver50) || 0);
   return body;
 }

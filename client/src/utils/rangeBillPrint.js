@@ -179,7 +179,7 @@ table.lines tr.rule td { border-top: 1px solid #000; padding-top: 2px; }
     function rowHtml(r) {
       var cls = (r.kind === 'total' || r.kind === 'closing' || r.kind === 'opening') ? ' class="rule"' : '';
       return '<tr' + cls + '><td class="date">' + esc(r.date) + '</td><td class="item">' + esc(r.item) +
-        '</td><td class="num">' + esc(r.bags) + '</td><td class="num">' + esc(r.kg) +
+        '</td><td class="num">' + esc(r.bags) +
         '</td><td class="num">' + esc(r.amount) + '</td></tr>';
     }
 

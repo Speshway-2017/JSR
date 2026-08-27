@@ -287,6 +287,52 @@ export default function SalePatty() {
                 </div>
               );
             })}
+
+            <div className="pt-3 border-t border-primary-100 space-y-2">
+              <h4 className="font-semibold text-primary-800 text-sm">Bag less (తగ్గింపు / Bag tare weight deduction)</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="label text-xs">Below 50 kgs (kg/bag)</label>
+                  <div className="relative">
+                    <input
+                      className="input-field !py-2 pr-10"
+                      type="text"
+                      inputMode="decimal"
+                      value={rates.bagLessUnder50 ?? '1'}
+                      onChange={(e) =>
+                        setRates({
+                          ...rates,
+                          bagLessUnder50: e.target.value.replace(/[^\d.]/g, ''),
+                        })
+                      }
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-primary-400 font-medium">
+                      kg
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="label text-xs">Equal to or above 50 kgs (kg/bag)</label>
+                  <div className="relative">
+                    <input
+                      className="input-field !py-2 pr-10"
+                      type="text"
+                      inputMode="decimal"
+                      value={rates.bagLessOver50 ?? '2'}
+                      onChange={(e) =>
+                        setRates({
+                          ...rates,
+                          bagLessOver50: e.target.value.replace(/[^\d.]/g, ''),
+                        })
+                      }
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-primary-400 font-medium">
+                      kg
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {d && (

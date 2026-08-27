@@ -110,14 +110,21 @@ export function vendorMaterialsHtml(lines, teluguMap) {
     .map((line) => {
       const name = displayMaterialName(line.materialName, teluguMap) || '—';
       const bags = line.bags || [];
+      const count = bags.length || Number(line.bagCount) || 0;
       const weights = bags.map((b) => fmtNum(b.billKg));
       const title = bags
         .map((b, i) => `${TE.bag} ${b.bagNo || i + 1}: ${fmtNum(b.billKg)}`)
         .join(', ');
+      const rate = line.ratePerKg != null && line.ratePerKg !== '' ? fmtNum(line.ratePerKg) : '';
+      const bagLabel = count
+        ? rate
+          ? `${count} * ${rate}`
+          : `${count}`
+        : '';
 
       return `<div class="mat-row">
         <span class="mat-name">${esc(name)}${
-          bags.length ? `<span class="bag-n">${bags.length}</span>` : ''
+          bagLabel ? `<span class="bag-n">${esc(bagLabel)}</span>` : ''
         }</span>${
           weights.length
             ? `<span class="bag-list" title="${esc(title)}">${esc(weights.join(', '))}</span>`

@@ -7,15 +7,15 @@ const bagSchema = new mongoose.Schema(
   { _id: true }
 );
 
-/** One rate line — bags sold at the same price for a material */
 const saleLineSchema = new mongoose.Schema(
   {
     material: { type: mongoose.Schema.Types.ObjectId, ref: 'Material' },
     materialName: { type: String, required: true, trim: true },
+    saleType: { type: String, enum: ['by_weight', 'by_bag'], default: 'by_weight' },
     ratePerKg: { type: Number, required: true, min: 0 },
     bags: [bagSchema],
     bagCount: { type: Number, required: true, min: 1 },
-    totalKg: { type: Number, required: true, min: 0.1 },
+    totalKg: { type: Number, required: true, min: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
   },
   { _id: true }

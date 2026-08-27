@@ -118,6 +118,49 @@ export default function PriceSettings() {
           <span className="font-semibold text-primary-700">{formatCurrency(perBagTotal)}</span>
         </div>
 
+        <div className="pt-3 border-t border-primary-100 space-y-3">
+          <div>
+            <h3 className="font-semibold text-primary-800 text-sm">Bag less (తగ్గింపు / Bag tare weight deduction)</h3>
+            <p className="text-xs text-primary-400">
+              Default tare deduction in kg per bag subtracted from actual bag weight on రైతుపట్టి bills
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label text-xs">Below 50 kgs (kg/bag)</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  className="input-field !py-2 pr-10"
+                  value={form.bagLessUnder50 ?? '1'}
+                  onChange={(e) => setForm({ ...form, bagLessUnder50: e.target.value })}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-primary-400 font-medium">
+                  kg
+                </span>
+              </div>
+            </div>
+            <div>
+              <label className="label text-xs">Equal to or above 50 kgs (kg/bag)</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  className="input-field !py-2 pr-10"
+                  value={form.bagLessOver50 ?? '2'}
+                  onChange={(e) => setForm({ ...form, bagLessOver50: e.target.value })}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-primary-400 font-medium">
+                  kg
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <button type="submit" className="btn-primary w-full" disabled={saving}>
           <Save className="w-4 h-4" /> {saving ? 'Saving...' : 'Save Settings'}
         </button>

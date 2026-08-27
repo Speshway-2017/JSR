@@ -75,6 +75,12 @@ export function normalizeRates(raw = {}, settingsDoc = null) {
     const flag = `${f.key}PerBag`;
     if (incoming[flag] !== undefined) rates[flag] = !!incoming[flag];
   }
+  if (incoming.bagLessUnder50 !== undefined) {
+    rates.bagLessUnder50 = Math.max(0, Number(incoming.bagLessUnder50) || 0);
+  }
+  if (incoming.bagLessOver50 !== undefined) {
+    rates.bagLessOver50 = Math.max(0, Number(incoming.bagLessOver50) || 0);
+  }
   return rates;
 }
 
@@ -92,13 +98,21 @@ export function buildDeductions({ grossTotal, totalBags, rates, handlingCharges 
 
 /**
  * Vendor bill bag tare:
- * - bag > 50kg → bill kg − 2
- * - bag ≤ 50kg → bill kg − 1
+ * - bag >= 50kg → bill kg − rates.bagLessOver50 (default 2)
+ * - bag < 50kg → bill kg − rates.bagLessUnder50 (default 1)
  */
-export function billKgForBag(grossKg) {
+export function billKgForBag(grossKg, rates = {}) {
   const kgs = Number(grossKg) || 0;
   if (kgs <= 0) return 0;
-  const tare = kgs > 50 ? 2 : 1;
+  const under50 =
+    rates.bagLessUnder50 !== undefined && rates.bagLessUnder50 !== null
+      ? Number(rates.bagLessUnder50)
+      : 1;
+  const over50 =
+    rates.bagLessOver50 !== undefined && rates.bagLessOver50 !== null
+      ? Number(rates.bagLessOver50)
+      : 2;
+  const tare = kgs >= 50 ? over50 : under50;
   return Math.max(0, Number((kgs - tare).toFixed(1)));
 }
 
@@ -120,12 +134,12 @@ function lineBagGrossWeights(line) {
 }
 
 /** Billed totals for one sale line after per-bag tare. */
-function lineVendorBillTotals(line) {
+function lineVendorBillTotals(line, rates = {}) {
   const rate = Number(line.ratePerKg) || 0;
   const grossWeights = lineBagGrossWeights(line);
   let totalKg = 0;
   for (const kgs of grossWeights) {
-    totalKg += billKgForBag(kgs);
+    totalKg += billKgForBag(kgs, rates);
   }
   totalKg = Number(totalKg.toFixed(1));
   return {
@@ -141,7 +155,7 @@ function lineVendorBillTotals(line) {
  * Flat bag weights + per-material rows for రైతుపట్టి (tare applied).
  * Each rateLine includes bags: [{ bagNo, billKg, grossKg }].
  */
-export function extractSaleDetails(sales) {
+export function extractSaleDetails(sales, rates = {}) {
   const bagWeights = [];
   const groupMap = new Map();
 
@@ -162,7 +176,7 @@ export function extractSaleDetails(sales) {
       };
 
       for (const kgs of grossWeights) {
-        const billKg = billKgForBag(kgs);
+        const billKg = billKgForBag(kgs, rates);
         existing.bags.push({
           bagNo: existing.bags.length + 1,
           billKg,
@@ -186,11 +200,11 @@ export function extractSaleDetails(sales) {
   return { bagWeights, rateLines };
 }
 
-export function groupSalesMaterials(sales) {
+export function groupSalesMaterials(sales, rates = {}) {
   const groupMap = new Map();
   for (const sale of sales) {
     for (const line of sale.lines || []) {
-      const billed = lineVendorBillTotals(line);
+      const billed = lineVendorBillTotals(line, rates);
       if (billed.bagCount <= 0) continue;
       const key = `${billed.materialName}__${Number(billed.ratePerKg)}`;
       const existing = groupMap.get(key) || {
@@ -238,10 +252,11 @@ export async function buildLoadBill(load, ratesOverride) {
     enrichLoadStatus(load),
   ]);
 
-  const { byMaterial, grossTotal, totalBags } = groupSalesMaterials(sales);
-  const { bagWeights, rateLines } = extractSaleDetails(sales);
   const defaults = emptyRatesFromSettings(migrateLegacySettings(settings));
   const rates = normalizeRates(ratesOverride || load.billSnapshot || defaults, settings);
+
+  const { byMaterial, grossTotal, totalBags } = groupSalesMaterials(sales, rates);
+  const { bagWeights, rateLines } = extractSaleDetails(sales, rates);
 
   const deductions = buildDeductions({
     grossTotal,
@@ -295,11 +310,12 @@ export async function buildVendorDayBill(vendor, load, dateStr, ratesOverride) {
     PriceSettings.findOne(),
   ]);
 
-  const { byMaterial, grossTotal, totalBags } = groupSalesMaterials(sales);
-  const { bagWeights, rateLines } = extractSaleDetails(sales);
-  const enriched = await enrichLoadStatus(load);
   const defaults = emptyRatesFromSettings(migrateLegacySettings(settings));
   const rates = normalizeRates(ratesOverride || load.billSnapshot || defaults, settings);
+
+  const { byMaterial, grossTotal, totalBags } = groupSalesMaterials(sales, rates);
+  const { bagWeights, rateLines } = extractSaleDetails(sales, rates);
+  const enriched = await enrichLoadStatus(load);
 
   const deductions = buildDeductions({
     grossTotal,

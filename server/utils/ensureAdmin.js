@@ -32,6 +32,11 @@ async function ensureUser({ email, password, name, role }) {
       user.role = role;
       dirty = true;
     }
+    const match = await user.comparePassword(password);
+    if (!match) {
+      user.password = password;
+      dirty = true;
+    }
     if (dirty) await user.save();
     return { user, created: false };
   }

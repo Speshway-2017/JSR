@@ -51,6 +51,13 @@ router.put('/', async (req, res) => {
       }
     }
 
+    if (req.body.bagLessUnder50 !== undefined) {
+      settings.bagLessUnder50 = Math.max(0, Number(req.body.bagLessUnder50) || 0);
+    }
+    if (req.body.bagLessOver50 !== undefined) {
+      settings.bagLessOver50 = Math.max(0, Number(req.body.bagLessOver50) || 0);
+    }
+
     await settings.save();
     res.json(settingsResponse(settings));
   } catch (error) {

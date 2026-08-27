@@ -1,0 +1,9 @@
+JSR Software License Agreement
+
+End-User License Agreement (EULA) for JSR Desktop Application.
+
+1. Grant of License: JSR grants you a personal, non-exclusive license to use the JSR Desktop Application on your computer.
+2. Usage: This software is designed for offline vendor and sales management.
+3. Ownership: All rights, title, and interest in JSR remain with the software author.
+
+Thank you for using JSR.

@@ -19,6 +19,14 @@ export function emptyRatesFromSettings(settings = {}) {
         ? !!settings[`${f.key}PerBag`]
         : f.defaultPerBag;
   }
+  rates.bagLessUnder50 =
+    settings.bagLessUnder50 !== undefined && settings.bagLessUnder50 !== null
+      ? Number(settings.bagLessUnder50)
+      : 1;
+  rates.bagLessOver50 =
+    settings.bagLessOver50 !== undefined && settings.bagLessOver50 !== null
+      ? Number(settings.bagLessOver50)
+      : 2;
   return rates;
 }
 
@@ -45,6 +53,8 @@ export function migrateLegacySettings(doc) {
     if (o[`${f.key}PerBag`] === undefined) o[`${f.key}PerBag`] = f.defaultPerBag;
     if (o[f.key] === undefined) o[f.key] = 0;
   }
+  if (o.bagLessUnder50 === undefined) o.bagLessUnder50 = 1;
+  if (o.bagLessOver50 === undefined) o.bagLessOver50 = 2;
   return o;
 }
 

@@ -31,7 +31,8 @@ async function processSaleLines(lines, load, { extraStockMap } = {}) {
   let totalWeight = 0;
 
   for (const line of lines) {
-    const { materialId, materialName, ratePerKg, bags, bagCount, totalKg } = line;
+    const { materialId, materialName, saleType, ratePerKg, bags, bagCount, totalKg } = line;
+    const isByBag = saleType === 'by_bag';
 
     let material = materialId ? await Material.findById(materialId) : null;
     if (!material && materialName) {
@@ -56,7 +57,11 @@ async function processSaleLines(lines, load, { extraStockMap } = {}) {
     let lineBagCount = 0;
     let lineKg = 0;
 
-    if (bags?.length) {
+    if (isByBag) {
+      lineBagCount = Math.max(1, Math.floor(Number(bagCount) || 1));
+      lineKg = 0;
+      bagEntries = [];
+    } else if (bags?.length) {
       bagEntries = bags.map((b) => ({ kgs: Number(b.kgs) })).filter((b) => b.kgs > 0);
       lineBagCount = bagEntries.length;
       lineKg = bagEntries.reduce((s, b) => s + b.kgs, 0);
@@ -71,7 +76,13 @@ async function processSaleLines(lines, load, { extraStockMap } = {}) {
       );
     }
 
-    if (!bagEntries.length || lineKg <= 0) {
+    if (isByBag) {
+      if (lineBagCount <= 0) {
+        const err = new Error('Enter valid number of bags');
+        err.status = 400;
+        throw err;
+      }
+    } else if (!bagEntries.length || lineKg <= 0) {
       const err = new Error('Enter bags and quantity (kg)');
       err.status = 400;
       throw err;
@@ -79,12 +90,12 @@ async function processSaleLines(lines, load, { extraStockMap } = {}) {
 
     const rate = Number(ratePerKg);
     if (rate < 0 || Number.isNaN(rate)) {
-      const err = new Error('Enter a valid rate per kg');
+      const err = new Error(isByBag ? 'Enter a valid rate per bag' : 'Enter a valid rate per kg');
       err.status = 400;
       throw err;
     }
 
-    if (!arrivalOnly) {
+    if (!arrivalOnly && !isByBag) {
       const nextRequested = (requestedByMaterial.get(material._id.toString()) || 0) + lineKg;
       requestedByMaterial.set(material._id.toString(), nextRequested);
       const available = getAvailableKg(stockMap, material._id);
@@ -95,7 +106,10 @@ async function processSaleLines(lines, load, { extraStockMap } = {}) {
       }
     }
 
-    const totalAmount = Number((lineKg * rate).toFixed(2));
+    const totalAmount = isByBag
+      ? Number((lineBagCount * rate).toFixed(2))
+      : Number((lineKg * rate).toFixed(2));
+
     materialsTotal += totalAmount;
     totalBags += lineBagCount;
     totalWeight += lineKg;
@@ -103,6 +117,7 @@ async function processSaleLines(lines, load, { extraStockMap } = {}) {
     processedLines.push({
       material: material._id,
       materialName: material.name,
+      saleType: isByBag ? 'by_bag' : 'by_weight',
       ratePerKg: rate,
       bags: bagEntries,
       bagCount: lineBagCount,
@@ -193,6 +208,7 @@ router.get('/report-2', async (req, res) => {
         }
         const mat = materials.get(materialId);
         const rate = Number(line.ratePerKg) || 0;
+        const isByBag = line.saleType === 'by_bag' || (line.bagCount > 0 && (!line.bags || line.bags.length === 0) && Number(line.totalKg) === 0);
         const bags = bagKgList(line);
         if (!mat.rateMap.has(rate)) {
           mat.rateMap.set(rate, { rate, customerMap: new Map(), bagCount: 0, totalKg: 0, totalAmount: 0 });
@@ -206,11 +222,16 @@ router.get('/report-2', async (req, res) => {
           });
         }
         const entry = group.customerMap.get(customerId);
-        entry.bags.push(...bags);
-        group.bagCount += bags.length || Number(line.bagCount) || 0;
-        group.totalKg += Number(line.totalKg) || bags.reduce((s, n) => s + n, 0);
+        if (isByBag || bags.length === 0) {
+          const count = Number(line.bagCount) || 1;
+          entry.bags.push(`${count} ${count === 1 ? 'Bag' : 'Bags'}`);
+        } else {
+          entry.bags.push(...bags);
+        }
+        group.bagCount += Number(line.bagCount) || bags.length || 0;
+        group.totalKg += Number(line.totalKg) || (typeof bags[0] === 'number' ? bags.reduce((s, n) => s + n, 0) : 0);
         group.totalAmount += Number(line.totalAmount) || 0;
-        mat.bagCount += bags.length || Number(line.bagCount) || 0;
+        mat.bagCount += Number(line.bagCount) || bags.length || 0;
         mat.totalKg += Number(line.totalKg) || 0;
       }
     }
@@ -233,7 +254,7 @@ router.get('/report-2', async (req, res) => {
               name: e.name,
               bags: e.bags,
               bagCount: e.bags.length,
-              totalKg: Number(e.bags.reduce((s, n) => s + n, 0).toFixed(1)),
+              totalKg: Number(e.bags.reduce((s, n) => s + (typeof n === 'number' ? n : 0), 0).toFixed(1)),
             })),
           }))
           .sort((a, b) => b.rate - a.rate),

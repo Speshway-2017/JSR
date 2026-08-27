@@ -31,6 +31,9 @@ const priceSettingsSchema = new mongoose.Schema(
     union: { type: Number, default: 0, min: 0 },
     unionPerBag: { type: Boolean, default: true },
 
+    bagLessUnder50: { type: Number, default: 1, min: 0 },
+    bagLessOver50: { type: Number, default: 2, min: 0 },
+
     // Legacy fields (kept for old documents; migrated on read)
     labour: { type: Number, default: 0, min: 0 },
     bill: { type: Number, default: 0, min: 0 },

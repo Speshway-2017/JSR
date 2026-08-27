@@ -3,7 +3,14 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import dns from 'dns';
 import { fileURLToPath } from 'url';
+
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+} catch {
+  /* ignore */
+}
 import connectDB, { isDbReady } from './config/db.js';
 import { ensureDefaultUsers } from './utils/ensureAdmin.js';
 import authRoutes from './routes/auth.js';
@@ -28,8 +35,8 @@ import { licenseLockMiddleware, refreshLicense } from './utils/license.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.join(__dirname, '.env') });
-dotenv.config({ path: path.join(__dirname, 'atlas.env') });
+dotenv.config({ path: path.join(__dirname, '.env'), override: true });
+dotenv.config({ path: path.join(__dirname, 'atlas.env'), override: true });
 const clientDist = process.env.CLIENT_DIST
   ? path.resolve(process.env.CLIENT_DIST)
   : path.join(__dirname, '../client/dist');
