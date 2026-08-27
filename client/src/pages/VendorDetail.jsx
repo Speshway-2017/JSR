@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
+import MDIModalWindow from '../components/mdi/MDIModalWindow';
 import { formatCurrency, formatDate, formatKg } from '../utils/format';
 import { openVendorBillPdf } from '../utils/vendorBillPdf';
 import { openCustomerSaleBillPdf } from '../utils/customerSaleBillPdf';
@@ -12,9 +13,12 @@ import { openBillPreviewTab } from '../utils/raituBillShared';
 import { DEDUCTION_FIELDS, emptyRatesState, ratesPayload } from '../utils/deductionFields';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
 import { useDataRestored } from '../utils/useDataRestored';
+import { useMDI } from '../context/MDIContext';
 
-export default function VendorDetail() {
-  const { id } = useParams();
+export default function VendorDetail({ path: windowPath }) {
+  const { openWindow } = useMDI();
+  const { id: routeId } = useParams();
+  const id = routeId || (windowPath ? windowPath.split('/vendors/')[1]?.split('?')[0] : null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPayment, setShowPayment] = useState(false);
@@ -40,6 +44,10 @@ export default function VendorDetail() {
   );
 
   const fetchData = useCallback(() => {
+    if (!id || id === 'undefined') {
+      setLoading(false);
+      return;
+    }
     api.get(`/vendors/${id}`).then((res) => {
       setData(res.data);
       const v = res.data.vendor;
@@ -53,7 +61,14 @@ export default function VendorDetail() {
     }).finally(() => setLoading(false));
   }, [id]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    if (!id || id === 'undefined') return;
+    setLoading(true);
+    setEditing(false);
+    setShowPayment(false);
+    setBillModal(null);
+    fetchData();
+  }, [id, fetchData]);
 
   useDataRestored(fetchData);
 
@@ -183,9 +198,13 @@ export default function VendorDetail() {
 
   return (
     <div className="space-y-4">
-      <Link to="/vendors" className="inline-flex items-center gap-2 text-primary-500 hover:text-primary-700 font-medium text-sm">
+      <button
+        type="button"
+        onClick={() => openWindow({ path: '/vendors', title: 'Vendors' })}
+        className="inline-flex items-center gap-2 text-primary-500 hover:text-primary-700 font-medium text-sm cursor-pointer"
+      >
         <ArrowLeft className="w-4 h-4" /> Back to Vendors
-      </Link>
+      </button>
 
       <div className="card">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -258,97 +277,94 @@ export default function VendorDetail() {
         </div>
       </div>
 
-      {showPayment && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handlePayment} className="card w-full max-w-md space-y-4">
-            <h2 className="text-lg font-bold text-primary-700">Pay Vendor</h2>
-            <p className="text-xs text-primary-400">Pay the receivable amount from the vendor bill after deductions.</p>
-            <div>
-              <label className="label">Amount (₹) *</label>
-              <input type="number" className="input-field" min="1" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required />
-            </div>
-            <div>
-              <label className="label">Description</label>
-              <input className="input-field" value={paymentDesc} onChange={(e) => setPaymentDesc(e.target.value)} />
-            </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setShowPayment(false)} className="btn-secondary flex-1">Cancel</button>
-              <button type="submit" className="btn-primary flex-1" disabled={paying}>{paying ? 'Saving...' : 'Save'}</button>
-            </div>
-          </form>
-        </div>
-      )}
+      <MDIModalWindow
+        open={showPayment}
+        title="Pay Vendor"
+        iconName="CreditCard"
+        onClose={() => setShowPayment(false)}
+      >
+        <form onSubmit={handlePayment} className="space-y-4">
+          <p className="text-xs text-primary-400">Pay the receivable amount from the vendor bill after deductions.</p>
+          <div>
+            <label className="label">Amount (₹) *</label>
+            <input type="number" className="input-field" min="1" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required />
+          </div>
+          <div>
+            <label className="label">Description</label>
+            <input className="input-field" value={paymentDesc} onChange={(e) => setPaymentDesc(e.target.value)} />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={() => setShowPayment(false)} className="btn-secondary flex-1">Cancel</button>
+            <button type="submit" className="btn-primary flex-1" disabled={paying}>{paying ? 'Saving...' : 'Save'}</button>
+          </div>
+        </form>
+      </MDIModalWindow>
 
-      {billModal && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleGenerateBill} className="card w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-primary-700">
-                {billModal.regenerating ? 'Update Load Bill' : 'Generate Load Bill'}
-              </h2>
-              <button type="button" onClick={() => setBillModal(null)} className="p-1">
-                <X className="w-5 h-5 text-primary-400" />
-              </button>
-            </div>
-            <p className="text-xs text-primary-400">
-              {billModal.regenerating
-                ? 'Adjust deduction rates and regenerate the bill PDF for this load.'
-                : 'Confirm deduction rates (from Price Settings). Toggle Per bag for each field.'}
-            </p>
-            <div className="grid grid-cols-[1fr_90px_72px] gap-2 text-xs font-semibold text-primary-400 uppercase">
-              <span>Field</span>
-              <span>Amount</span>
-              <span className="text-center">Per bag</span>
-            </div>
-            {DEDUCTION_FIELDS.map((field) => {
-              const perBag = !!billForm[`${field.key}PerBag`];
-              const isPct = field.isCommission && !perBag;
-              return (
-                <div key={field.key} className="grid grid-cols-[1fr_90px_72px] gap-2 items-center">
-                  <div>
-                    <p className="text-sm font-medium text-primary-800">{field.telugu}</p>
-                    <p className="text-xs text-primary-400">{field.label}</p>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      max={isPct ? 100 : undefined}
-                      step="0.01"
-                      className="input-field !py-2"
-                      value={billForm[field.key]}
-                      onChange={(e) => setBillForm({ ...billForm, [field.key]: e.target.value })}
-                    />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-primary-400">
-                      {isPct ? '%' : '₹'}
-                    </span>
-                  </div>
-                  <label className="flex justify-center">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 accent-primary-600"
-                      checked={perBag}
-                      onChange={(e) =>
-                        setBillForm({ ...billForm, [`${field.key}PerBag`]: e.target.checked })
-                      }
-                    />
-                  </label>
+      <MDIModalWindow
+        open={!!billModal}
+        title={billModal?.regenerating ? 'Update Load Bill' : 'Generate Load Bill'}
+        iconName="FileText"
+        onClose={() => setBillModal(null)}
+      >
+        <form onSubmit={handleGenerateBill} className="space-y-4">
+          <p className="text-xs text-primary-400">
+            {billModal?.regenerating
+              ? 'Adjust deduction rates and regenerate the bill PDF for this load.'
+              : 'Confirm deduction rates (from Price Settings). Toggle Per bag for each field.'}
+          </p>
+          <div className="grid grid-cols-[1fr_90px_72px] gap-2 text-xs font-semibold text-primary-400 uppercase">
+            <span>Field</span>
+            <span>Amount</span>
+            <span className="text-center">Per bag</span>
+          </div>
+          {DEDUCTION_FIELDS.map((field) => {
+            const perBag = !!billForm[`${field.key}PerBag`];
+            const isPct = field.isCommission && !perBag;
+            return (
+              <div key={field.key} className="grid grid-cols-[1fr_90px_72px] gap-2 items-center">
+                <div>
+                  <p className="text-sm font-medium text-primary-800">{field.telugu}</p>
+                  <p className="text-xs text-primary-400">{field.label}</p>
                 </div>
-              );
-            })}
-            <div className="flex gap-3 pt-1">
-              <button type="button" onClick={() => setBillModal(null)} className="btn-secondary flex-1">
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary flex-1" disabled={generatingBill}>
-                {generatingBill
-                  ? (billModal.regenerating ? 'Updating...' : 'Generating...')
-                  : (billModal.regenerating ? 'Update & View Bill' : 'Generate Bill')}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max={isPct ? 100 : undefined}
+                    step="0.01"
+                    className="input-field !py-2"
+                    value={billForm[field.key]}
+                    onChange={(e) => setBillForm({ ...billForm, [field.key]: e.target.value })}
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-primary-400">
+                    {isPct ? '%' : '₹'}
+                  </span>
+                </div>
+                <label className="flex justify-center">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-primary-600"
+                    checked={perBag}
+                    onChange={(e) =>
+                      setBillForm({ ...billForm, [`${field.key}PerBag`]: e.target.checked })
+                    }
+                  />
+                </label>
+              </div>
+            );
+          })}
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={() => setBillModal(null)} className="btn-secondary flex-1">
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary flex-1" disabled={generatingBill}>
+              {generatingBill
+                ? (billModal?.regenerating ? 'Updating...' : 'Generating...')
+                : (billModal?.regenerating ? 'Update & View Bill' : 'Generate Bill')}
+            </button>
+          </div>
+        </form>
+      </MDIModalWindow>
 
       <div className="card !p-0 overflow-hidden">
         <div className="flex border-b border-primary-100">

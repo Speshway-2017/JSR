@@ -3,15 +3,19 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Pencil, X, Save, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
+import MDIModalWindow from '../components/mdi/MDIModalWindow';
 import Toggle from '../components/Toggle';
 import { formatCurrency, formatDate, formatKg } from '../utils/format';
 import { openCustomerSaleBillPdf } from '../utils/customerSaleBillPdf';
 import { openBillPreviewTab } from '../utils/raituBillShared';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
 import { useDataRestored } from '../utils/useDataRestored';
+import { useMDI } from '../context/MDIContext';
 
-export default function CustomerDetail() {
-  const { id } = useParams();
+export default function CustomerDetail({ path: windowPath }) {
+  const { openWindow } = useMDI();
+  const { id: routeId } = useParams();
+  const id = routeId || (windowPath ? windowPath.split('/customers/')[1]?.split('?')[0] : null);
   const [data, setData] = useState(null);
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +37,10 @@ export default function CustomerDetail() {
   );
 
   const fetchData = useCallback(() => {
+    if (!id || id === 'undefined') {
+      setLoading(false);
+      return;
+    }
     Promise.all([api.get(`/customers/${id}`), api.get('/schedules')])
       .then(([res, schedRes]) => {
         setData(res.data);
@@ -50,8 +58,12 @@ export default function CustomerDetail() {
   }, [id]);
 
   useEffect(() => {
+    if (!id || id === 'undefined') return;
+    setLoading(true);
+    setEditing(false);
+    setShowPayment(false);
     fetchData();
-  }, [fetchData]);
+  }, [id, fetchData]);
 
   useDataRestored(fetchData);
 
@@ -140,9 +152,13 @@ export default function CustomerDetail() {
 
   return (
     <div className="space-y-4">
-      <Link to="/customers" className="inline-flex items-center gap-2 text-primary-500 hover:text-primary-700 font-medium text-sm">
+      <button
+        type="button"
+        onClick={() => openWindow({ path: '/customers', title: 'Customers' })}
+        className="inline-flex items-center gap-2 text-primary-500 hover:text-primary-700 font-medium text-sm cursor-pointer"
+      >
         <ArrowLeft className="w-4 h-4" /> Back to Customer List
-      </Link>
+      </button>
 
       <div className="card">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -220,25 +236,27 @@ export default function CustomerDetail() {
         </div>
       </div>
 
-      {showPayment && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handlePayment} className="card w-full max-w-md space-y-4">
-            <h2 className="text-lg font-bold text-primary-700">Record Customer Payment</h2>
-            <div>
-              <label className="label">Amount (₹) *</label>
-              <input type="number" className="input-field" min="1" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required />
-            </div>
-            <div>
-              <label className="label">Description</label>
-              <input className="input-field" value={paymentDesc} onChange={(e) => setPaymentDesc(e.target.value)} placeholder="Optional" />
-            </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setShowPayment(false)} className="btn-secondary flex-1">Cancel</button>
-              <button type="submit" className="btn-primary flex-1" disabled={paying}>{paying ? 'Saving...' : 'Save'}</button>
-            </div>
-          </form>
-        </div>
-      )}
+      <MDIModalWindow
+        open={showPayment}
+        title="Record Customer Payment"
+        iconName="CreditCard"
+        onClose={() => setShowPayment(false)}
+      >
+        <form onSubmit={handlePayment} className="space-y-4">
+          <div>
+            <label className="label">Amount (₹) *</label>
+            <input type="number" className="input-field" min="1" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required />
+          </div>
+          <div>
+            <label className="label">Description</label>
+            <input className="input-field" value={paymentDesc} onChange={(e) => setPaymentDesc(e.target.value)} placeholder="Optional" />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={() => setShowPayment(false)} className="btn-secondary flex-1">Cancel</button>
+            <button type="submit" className="btn-primary flex-1" disabled={paying}>{paying ? 'Saving...' : 'Save'}</button>
+          </div>
+        </form>
+      </MDIModalWindow>
 
       <div className="card !p-0 overflow-hidden">
         <div className="px-4 py-3 border-b border-primary-100 font-semibold text-primary-700">Sale History</div>

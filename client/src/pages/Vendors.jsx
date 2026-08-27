@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { Plus, Phone, MapPin, ChevronRight, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
+import MDIModalWindow from '../components/mdi/MDIModalWindow';
 import { formatCurrency } from '../utils/format';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
 import { useDataRestored } from '../utils/useDataRestored';
+import { useMDI } from '../context/MDIContext';
 
 const emptyForm = {
   name: '',
@@ -16,6 +18,7 @@ const emptyForm = {
 };
 
 export default function Vendors() {
+  const { openWindow } = useMDI();
   const [vendors, setVendors] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -72,78 +75,73 @@ export default function Vendors() {
         </button>
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-bold text-primary-800">Add New Vendor</h2>
-              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-primary-50 rounded-lg">
-                <X className="w-5 h-5 text-primary-500" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="label">Vendor Name *</label>
-                <input
-                  className="input-field"
-                  placeholder="e.g. Manoj"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                />
-                <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
-                  {form.name.trim()
-                    ? teluguLoading && !liveTelugu
-                      ? '…'
-                      : form.nameTelugu || liveTelugu || ''
-                    : ''}
-                </p>
-                <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
-              </div>
-              <div>
-                <label className="label">Mobile Number *</label>
-                <input
-                  className="input-field"
-                  placeholder="e.g. 9876543210"
-                  type="tel"
-                  value={form.mobile}
-                  onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">City *</label>
-                <input
-                  className="input-field"
-                  placeholder="e.g. Hyderabad"
-                  value={form.city}
-                  onChange={(e) => setForm({ ...form, city: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">Address *</label>
-                <textarea
-                  className="input-field min-h-[80px] resize-none"
-                  placeholder="Full address"
-                  value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary flex-1" disabled={saving}>
-                  {saving ? 'Saving...' : 'Save Vendor'}
-                </button>
-              </div>
-            </form>
+      <MDIModalWindow
+        open={showForm}
+        title="Add New Vendor"
+        iconName="UserRound"
+        onClose={() => setShowForm(false)}
+        maxWidth="max-w-lg"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="label">Vendor Name *</label>
+            <input
+              className="input-field"
+              placeholder="e.g. Manoj"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              required
+            />
+            <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
+              {form.name.trim()
+                ? teluguLoading && !liveTelugu
+                  ? '…'
+                  : form.nameTelugu || liveTelugu || ''
+                : ''}
+            </p>
+            <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
           </div>
-        </div>
-      )}
+          <div>
+            <label className="label">Mobile Number *</label>
+            <input
+              className="input-field"
+              placeholder="e.g. 9876543210"
+              type="tel"
+              value={form.mobile}
+              onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="label">City *</label>
+            <input
+              className="input-field"
+              placeholder="e.g. Hyderabad"
+              value={form.city}
+              onChange={(e) => setForm({ ...form, city: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="label">Address *</label>
+            <textarea
+              className="input-field min-h-[80px] resize-none"
+              placeholder="Full address"
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              required
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary flex-1" disabled={saving}>
+              {saving ? 'Saving...' : 'Save Vendor'}
+            </button>
+          </div>
+        </form>
+      </MDIModalWindow>
 
       {loading ? (
         <div className="text-center py-20 text-primary-400">Loading vendors...</div>
@@ -155,10 +153,11 @@ export default function Vendors() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {vendors.map((vendor) => (
-            <Link
+            <button
               key={vendor._id}
-              to={`/vendors/${vendor._id}`}
-              className="card hover:shadow-lg hover:border-primary-200 transition group"
+              type="button"
+              onClick={() => openWindow({ path: `/vendors/${vendor._id}`, title: `Vendor: ${vendor.name}` })}
+              className="card hover:shadow-lg hover:border-primary-200 transition group text-left cursor-pointer w-full"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -183,7 +182,7 @@ export default function Vendors() {
                 <p className="text-xs text-primary-400">Payable Balance</p>
                 <p className="font-bold text-accent-600">{formatCurrency(vendor.creditBalance)}</p>
               </div>
-            </Link>
+            </button>
           ))}
         </div>
       )}

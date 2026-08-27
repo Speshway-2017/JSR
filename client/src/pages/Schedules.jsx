@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, CalendarDays, X, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
+import MDIModalWindow from '../components/mdi/MDIModalWindow';
 
 export default function Schedules() {
   const [schedules, setSchedules] = useState([]);
@@ -100,39 +101,34 @@ export default function Schedules() {
         </button>
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSubmit} className="card w-full max-w-md space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-primary-800">
-                {editing ? 'Edit Schedule' : 'Add Schedule'}
-              </h2>
-              <button type="button" onClick={closeForm} className="p-2 hover:bg-primary-50 rounded-lg">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div>
-              <label className="label">Schedule Name *</label>
-              <input
-                className="input-field"
-                placeholder="e.g. Morning Route"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                autoFocus
-              />
-            </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={closeForm} className="btn-secondary flex-1">
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary flex-1" disabled={saving}>
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <MDIModalWindow
+        open={showForm}
+        title={editing ? 'Edit Schedule' : 'Add Schedule'}
+        iconName="Calendar"
+        onClose={closeForm}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="label">Schedule Name *</label>
+            <input
+              className="input-field"
+              placeholder="e.g. Morning Route"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={closeForm} className="btn-secondary flex-1">
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary flex-1" disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </MDIModalWindow>
 
       {loading ? (
         <div className="text-center py-20 text-primary-400">Loading schedules...</div>

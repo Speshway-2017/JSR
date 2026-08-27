@@ -18,15 +18,39 @@ function appliedCooly(rate, bags, perBag) {
   return perBag ? Number((r * b).toFixed(2)) : r;
 }
 
-export default function Sell() {
+export default function Sell({ path: windowPath }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [date, setDate] = useState(searchParams.get('date') || todayInputValue());
+  const effectiveSearchParams = useMemo(() => {
+    if (windowPath && windowPath.includes('?')) {
+      return new URLSearchParams(windowPath.split('?')[1]);
+    }
+    return searchParams;
+  }, [windowPath, searchParams]);
+
+  const paramDate = effectiveSearchParams.get('date');
+  const [date, setDate] = useState(paramDate || todayInputValue());
   const [materials, setMaterials] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [sales, setSales] = useState([]);
-  const [editingSaleId, setEditingSaleId] = useState(searchParams.get('saleId') || '');
-  const [focusSaleId, setFocusSaleId] = useState(searchParams.get('saleId') || '');
+  const initialSaleId = effectiveSearchParams.get('saleId') || effectiveSearchParams.get('highlightSaleId') || '';
+  const [editingSaleId, setEditingSaleId] = useState(initialSaleId);
+  const [focusSaleId, setFocusSaleId] = useState(initialSaleId);
+
+  useEffect(() => {
+    const pDate = effectiveSearchParams.get('date');
+    const pSaleId = effectiveSearchParams.get('saleId') || effectiveSearchParams.get('highlightSaleId');
+    const pCustId = effectiveSearchParams.get('customerId');
+    const pVendId = effectiveSearchParams.get('vendorId');
+
+    if (pDate && pDate !== date) setDate(pDate);
+    if (pSaleId) {
+      setFocusSaleId(pSaleId);
+      setEditingSaleId(pSaleId);
+    }
+    if (pCustId) setFilterCustomer(pCustId);
+    if (pVendId) setFilterVendor(pVendId);
+  }, [windowPath, effectiveSearchParams]);
   const fillingRef = useRef(false);
   const queryApplied = useRef(false);
   const fetchingSale = useRef(false);
@@ -1007,7 +1031,7 @@ export default function Sell() {
                     ref={r.saleId === focusSaleId ? focusRowRef : null}
                     className={
                       r.saleId === focusSaleId || r.saleId === editingSaleId
-                        ? 'bg-accent-100'
+                        ? 'bg-amber-100/90 ring-2 ring-amber-400 font-bold shadow-md transition-all duration-300'
                         : i % 2 === 0
                           ? 'bg-surface'
                           : 'bg-primary-50/40'

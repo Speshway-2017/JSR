@@ -4,10 +4,12 @@ import { Plus, Search, Users, X, Pencil, Trash2, ChevronLeft, ChevronRight } fro
 import toast from 'react-hot-toast';
 import api from '../api';
 import Toggle from '../components/Toggle';
+import MDIModalWindow from '../components/mdi/MDIModalWindow';
 import { formatCurrency } from '../utils/format';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
 import { matchesSearchFields } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
+import { useMDI } from '../context/MDIContext';
 
 const emptyForm = {
   name: '',
@@ -21,6 +23,7 @@ const emptyForm = {
 const PAGE_SIZE = 20;
 
 export default function Customers() {
+  const { openWindow } = useMDI();
   const [customers, setCustomers] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -171,100 +174,95 @@ export default function Customers() {
         </button>
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSubmit} className="card w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-primary-700">
-                {editing ? 'Edit Customer' : 'Add Customer'}
-              </h2>
-              <button type="button" onClick={closeForm} className="p-2 hover:bg-primary-50 rounded-lg">
-                <X className="w-5 h-5 text-primary-500" />
-              </button>
-            </div>
-            <div>
-              <label className="label">Name *</label>
-              <input
-                className="input-field"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-                autoFocus
-              />
-              <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
-                {form.name.trim()
-                  ? teluguLoading && !liveTelugu
-                    ? '…'
-                    : form.nameTelugu || liveTelugu || ''
-                  : ''}
-              </p>
-              <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
-            </div>
-            <div>
-              <label className="label">Phone</label>
-              <input
-                className="input-field"
-                type="tel"
-                value={form.mobile}
-                onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="label">Schedule *</label>
-              <select
-                className="input-field"
-                value={form.schedule}
-                onChange={(e) => setForm({ ...form, schedule: e.target.value })}
-                required
-              >
-                <option value="">Select schedule</option>
-                {schedules.map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-              {schedules.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Create a schedule under Master → Schedule List first.
-                </p>
-              )}
-            </div>
-            {!editing && (
-              <div>
-                <label className="label">Credit</label>
-                <input
-                  className="input-field"
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0"
-                  value={form.credit}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/[^\d.]/g, '');
-                    setForm({ ...form, credit: raw });
-                  }}
-                />
-                <p className="text-xs text-primary-400 mt-1">
-                  If entered, this becomes the customer’s credit balance.
-                </p>
-              </div>
-            )}
-            <Toggle
-              checked={form.handlingCharges}
-              onChange={(v) => setForm({ ...form, handlingCharges: v })}
-              label="Cooly"
+      <MDIModalWindow
+        open={showForm}
+        title={editing ? 'Edit Customer' : 'Add Customer'}
+        iconName="Users"
+        onClose={closeForm}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="label">Name *</label>
+            <input
+              className="input-field"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              required
+              autoFocus
             />
-            <div className="flex gap-3">
-              <button type="button" onClick={closeForm} className="btn-secondary flex-1">
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary flex-1" disabled={saving || schedules.length === 0}>
-                {saving ? 'Saving...' : 'Save'}
-              </button>
+            <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
+              {form.name.trim()
+                ? teluguLoading && !liveTelugu
+                  ? '…'
+                  : form.nameTelugu || liveTelugu || ''
+                : ''}
+            </p>
+            <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
+          </div>
+          <div>
+            <label className="label">Phone</label>
+            <input
+              className="input-field"
+              type="tel"
+              value={form.mobile}
+              onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Schedule *</label>
+            <select
+              className="input-field"
+              value={form.schedule}
+              onChange={(e) => setForm({ ...form, schedule: e.target.value })}
+              required
+            >
+              <option value="">Select schedule</option>
+              {schedules.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            {schedules.length === 0 && (
+              <p className="text-xs text-amber-600 mt-1">
+                Create a schedule under Master → Schedule List first.
+              </p>
+            )}
+          </div>
+          {!editing && (
+            <div>
+              <label className="label">Credit</label>
+              <input
+                className="input-field"
+                type="text"
+                inputMode="decimal"
+                placeholder="0"
+                value={form.credit}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^\d.]/g, '');
+                  setForm({ ...form, credit: raw });
+                }}
+              />
+              <p className="text-xs text-primary-400 mt-1">
+                If entered, this becomes the customer’s credit balance.
+              </p>
             </div>
-          </form>
-        </div>
-      )}
+          )}
+          <Toggle
+            checked={form.handlingCharges}
+            onChange={(v) => setForm({ ...form, handlingCharges: v })}
+            label="Cooly"
+          />
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={closeForm} className="btn-secondary flex-1">
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary flex-1" disabled={saving || schedules.length === 0}>
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </MDIModalWindow>
 
       {customers.length > 0 && (
         <div className="card !p-3 sm:!p-4">
@@ -330,12 +328,13 @@ export default function Customers() {
                 {paged.map((c) => (
                   <tr key={c._id} className="border-b border-primary-50 hover:bg-primary-50/40">
                     <td className="px-4 py-3">
-                      <Link
-                        to={`/customers/${c._id}`}
-                        className="font-medium text-primary-800 hover:text-primary-600"
+                      <button
+                        type="button"
+                        onClick={() => openWindow({ path: `/customers/${c._id}`, title: `Customer: ${c.name}` })}
+                        className="font-medium text-primary-800 hover:text-primary-600 text-left cursor-pointer"
                       >
                         {c.name}
-                      </Link>
+                      </button>
                       {c.nameTelugu ? (
                         <p className="text-xs text-primary-500 mt-0.5">{c.nameTelugu}</p>
                       ) : null}

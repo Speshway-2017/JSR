@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { MDIProvider } from '../context/MDIContext';
 import Layout from '../components/Layout';
 
 export default function PrivateRoute() {
@@ -16,8 +17,10 @@ export default function PrivateRoute() {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   return (
-    <Layout>
-      <Outlet />
-    </Layout>
+    <MDIProvider>
+      <Layout>
+        <Outlet />
+      </Layout>
+    </MDIProvider>
   );
 }

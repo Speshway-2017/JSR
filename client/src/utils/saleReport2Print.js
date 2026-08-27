@@ -212,9 +212,19 @@ ${SALE_REPORT_2_CSS}
 <body>
   <div class="preview-toolbar">
     <button type="button" onclick="window.close()">Close</button>
+    <button type="button" style="background:#25D366;color:#fff;border-color:#25D366;font-weight:600;" onclick="sendWhatsAppBill()">Send WhatsApp</button>
     <button type="button" class="primary" onclick="window.print()">Print / Save PDF</button>
   </div>
   <div class="stage">${inner}</div>
+  <script>
+    function sendWhatsAppBill() {
+      var stage = document.querySelector('.stage');
+      var bodyText = stage ? stage.innerText : document.body.innerText;
+      var lines = bodyText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+      var text = '*JSR AGRI TRADES - Day Wise Sale Report*\n-----------------------------------\n' + lines.slice(0, 40).join('\n') + '\n-----------------------------------\n*Thank you!* 🙏';
+      window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+    }
+  </script>
 </body>
 </html>`;
 

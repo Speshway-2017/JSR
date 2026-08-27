@@ -160,11 +160,20 @@ table.lines tr.rule td { border-top: 1px solid #000; padding-top: 2px; }
 <body>
   <div class="preview-toolbar">
     <button type="button" onclick="window.close()">Close</button>
+    <button type="button" style="background:#25D366;color:#fff;border-color:#25D366;font-weight:600;" onclick="sendWhatsAppBill()">Send WhatsApp</button>
     <button type="button" class="primary" onclick="window.print()">Print / Save PDF</button>
   </div>
   <div class="stage" id="stage"></div>
   <div class="measure" id="measure"></div>
   <script>
+    function sendWhatsAppBill() {
+      var stage = document.getElementById('stage');
+      var bodyText = stage ? stage.innerText : document.body.innerText;
+      var lines = bodyText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+      var text = '*JSR AGRI TRADES - Customer Bills*\n-----------------------------------\n' + lines.slice(0, 40).join('\n') + '\n-----------------------------------\n*Thank you!* 🙏';
+      window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+    }
+
     const BILLS = ${payload};
     const PER = ${n};
 

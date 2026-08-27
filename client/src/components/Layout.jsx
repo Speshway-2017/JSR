@@ -23,6 +23,8 @@ import BrandLogo from './BrandLogo';
 import ChangePasswordModal from './ChangePasswordModal';
 import UtilConfirmModal from './UtilConfirmModal';
 import LogoutConfirmModal from './LogoutConfirmModal';
+import MDIWorkspace from './mdi/MDIWorkspace';
+import { useMDI } from '../context/MDIContext';
 import { warmRaituBillAssets } from '../utils/raituBillShared';
 import { runAtlasUtilAction } from '../utils/atlasNetwork';
 
@@ -109,6 +111,7 @@ function linkClass(isActive) {
 
 function AdminTopNav({ onNavigate, user, onLogout, onChangePassword, onUtilAction }) {
   const location = useLocation();
+  const { openWindow, windows } = useMDI();
   const [openMenuId, setOpenMenuId] = useState(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const barRef = useRef(null);
@@ -157,7 +160,7 @@ function AdminTopNav({ onNavigate, user, onLogout, onChangePassword, onUtilActio
     <div ref={barRef} className="flex items-center gap-1 min-w-0 flex-1 overflow-visible">
       <nav className="hidden md:flex items-center gap-0.5 min-w-0 flex-1 overflow-visible">
         {adminTopMenus.map((menu) => {
-          const active = menuIsActive(menu, location.pathname);
+          const active = menu.items.some((item) => item.to && windows.some((w) => w.path === item.to && !w.isMinimized));
           const open = openMenuId === menu.id;
           const hasItems = menu.items.length > 0;
 
@@ -196,7 +199,7 @@ function AdminTopNav({ onNavigate, user, onLogout, onChangePassword, onUtilActio
       {openMenu && openMenu.items.length > 0 && (
         <div
           role="menu"
-          className="fixed min-w-[12rem] rounded-xl border border-primary-200 bg-surface shadow-card py-1 z-[80]"
+          className="fixed min-w-[12rem] rounded-xl border border-primary-200 bg-surface shadow-card py-1 z-[9999]"
           style={{ top: menuPos.top, left: menuPos.left, ...noDragRegion }}
         >
           {openMenu.items.map((item) =>
@@ -215,24 +218,23 @@ function AdminTopNav({ onNavigate, user, onLogout, onChangePassword, onUtilActio
                 {item.label}
               </button>
             ) : (
-              <NavLink
+              <button
                 key={item.to}
-                to={item.to}
+                type="button"
                 role="menuitem"
                 onClick={() => {
                   setOpenMenuId(null);
                   onNavigate?.();
+                  openWindow({ path: item.to, title: item.label });
                 }}
-                className={({ isActive }) =>
-                  `block px-4 py-2.5 text-sm transition ${
-                    isActive
-                      ? 'bg-primary-100 text-primary-800 font-semibold'
-                      : 'text-primary-700 hover:bg-primary-50'
-                  }`
-                }
+                className={`block w-full text-left px-4 py-2.5 text-sm transition ${
+                  windows.some((w) => w.path === item.to && w.isActive && !w.isMinimized)
+                    ? 'bg-primary-100 text-primary-800 font-semibold'
+                    : 'text-primary-700 hover:bg-primary-50'
+                }`}
               >
                 {item.label}
-              </NavLink>
+              </button>
             )
           )}
         </div>
@@ -268,7 +270,7 @@ function AdminTopNav({ onNavigate, user, onLogout, onChangePassword, onUtilActio
 }
 
 function AdminMobileMenu({ onClose, onLogout, onChangePassword, user, onUtilAction }) {
-  const location = useLocation();
+  const { openWindow, windows } = useMDI();
 
   return (
     <div className="flex flex-col h-full">
@@ -304,14 +306,19 @@ function AdminMobileMenu({ onClose, onLogout, onChangePassword, user, onUtilActi
                       {item.label}
                     </button>
                   ) : (
-                    <NavLink
+                    <button
                       key={item.to}
-                      to={item.to}
-                      onClick={onClose}
-                      className={() => linkClass(pathMatches(item.to, location.pathname))}
+                      type="button"
+                      onClick={() => {
+                        onClose?.();
+                        openWindow({ path: item.to, title: item.label });
+                      }}
+                      className={`w-full text-left ${linkClass(
+                        windows.some((w) => w.path === item.to && w.isActive && !w.isMinimized)
+                      )}`}
                     >
                       {item.label}
-                    </NavLink>
+                    </button>
                   )
                 )}
               </div>
@@ -370,7 +377,7 @@ function SalesTopNav({ onNavigate, user, onLogout, onChangePassword }) {
               key={to}
               to={to}
               end={end}
-              onClick={() => onNavigate?.()}
+              onClick={onNavigate}
               style={noDragRegion}
               className={`inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-semibold transition ${
                 active
@@ -414,6 +421,8 @@ function SalesTopNav({ onNavigate, user, onLogout, onChangePassword }) {
 }
 
 function SalesMobileMenu({ onClose, onLogout, onChangePassword, user }) {
+  const location = useLocation();
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-4 py-5 border-b border-primary-100">
@@ -425,18 +434,21 @@ function SalesMobileMenu({ onClose, onLogout, onChangePassword, user }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
-        {salesTopLinks.map(({ to, icon: Icon, label, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            onClick={onClose}
-            className={({ isActive }) => linkClass(isActive)}
-          >
-            <Icon className="w-5 h-5 shrink-0" />
-            {label}
-          </NavLink>
-        ))}
+        {salesTopLinks.map(({ to, icon: Icon, label, end }) => {
+          const active = salesLinkIsActive(to, location.pathname, end);
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              onClick={onClose}
+              className={`w-full ${linkClass(active)}`}
+            >
+              <Icon className="w-5 h-5 shrink-0" />
+              {label}
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="p-4 border-t border-primary-100 space-y-2">
@@ -514,25 +526,29 @@ export default function Layout({ children }) {
       }
     }
   };
+  const { minimizeAllWindows } = useMDI();
   const headerPadLeft = isMacElectron ? MAC_TRAFFIC_PAD : undefined;
   const chromeStyle = isElectron ? dragRegion : undefined;
-  const homeTo = isSales ? '/sales-orders' : '/dashboard';
   const roleLabel = isSales ? 'Sales' : 'Admin';
 
   return (
     <div className="h-full min-h-0 flex flex-col bg-cream overflow-hidden">
       <header
-        className="fixed left-0 right-0 top-0 z-40 bg-surface border-b border-primary-200 overflow-visible"
+        className="fixed left-0 right-0 top-0 z-[9990] bg-surface border-b border-primary-200 overflow-visible"
         style={chromeStyle}
       >
         <div
           className="flex items-center gap-3 px-3 md:px-4 h-12 overflow-visible"
           style={headerPadLeft ? { paddingLeft: headerPadLeft } : undefined}
         >
-          <NavLink
-            to={homeTo}
-            className="flex items-center gap-2 shrink-0"
-            title={roleLabel}
+          <button
+            type="button"
+            onClick={() => {
+              closeMenu();
+              minimizeAllWindows();
+            }}
+            className="flex items-center gap-2 shrink-0 text-left hover:opacity-85 transition"
+            title="Minimize all active windows"
             style={noDragRegion}
           >
             <BrandLogo className="w-8 h-8" />
@@ -540,7 +556,7 @@ export default function Layout({ children }) {
               <p className="font-bold text-primary-700 text-sm">JSR</p>
               <p className="text-[10px] text-primary-400 -mt-0.5">{roleLabel}</p>
             </div>
-          </NavLink>
+          </button>
 
           {isSales ? (
             <SalesTopNav
@@ -601,15 +617,11 @@ export default function Layout({ children }) {
       )}
 
       <main className="flex-1 min-h-0 overflow-hidden flex flex-col pt-[3.125rem]">
-        <div
-          className={
-            sellPage
-              ? 'flex-1 min-h-0 overflow-hidden px-2 py-2 w-full flex flex-col'
-              : 'flex-1 min-h-0 overflow-y-auto p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full flex flex-col'
-          }
-        >
-          {children}
-        </div>
+        {isSales ? (
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">{children}</div>
+        ) : (
+          <MDIWorkspace fallbackChildren={children} />
+        )}
       </main>
 
       <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />

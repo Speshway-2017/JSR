@@ -1,5 +1,6 @@
 import express from 'express';
 import Customer from '../models/Customer.js';
+import Vendor from '../models/Vendor.js';
 import Sale from '../models/Sale.js';
 import Transaction from '../models/Transaction.js';
 import { auth, requireRole } from '../middleware/auth.js';
@@ -19,12 +20,15 @@ const router = express.Router();
 router.use(auth);
 router.use(requireRole('admin'));
 
-/** Customer ledger: sales, cash received, less (record only), running balance. */
+/** Ledger for Customer or Vendor: sales, cash received/paid, running balance. */
 router.get('/ledger', async (req, res) => {
   try {
-    const { customerId, startDate, endDate } = req.query;
-    if (!customerId) {
-      return res.status(400).json({ message: 'Select a customer' });
+    const { customerId, vendorId, partyType, startDate, endDate } = req.query;
+    const isVendor = partyType === 'vendor' || (!customerId && !!vendorId);
+    const targetId = isVendor ? vendorId : customerId;
+
+    if (!targetId) {
+      return res.status(400).json({ message: isVendor ? 'Select a vendor' : 'Select a customer' });
     }
     if (!startDate || !endDate) {
       return res.status(400).json({ message: 'Select a date range' });
@@ -34,6 +38,111 @@ router.get('/ledger', async (req, res) => {
     const end = endOfDay(endDate);
     if (start > end) {
       return res.status(400).json({ message: 'Start date must be before or equal to end date' });
+    }
+
+    if (isVendor) {
+      const vendor = await Vendor.findById(vendorId);
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+      const [txs, sales] = await Promise.all([
+        Transaction.find({ vendor: vendorId })
+          .populate('sale', 'totalAmount createdAt lines totalBags')
+          .sort({ createdAt: 1 })
+          .lean(),
+        Sale.find({ vendor: vendorId })
+          .populate('customer', 'name nameTelugu')
+          .sort({ createdAt: 1 })
+          .lean(),
+      ]);
+
+      const items = [];
+      for (const tx of txs) {
+        items.push({
+          date: txWhen(tx),
+          created: new Date(tx.createdAt),
+          kind: tx.type === 'vendor_payment' ? 'paid' : 'other',
+          particulars: tx.description || (tx.type === 'vendor_payment' ? 'Payment to Vendor' : 'Transaction'),
+          saleAmt: 0,
+          paidAmt: Number(tx.amount || 0),
+          lessAmt: 0,
+          delta: -Number(tx.amount || 0),
+          saleId: tx.sale?._id ? String(tx.sale._id) : tx.sale ? String(tx.sale) : null,
+        });
+      }
+
+      for (const sale of sales) {
+        const saleAmt = Number(sale.lines?.reduce((s, l) => s + (l.totalAmount || 0), 0) || 0);
+        const mats = sale.lines?.map((l) => l.materialName).filter(Boolean).join(', ');
+        items.push({
+          date: new Date(sale.createdAt),
+          created: new Date(sale.createdAt),
+          kind: 'sale',
+          particulars: `Sale to ${sale.customer?.name || 'Customer'}${mats ? ` (${mats})` : ''}`,
+          saleAmt,
+          paidAmt: 0,
+          lessAmt: 0,
+          delta: saleAmt,
+          saleId: String(sale._id),
+        });
+      }
+
+      items.sort((a, b) => a.date - b.date || a.created - b.created);
+
+      let running = 0;
+      let openingBalance = 0;
+      const rows = [];
+
+      for (const item of items) {
+        if (item.date < start) {
+          running += item.delta;
+          openingBalance = running;
+          continue;
+        }
+        if (item.date > end) break;
+
+        running += item.delta;
+        rows.push({
+          id: `${item.kind}-${item.date.getTime()}-${Math.random().toString(36).slice(2, 6)}`,
+          date: item.date,
+          kind: item.kind,
+          particulars: item.particulars,
+          sale: item.saleAmt,
+          paid: item.paidAmt,
+          less: item.lessAmt,
+          balance: Number(running.toFixed(2)),
+          saleId: item.saleId,
+        });
+      }
+
+      const totals = rows.reduce(
+        (acc, r) => ({
+          sale: acc.sale + r.sale,
+          paid: acc.paid + r.paid,
+          less: acc.less + r.less,
+        }),
+        { sale: 0, paid: 0, less: 0 }
+      );
+
+      return res.json({
+        partyType: 'vendor',
+        customer: {
+          _id: vendor._id,
+          name: vendor.name,
+          nameTelugu: vendor.nameTelugu || '',
+          schedule: null,
+          creditBalance: vendor.creditBalance,
+        },
+        startDate: start,
+        endDate: end,
+        openingBalance: Number(openingBalance.toFixed(2)),
+        closingBalance: Number(running.toFixed(2)),
+        totals: {
+          sale: Number(totals.sale.toFixed(2)),
+          paid: Number(totals.paid.toFixed(2)),
+          less: Number(totals.less.toFixed(2)),
+        },
+        rows,
+      });
     }
 
     const customer = await Customer.findById(customerId).populate('schedule', 'name');
@@ -91,6 +200,7 @@ router.get('/ledger', async (req, res) => {
     );
 
     res.json({
+      partyType: 'customer',
       customer: {
         _id: customer._id,
         name: customer.name,

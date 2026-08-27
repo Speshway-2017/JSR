@@ -1,51 +1,56 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
 import { matchesSearchFields } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
+import { useMDI } from '../context/MDIContext';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function Ledger() {
-  const navigate = useNavigate();
+  const { openWindow } = useMDI();
   const today = todayInputValue();
-  const [customers, setCustomers] = useState([]);
-  const [customerId, setCustomerId] = useState('');
+  const [partyType, setPartyType] = useState('customer'); // 'customer' | 'vendor'
+  const [parties, setParties] = useState([]);
+  const [partyId, setPartyId] = useState('');
   const [nameQuery, setNameQuery] = useState('');
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const fetchCustomers = useCallback(() => {
+  const fetchParties = useCallback(() => {
+    const endpoint = partyType === 'vendor' ? '/vendors' : '/customers';
     api
-      .get('/customers')
-      .then((res) => setCustomers(res.data))
-      .catch(() => toast.error('Failed to load customers'));
-  }, []);
+      .get(endpoint)
+      .then((res) => setParties(res.data))
+      .catch(() => toast.error(`Failed to load ${partyType}s`));
+  }, [partyType]);
 
   useEffect(() => {
-    fetchCustomers();
-  }, [fetchCustomers]);
+    setPartyId('');
+    setNameQuery('');
+    setData(null);
+    fetchParties();
+  }, [partyType, fetchParties]);
 
   const suggestions = useMemo(() => {
     if (!nameQuery.trim()) return [];
-    return customers
-      .filter((c) => matchesSearchFields(c, ['name', 'nameTelugu', 'mobile'], nameQuery))
+    return parties
+      .filter((p) => matchesSearchFields(p, ['name', 'nameTelugu', 'mobile', 'city'], nameQuery))
       .slice(0, 10);
-  }, [customers, nameQuery]);
+  }, [parties, nameQuery]);
 
-  const selected = customers.find((c) => c._id === customerId);
+  const selected = parties.find((p) => p._id === partyId);
 
   const loadLedger = useCallback(async (e) => {
     e?.preventDefault?.();
-    if (!customerId) {
-      if (e) toast.error('Select a customer');
+    if (!partyId) {
+      if (e) toast.error(`Select a ${partyType}`);
       return;
     }
     if (startDate > endDate) {
@@ -54,9 +59,11 @@ export default function Ledger() {
     }
     setLoading(true);
     try {
-      const res = await api.get('/reports/ledger', {
-        params: { customerId, startDate, endDate },
-      });
+      const params = { partyType, startDate, endDate };
+      if (partyType === 'vendor') params.vendorId = partyId;
+      else params.customerId = partyId;
+
+      const res = await api.get('/reports/ledger', { params });
       setData(res.data);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to load ledger');
@@ -64,26 +71,32 @@ export default function Ledger() {
     } finally {
       setLoading(false);
     }
-  }, [customerId, startDate, endDate]);
+  }, [partyId, partyType, startDate, endDate]);
 
   useEffect(() => {
-    if (customerId && startDate <= endDate) {
+    if (partyId && startDate <= endDate) {
       loadLedger();
     }
-  }, [customerId, startDate, endDate, loadLedger]);
+  }, [partyId, startDate, endDate, loadLedger]);
 
   const reloadAll = useCallback(() => {
-    fetchCustomers();
-    if (customerId) loadLedger();
-  }, [fetchCustomers, customerId, loadLedger]);
+    fetchParties();
+    if (partyId) loadLedger();
+  }, [fetchParties, partyId, loadLedger]);
 
   useDataRestored(reloadAll);
 
   const openEntry = (row) => {
     const d = new Date(row.date).toISOString().slice(0, 10);
-    const params = new URLSearchParams({ date: d, customerId });
-    if (row.saleId) params.set('saleId', row.saleId);
-    navigate(`/sell?${params.toString()}`);
+    const params = new URLSearchParams({ date: d });
+    if (partyType === 'vendor') params.set('vendorId', partyId);
+    else params.set('customerId', partyId);
+
+    if (row.saleId) {
+      params.set('saleId', row.saleId);
+      params.set('highlightSaleId', row.saleId);
+    }
+    openWindow({ path: `/sell?${params.toString()}`, title: 'Sales' });
   };
 
   return (
@@ -91,40 +104,68 @@ export default function Ledger() {
       <div>
         <h1 className="page-title">Ledger</h1>
         <p className="text-primary-400 text-sm mt-0.5">
-          Customer transactions — sales, cash received, and less (record only)
+          Customer & Vendor transactions — sales, cash received/paid, running balance
         </p>
       </div>
 
       <form onSubmit={loadLedger} className="card space-y-3">
+        <div className="flex items-center gap-3 bg-primary-50/70 p-2 rounded-xl border border-primary-100 mb-2">
+          <span className="text-xs font-semibold text-primary-600">Party Type:</span>
+          <button
+            type="button"
+            onClick={() => setPartyType('customer')}
+            className={`px-3 py-1 text-xs rounded-lg font-medium transition ${
+              partyType === 'customer'
+                ? 'bg-primary-600 text-white shadow-sm'
+                : 'text-primary-600 hover:bg-primary-100'
+            }`}
+          >
+            Customer
+          </button>
+          <button
+            type="button"
+            onClick={() => setPartyType('vendor')}
+            className={`px-3 py-1 text-xs rounded-lg font-medium transition ${
+              partyType === 'vendor'
+                ? 'bg-primary-600 text-white shadow-sm'
+                : 'text-primary-600 hover:bg-primary-100'
+            }`}
+          >
+            Vendor
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="md:col-span-2 relative">
-            <label className="label">Customer *</label>
+            <label className="label">{partyType === 'vendor' ? 'Vendor *' : 'Customer *'}</label>
             <input
               className="input-field"
               value={nameQuery}
               onChange={(e) => {
                 setNameQuery(e.target.value);
-                setCustomerId('');
+                setPartyId('');
               }}
-              placeholder="Type to search…"
+              placeholder={`Search ${partyType === 'vendor' ? 'vendor' : 'customer'}…`}
               autoComplete="off"
             />
-            {!customerId && suggestions.length > 0 && (
+            {!partyId && suggestions.length > 0 && (
               <ul className="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-xl border border-primary-200 bg-surface shadow-card">
-                {suggestions.map((c) => (
-                  <li key={c._id}>
+                {suggestions.map((p) => (
+                  <li key={p._id}>
                     <button
                       type="button"
                       className="w-full text-left px-3 py-2 text-sm hover:bg-primary-50"
                       onMouseDown={(ev) => {
                         ev.preventDefault();
-                        setCustomerId(c._id);
-                        setNameQuery(c.name);
+                        setPartyId(p._id);
+                        setNameQuery(p.name);
                       }}
                     >
-                      {c.name}
-                      {c.schedule?.name ? (
-                        <span className="text-xs text-primary-400"> · {c.schedule.name}</span>
+                      {p.name}
+                      {p.city ? (
+                        <span className="text-xs text-primary-400"> · {p.city}</span>
+                      ) : p.schedule?.name ? (
+                        <span className="text-xs text-primary-400"> · {p.schedule.name}</span>
                       ) : null}
                     </button>
                   </li>
@@ -133,7 +174,7 @@ export default function Ledger() {
             )}
             {selected ? (
               <p className="text-xs text-primary-400 mt-1">
-                {selected.schedule?.name || 'No schedule'} · Balance{' '}
+                {selected.city || selected.schedule?.name || 'Party selected'} · Balance{' '}
                 {formatCurrency(selected.creditBalance)}
               </p>
             ) : null}
@@ -203,13 +244,25 @@ export default function Ledger() {
                   data.rows.map((row) => (
                     <tr
                       key={row.id}
-                      className="border-t border-primary-50 hover:bg-primary-50/80 cursor-pointer"
+                      className="border-t border-primary-50 hover:bg-primary-50/80 cursor-pointer transition-colors"
                       onClick={() => openEntry(row)}
-                      title="Open sales bill for this date"
+                      onDoubleClick={() => openEntry(row)}
+                      title="Double-click or click to open sale details in Sales"
                     >
                       <td className="px-3 py-2 whitespace-nowrap">{formatDateOnly(row.date)}</td>
                       <td className="px-3 py-2 text-primary-700">{row.particulars}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
+                      <td
+                        className="px-3 py-2 text-right tabular-nums font-semibold text-primary-800 hover:text-accent-700 underline underline-offset-2 decoration-primary-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEntry(row);
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          openEntry(row);
+                        }}
+                        title="Click or double-click sale to view and highlight in Sales"
+                      >
                         {row.sale ? formatCurrency(row.sale) : '—'}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">

@@ -10,6 +10,7 @@ import { matchesPrefix } from '../utils/search';
 import { buildMaterialColumns, BRAND, exportBrandedBagBagExcel, exportIndividualBagReportExcel, listPersonNames } from '../utils/salesOrderExcel';
 import { exportBrandedBagBagPdf, exportIndividualBagReportPdf, PDF_PAPER_SIZES } from '../utils/salesOrderPdf';
 import { useDataRestored } from '../utils/useDataRestored';
+import { useMDI } from '../context/MDIContext';
 
 function toUiEntries(entries = []) {
   return entries.map((e, i) => ({
@@ -46,9 +47,9 @@ function filterSuggestions(list, query, { requireQuery = false } = {}) {
 
 /** List of saved reports */
 export function SalesBagReportsList() {
+  const { openWindow } = useMDI();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -83,50 +84,62 @@ export function SalesBagReportsList() {
           <h1 className="page-title">Previous Reports</h1>
           <p className="text-primary-400 text-sm mt-0.5">View, edit, or delete saved bag order sheets</p>
         </div>
-        <Link to="/sales-orders" className="btn-primary !py-2 !px-4 !text-sm">
+        <button
+          type="button"
+          onClick={() => openWindow({ path: '/sales-orders', title: 'New Report' })}
+          className="btn-primary !py-2 !px-4 !text-sm cursor-pointer"
+        >
           <FilePlus className="w-4 h-4" /> New report
-        </Link>
+        </button>
       </div>
 
       {loading ? (
-        <div className="text-center py-16 text-primary-400">Loading reports…</div>
+        <div className="text-center py-20 text-primary-400">Loading reports...</div>
       ) : reports.length === 0 ? (
-        <div className="card text-center py-12 text-primary-400">
-          <History className="w-10 h-10 mx-auto mb-2 text-primary-300" />
-          No saved reports yet. Add lines on Sales Orders — they save automatically.
+        <div className="card text-center py-16">
+          <p className="text-primary-400 text-sm">No saved reports yet.</p>
+          <button
+            type="button"
+            onClick={() => openWindow({ path: '/sales-orders', title: 'New Report' })}
+            className="btn-primary inline-flex items-center gap-2 mt-4 cursor-pointer"
+          >
+            <FilePlus className="w-4 h-4" /> Create first report
+          </button>
         </div>
       ) : (
         <div className="card !p-0 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-primary-100 bg-primary-50/80">
-                  <th className="px-4 py-3 font-semibold text-primary-500">Title</th>
-                  <th className="px-4 py-3 font-semibold text-primary-500">Lines</th>
-                  <th className="px-4 py-3 font-semibold text-primary-500">Updated</th>
-                  <th className="px-4 py-3 font-semibold text-primary-500 text-right">Actions</th>
+                <tr className="border-b border-primary-100 bg-primary-50/50 text-left text-xs font-semibold text-primary-500 uppercase tracking-wider">
+                  <th className="px-4 py-3">Title</th>
+                  <th className="px-4 py-3">Updated</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-primary-100">
                 {reports.map((r) => (
-                  <tr key={r._id} className="border-b border-primary-50 hover:bg-primary-50/40">
-                    <td className="px-4 py-3 font-medium text-primary-800">{r.title || 'Untitled'}</td>
-                    <td className="px-4 py-3 text-primary-600">{r.entries?.length || 0}</td>
-                    <td className="px-4 py-3 text-primary-500">{formatDate(r.updatedAt || r.createdAt)}</td>
+                  <tr key={r._id} className="hover:bg-primary-50/40">
+                    <td className="px-4 py-3 font-medium text-primary-800">
+                      {r.title || 'Untitled report'}
+                    </td>
+                    <td className="px-4 py-3 text-primary-400 text-xs">
+                      {formatDate(r.updatedAt || r.createdAt)}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1.5">
                         <button
                           type="button"
-                          className="btn-secondary !py-1.5 !px-2.5 !text-xs"
-                          onClick={() => navigate(`/sales-orders/${r._id}?mode=view`)}
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs cursor-pointer"
+                          onClick={() => openWindow({ path: `/sales-orders/${r._id}?mode=view`, title: `View: ${r.title || 'Report'}` })}
                           title="View"
                         >
                           <Eye className="w-3.5 h-3.5" /> View
                         </button>
                         <button
                           type="button"
-                          className="btn-secondary !py-1.5 !px-2.5 !text-xs"
-                          onClick={() => navigate(`/sales-orders/${r._id}`)}
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs cursor-pointer"
+                          onClick={() => openWindow({ path: `/sales-orders/${r._id}`, title: `Edit: ${r.title || 'Report'}` })}
                           title="Edit"
                         >
                           <Pencil className="w-3.5 h-3.5" /> Edit
@@ -153,11 +166,13 @@ export function SalesBagReportsList() {
 }
 
 /** Create / edit / view a bag order report */
-export default function SalesOrders() {
-  const { id } = useParams();
+export default function SalesOrders({ path: windowPath }) {
+  const { id: routeId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const viewOnly = searchParams.get('mode') === 'view';
+  const rawId = routeId || (windowPath ? windowPath.split('/sales-orders/')[1]?.split('?')[0] : null);
+  const id = (rawId === 'previous' || rawId === 'undefined' ? null : rawId);
+  const viewOnly = searchParams.get('mode') === 'view' || (windowPath && windowPath.includes('mode=view'));
 
   const [reportId, setReportId] = useState(id || null);
   const [title, setTitle] = useState('');

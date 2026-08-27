@@ -29,6 +29,7 @@ import {
 import api from '../api';
 import { formatCurrency, formatDate, formatKg } from '../utils/format';
 import { useDataRestored } from '../utils/useDataRestored';
+import { useMDI } from '../context/MDIContext';
 
 const COLORS = {
   primary: '#637d6c',
@@ -66,6 +67,7 @@ function EmptyChart({ message = 'No data yet' }) {
 }
 
 export default function Dashboard() {
+  const { openWindow } = useMDI();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -183,7 +185,12 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {cards.map(({ label, value, sub, icon: Icon, color, link }) => (
-          <Link key={label} to={link} className="card hover:border-primary-200 transition !p-4">
+          <button
+            key={label}
+            type="button"
+            onClick={() => openWindow({ path: link, title: label })}
+            className="card hover:border-primary-200 transition !p-4 text-left cursor-pointer w-full"
+          >
             <div className="flex items-start justify-between gap-2">
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
                 <Icon className="w-4 h-4" />
@@ -192,7 +199,7 @@ export default function Dashboard() {
             <p className="text-xs text-primary-400 mt-3">{label}</p>
             <p className="text-lg font-bold text-primary-700 mt-0.5 leading-tight">{value}</p>
             {sub && <p className="text-[11px] text-primary-400 mt-0.5">{sub}</p>}
-          </Link>
+          </button>
         ))}
       </div>
 
@@ -375,10 +382,11 @@ export default function Dashboard() {
                 const max = topCustomers[0]?.amount || 1;
                 const pct = Math.max(6, Math.round((c.amount / max) * 100));
                 return (
-                  <Link
+                  <button
                     key={c.id}
-                    to={`/customers/${c.id}`}
-                    className="block p-2.5 rounded-xl hover:bg-primary-50 transition"
+                    type="button"
+                    onClick={() => openWindow({ path: `/customers/${c.id}`, title: `Customer: ${c.name}` })}
+                    className="block w-full text-left p-2.5 rounded-xl hover:bg-primary-50 transition cursor-pointer"
                   >
                     <div className="flex justify-between gap-2 text-sm mb-1.5">
                       <span className="font-semibold text-primary-700 truncate">
@@ -389,7 +397,7 @@ export default function Dashboard() {
                     <div className="h-1.5 rounded-full bg-primary-50 overflow-hidden">
                       <div className="h-full rounded-full bg-primary-400" style={{ width: `${pct}%` }} />
                     </div>
-                  </Link>
+                  </button>
                 );
               })}
             </div>
@@ -407,10 +415,11 @@ export default function Dashboard() {
                 const max = topVendors[0]?.amount || 1;
                 const pct = Math.max(6, Math.round((v.amount / max) * 100));
                 return (
-                  <Link
+                  <button
                     key={v.id}
-                    to={`/vendors/${v.id}`}
-                    className="block p-2.5 rounded-xl hover:bg-primary-50 transition"
+                    type="button"
+                    onClick={() => openWindow({ path: `/vendors/${v.id}`, title: `Vendor: ${v.name}` })}
+                    className="block w-full text-left p-2.5 rounded-xl hover:bg-primary-50 transition cursor-pointer"
                   >
                     <div className="flex justify-between gap-2 text-sm mb-1.5">
                       <span className="font-semibold text-primary-700 truncate">
@@ -421,7 +430,7 @@ export default function Dashboard() {
                     <div className="h-1.5 rounded-full bg-primary-50 overflow-hidden">
                       <div className="h-full rounded-full bg-accent-400" style={{ width: `${pct}%` }} />
                     </div>
-                  </Link>
+                  </button>
                 );
               })}
             </div>
@@ -434,17 +443,18 @@ export default function Dashboard() {
           <h2 className="text-lg font-bold text-primary-700 mb-3">Quick Actions</h2>
           <div className="space-y-2">
             {actions.map(({ label, desc, link }) => (
-              <Link
+              <button
                 key={label}
-                to={link}
-                className="flex items-center justify-between p-3 rounded-xl hover:bg-primary-50 transition group"
+                type="button"
+                onClick={() => openWindow({ path: link, title: label })}
+                className="flex items-center justify-between p-3 rounded-xl hover:bg-primary-50 transition group w-full text-left cursor-pointer"
               >
                 <div>
                   <p className="font-semibold text-primary-700 group-hover:text-primary-600">{label}</p>
                   <p className="text-xs text-primary-400">{desc}</p>
                 </div>
                 <ArrowRight className="w-4 h-4 text-primary-300" />
-              </Link>
+              </button>
             ))}
           </div>
         </div>
@@ -452,19 +462,24 @@ export default function Dashboard() {
         <div className="card">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold text-primary-700">Recent Sales</h2>
-            <Link to="/sales-report" className="text-xs font-medium text-primary-500 hover:text-primary-700">
+            <button
+              type="button"
+              onClick={() => openWindow({ path: '/sales-report', title: 'Sales Report' })}
+              className="text-xs font-medium text-primary-500 hover:text-primary-700 cursor-pointer"
+            >
               Sales report →
-            </Link>
+            </button>
           </div>
           {recentSales.length === 0 ? (
             <p className="text-primary-400 text-sm py-6 text-center">No sales yet</p>
           ) : (
             <div className="space-y-2">
               {recentSales.map((sale) => (
-                <Link
+                <button
                   key={sale._id}
-                  to={`/customers/${sale.customer?._id || sale.customer}`}
-                  className="flex justify-between items-center gap-3 p-3 rounded-xl hover:bg-primary-50"
+                  type="button"
+                  onClick={() => openWindow({ path: `/customers/${sale.customer?._id || sale.customer}`, title: `Customer: ${sale.customer?.name || 'Customer'}` })}
+                  className="flex justify-between items-center gap-3 p-3 rounded-xl hover:bg-primary-50 w-full text-left cursor-pointer"
                 >
                   <div className="min-w-0">
                     <p className="font-semibold text-primary-700 truncate">
@@ -479,7 +494,7 @@ export default function Dashboard() {
                     <FileText className="w-3.5 h-3.5 text-primary-300" />
                     <p className="font-bold text-accent-600 text-sm">{formatCurrency(sale.totalAmount)}</p>
                   </div>
-                </Link>
+                </button>
               ))}
             </div>
           )}

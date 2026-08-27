@@ -503,6 +503,15 @@ body.bill-preview {
   border-radius: 8px;
   padding: 8px 14px;
 }
+.preview-toolbar button.whatsapp {
+  background: #25D366;
+  color: #fff;
+  border-color: #25D366;
+  font-weight: 600;
+}
+.preview-toolbar button.whatsapp:hover {
+  background: #1eb956;
+}
 .preview-toolbar button.secondary {
   background: #fff;
   color: #166534;
@@ -600,11 +609,21 @@ ${BILL_CSS}
 <body class="bill-preview" style="font-family:'${RAMABHADRA}','Noto Sans Telugu',sans-serif;font-weight:400;">
   <div class="preview-toolbar no-print">
     <button type="button" class="secondary" onclick="window.close()">Close</button>
+    <button type="button" class="whatsapp" onclick="sendWhatsAppBill()">Send WhatsApp</button>
     <button type="button" onclick="window.print()">Print / Save PDF</button>
   </div>
   <div class="preview-stage">
     <div class="sheet">${sheetInner}</div>
   </div>
+  <script>
+    function sendWhatsAppBill() {
+      var sheet = document.querySelector('.sheet');
+      var bodyText = sheet ? sheet.innerText : document.body.innerText;
+      var lines = bodyText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+      var text = '*JSR AGRI TRADES - Bill Details*\n-----------------------------------\n' + lines.slice(0, 35).join('\n') + '\n-----------------------------------\n*Thank you!* 🙏';
+      window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+    }
+  </script>
 </body>
 </html>`;
 
