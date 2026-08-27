@@ -10,7 +10,7 @@ import {
   BILL_CSS,
   openBillPreviewTab,
 } from './raituBillShared';
-import { RAMABHADRA } from './pdfFont';
+import { RAMABHADRA, ramabhadraFontFaceCss } from './pdfFont';
 
 async function customerBillInner(sale) {
   const [teluguMap, partyName] = await Promise.all([
@@ -90,15 +90,7 @@ export async function openCustomerBillsNUp(sales, perPage = 4, previewTab) {
   }
 
   const pages = chunk(inners, n);
-  const origin = window.location.origin;
-  const fontCss = `
-@font-face {
-  font-family: '${RAMABHADRA}';
-  src: url('${origin}/fonts/Ramabhadra-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}`.trim();
+  const fontCss = await ramabhadraFontFaceCss();
 
   const pageHtml = pages
     .map(

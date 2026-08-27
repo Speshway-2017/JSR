@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatDate } from '../utils/format';
+import { matchesSearchFields } from '../utils/search';
+import { useDataRestored } from '../utils/useDataRestored';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -22,21 +24,26 @@ export default function AddLoad() {
   const selected = vendors.find((v) => v._id === vendorId);
 
   const suggestions = useMemo(() => {
-    const q = vendorQuery.trim().toLowerCase();
-    if (!q) return [];
+    if (!vendorQuery.trim()) return [];
     return vendors
-      .filter((v) => (v.name || '').toLowerCase().includes(q) || (v.city || '').toLowerCase().includes(q))
+      .filter((v) => matchesSearchFields(v, ['name', 'nameTelugu', 'city', 'mobile'], vendorQuery))
       .slice(0, 8);
   }, [vendors, vendorQuery]);
 
-  const loadRecent = () => {
+  const loadRecent = useCallback(() => {
     api.get('/loads').then((res) => setRecent(res.data.slice(0, 20))).catch(() => {});
-  };
+  }, []);
 
-  useEffect(() => {
+  const loadAll = useCallback(() => {
     api.get('/vendors').then((res) => setVendors(res.data)).catch(() => toast.error('Failed to load vendors'));
     loadRecent();
-  }, []);
+  }, [loadRecent]);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  useDataRestored(loadAll);
 
   const pickVendor = (v) => {
     setVendorId(v._id);

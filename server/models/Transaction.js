@@ -22,4 +22,9 @@ const transactionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+transactionSchema.index({ createdAt: -1 });
+transactionSchema.index({ vendor: 1, createdAt: -1 });
+transactionSchema.index({ customer: 1, createdAt: -1 });
+transactionSchema.index({ type: 1, createdAt: -1 });
+
 export default mongoose.model('Transaction', transactionSchema);

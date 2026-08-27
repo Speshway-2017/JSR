@@ -1,37 +1,72 @@
-import { useEffect, useState } from 'react';
-import { Receipt } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Receipt, Search } from 'lucide-react';
 import api from '../api';
 import { formatCurrency, formatDate } from '../utils/format';
 import { transactionTypeColors, transactionTypeLabels } from '../utils/transactionTypes';
+import { matchesPrefix } from '../utils/search';
+import { useDataRestored } from '../utils/useDataRestored';
 
 export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [filter, setFilter] = useState({ vendorId: '', customerId: '', type: '' });
+  const [vendorId, setVendorId] = useState('');
+  const [customerId, setCustomerId] = useState('');
+  const [type, setType] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [limit, setLimit] = useState(200);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    Promise.all([api.get('/vendors'), api.get('/customers')]).then(([v, c]) => {
-      setVendors(v.data);
-      setCustomers(c.data);
-    });
+  const fetchMasters = useCallback(() => {
+    Promise.all([api.get('/vendors'), api.get('/customers')])
+      .then(([v, c]) => {
+        setVendors(v.data);
+        setCustomers(c.data);
+      })
+      .catch(() => {});
   }, []);
 
-  useEffect(() => {
+  const fetchTransactions = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (filter.vendorId) params.set('vendorId', filter.vendorId);
-    if (filter.customerId) params.set('customerId', filter.customerId);
-    if (filter.type) params.set('type', filter.type);
+    if (vendorId) params.set('vendorId', vendorId);
+    if (customerId) params.set('customerId', customerId);
+    if (type) params.set('type', type);
+    if (limit) params.set('limit', String(limit));
 
     api
       .get(`/transactions?${params}`)
-      .then((res) => setTransactions(res.data))
+      .then((res) => setTransactions(res.data || []))
+      .catch(() => setTransactions([]))
       .finally(() => setLoading(false));
-  }, [filter]);
+  }, [vendorId, customerId, type, limit]);
+
+  useEffect(() => {
+    fetchMasters();
+  }, [fetchMasters]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  const reloadAll = useCallback(() => {
+    fetchMasters();
+    fetchTransactions();
+  }, [fetchMasters, fetchTransactions]);
+
+  useDataRestored(reloadAll);
 
   const partyName = (tx) => tx.customer?.name || tx.vendor?.name || '—';
+
+  const filteredTransactions = useMemo(() => {
+    if (!searchQuery.trim()) return transactions;
+    const q = searchQuery.trim();
+    return transactions.filter((tx) => {
+      const pName = partyName(tx);
+      const desc = tx.description || '';
+      return matchesPrefix(pName, q) || matchesPrefix(desc, q);
+    });
+  }, [transactions, searchQuery]);
 
   return (
     <div className="space-y-4">
@@ -41,41 +76,58 @@ export default function Transactions() {
       </div>
 
       <div className="card !p-3 sm:!p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex items-center gap-2 min-w-[140px] flex-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="w-4 h-4 text-primary-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              className="input-field !pl-9 !py-2 !text-sm"
+              placeholder="Search by party or description…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-2 min-w-[140px] shrink-0">
             <label className="text-xs text-primary-400 shrink-0">Vendor</label>
             <select
               className="input-field !py-2 !text-sm flex-1"
-              value={filter.vendorId}
-              onChange={(e) => setFilter({ ...filter, vendorId: e.target.value })}
+              value={vendorId}
+              onChange={(e) => setVendorId(e.target.value)}
             >
-              <option value="">All</option>
+              <option value="">All Vendors</option>
               {vendors.map((v) => (
-                <option key={v._id} value={v._id}>{v.name}</option>
+                <option key={v._id} value={v._id}>
+                  {v.name}
+                </option>
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-2 min-w-[140px] flex-1">
+
+          <div className="flex items-center gap-2 min-w-[140px] shrink-0">
             <label className="text-xs text-primary-400 shrink-0">Customer</label>
             <select
               className="input-field !py-2 !text-sm flex-1"
-              value={filter.customerId}
-              onChange={(e) => setFilter({ ...filter, customerId: e.target.value })}
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
             >
-              <option value="">All</option>
+              <option value="">All Customers</option>
               {customers.map((c) => (
-                <option key={c._id} value={c._id}>{c.name}</option>
+                <option key={c._id} value={c._id}>
+                  {c.name}
+                </option>
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-2 min-w-[140px] flex-1">
+
+          <div className="flex items-center gap-2 min-w-[140px] shrink-0">
             <label className="text-xs text-primary-400 shrink-0">Type</label>
             <select
               className="input-field !py-2 !text-sm flex-1"
-              value={filter.type}
-              onChange={(e) => setFilter({ ...filter, type: e.target.value })}
+              value={type}
+              onChange={(e) => setType(e.target.value)}
             >
-              <option value="">All</option>
+              <option value="">All Types</option>
               <option value="customer_credit">Customer Credit</option>
               <option value="customer_payment">Customer Payment</option>
               <option value="vendor_credit">Vendor Credit</option>
@@ -87,8 +139,8 @@ export default function Transactions() {
 
       <div className="card !p-0 overflow-hidden">
         {loading ? (
-          <div className="text-center py-12 text-primary-400 text-sm">Loading...</div>
-        ) : transactions.length === 0 ? (
+          <div className="text-center py-12 text-primary-400 text-sm">Loading transactions…</div>
+        ) : filteredTransactions.length === 0 ? (
           <div className="text-center py-12">
             <Receipt className="w-10 h-10 text-primary-300 mx-auto mb-2" />
             <p className="text-primary-400 text-sm">No transactions found</p>
@@ -106,8 +158,8 @@ export default function Transactions() {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((tx) => (
-                  <tr key={tx._id} className="border-b border-primary-50">
+                {filteredTransactions.map((tx) => (
+                  <tr key={tx._id} className="border-b border-primary-50 hover:bg-primary-50/30">
                     <td className="py-2.5 px-4 text-sm text-primary-600 whitespace-nowrap">{formatDate(tx.createdAt)}</td>
                     <td className="py-2.5 px-4">
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${transactionTypeColors[tx.type] || 'bg-primary-100 text-primary-600'}`}>
@@ -117,12 +169,23 @@ export default function Transactions() {
                     <td className="py-2.5 px-4 text-sm text-primary-600">{partyName(tx)}</td>
                     <td className="py-2.5 px-4 text-sm text-primary-600 max-w-xs truncate">{tx.description}</td>
                     <td className="py-2.5 px-4 text-sm font-semibold text-primary-700 text-right whitespace-nowrap">
-                      {tx.type.includes('payment') ? '-' : '+'}{formatCurrency(tx.amount)}
+                      {tx.type?.includes('payment') ? '-' : '+'}{formatCurrency(tx.amount)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {transactions.length >= limit && (
+          <div className="p-3 text-center border-t border-primary-100 bg-primary-50/40">
+            <button
+              type="button"
+              className="btn-secondary !py-1.5 !px-4 !text-xs"
+              onClick={() => setLimit((prev) => prev + 200)}
+            >
+              Load More Transactions
+            </button>
           </div>
         )}
       </div>

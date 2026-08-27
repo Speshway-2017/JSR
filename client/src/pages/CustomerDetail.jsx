@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Pencil, X, Save, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -8,6 +8,7 @@ import { formatCurrency, formatDate, formatKg } from '../utils/format';
 import { openCustomerSaleBillPdf } from '../utils/customerSaleBillPdf';
 import { openBillPreviewTab } from '../utils/raituBillShared';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
+import { useDataRestored } from '../utils/useDataRestored';
 
 export default function CustomerDetail() {
   const { id } = useParams();
@@ -31,7 +32,7 @@ export default function CustomerDetail() {
     editing ? editForm.name : ''
   );
 
-  const fetchData = () => {
+  const fetchData = useCallback(() => {
     Promise.all([api.get(`/customers/${id}`), api.get('/schedules')])
       .then(([res, schedRes]) => {
         setData(res.data);
@@ -46,11 +47,13 @@ export default function CustomerDetail() {
         });
       })
       .finally(() => setLoading(false));
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchData();
-  }, [id]);
+  }, [fetchData]);
+
+  useDataRestored(fetchData);
 
   useEffect(() => {
     if (!editing) return;

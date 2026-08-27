@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency } from '../utils/format';
 import { openBillPreviewTab, openRangeBillsNUp } from '../utils/rangeBillPrint';
+import { matchesSearchFields } from '../utils/search';
+import { useDataRestored } from '../utils/useDataRestored';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -77,14 +79,9 @@ export default function Sell() {
   const amount = Number((materialsAmount + coolyApplied).toFixed(2));
 
   const suggestions = useMemo(() => {
-    const q = nameQuery.trim().toLowerCase();
-    if (!q) return [];
+    if (!nameQuery.trim()) return [];
     return customers
-      .filter((c) => {
-        const name = (c.name || '').toLowerCase();
-        const te = (c.nameTelugu || '').toLowerCase();
-        return name.includes(q) || te.includes(q);
-      })
+      .filter((c) => matchesSearchFields(c, ['name', 'nameTelugu', 'mobile'], nameQuery))
       .slice(0, 8);
   }, [customers, nameQuery]);
 
@@ -283,7 +280,7 @@ export default function Sell() {
     }, 0);
   };
 
-  useEffect(() => {
+  const loadMasterData = useCallback(() => {
     Promise.all([api.get('/materials'), api.get('/customers'), api.get('/vendors')])
       .then(([m, c, v]) => {
         setMaterials(m.data);
@@ -292,6 +289,17 @@ export default function Sell() {
       })
       .catch(() => toast.error('Failed to load master data'));
   }, []);
+
+  useEffect(() => {
+    loadMasterData();
+  }, [loadMasterData]);
+
+  const reloadAll = useCallback(() => {
+    loadMasterData();
+    loadDaySales().catch(() => setSales([]));
+  }, [loadMasterData, date]);
+
+  useDataRestored(reloadAll);
 
   useEffect(() => {
     loadDaySales().catch(() => setSales([]));

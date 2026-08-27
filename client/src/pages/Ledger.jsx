@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
+import { matchesSearchFields } from '../utils/search';
+import { useDataRestored } from '../utils/useDataRestored';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -20,35 +22,34 @@ export default function Ledger() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchCustomers = useCallback(() => {
     api
       .get('/customers')
       .then((res) => setCustomers(res.data))
       .catch(() => toast.error('Failed to load customers'));
   }, []);
 
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
+
   const suggestions = useMemo(() => {
-    const q = nameQuery.trim().toLowerCase();
-    if (!q) return [];
+    if (!nameQuery.trim()) return [];
     return customers
-      .filter((c) => {
-        const name = (c.name || '').toLowerCase();
-        const te = (c.nameTelugu || '').toLowerCase();
-        return name.includes(q) || te.includes(q);
-      })
+      .filter((c) => matchesSearchFields(c, ['name', 'nameTelugu', 'mobile'], nameQuery))
       .slice(0, 10);
   }, [customers, nameQuery]);
 
   const selected = customers.find((c) => c._id === customerId);
 
-  const loadLedger = async (e) => {
+  const loadLedger = useCallback(async (e) => {
     e?.preventDefault?.();
     if (!customerId) {
-      toast.error('Select a customer');
+      if (e) toast.error('Select a customer');
       return;
     }
     if (startDate > endDate) {
-      toast.error('Start date must be before end date');
+      if (e) toast.error('Start date must be before end date');
       return;
     }
     setLoading(true);
@@ -63,7 +64,20 @@ export default function Ledger() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [customerId, startDate, endDate]);
+
+  useEffect(() => {
+    if (customerId && startDate <= endDate) {
+      loadLedger();
+    }
+  }, [customerId, startDate, endDate, loadLedger]);
+
+  const reloadAll = useCallback(() => {
+    fetchCustomers();
+    if (customerId) loadLedger();
+  }, [fetchCustomers, customerId, loadLedger]);
+
+  useDataRestored(reloadAll);
 
   const openEntry = (row) => {
     const d = new Date(row.date).toISOString().slice(0, 10);

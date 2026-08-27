@@ -10,18 +10,22 @@ router.use(requireRole('admin'));
 
 router.get('/', async (req, res) => {
   try {
-    const { vendorId, customerId, type } = req.query;
+    const { vendorId, customerId, type, limit } = req.query;
     const filter = {};
     if (vendorId) filter.vendor = vendorId;
     if (customerId) filter.customer = customerId;
     if (type) filter.type = type;
+
+    const maxRecords = limit ? Math.min(Number(limit) || 100, 1000) : 200;
 
     const transactions = await Transaction.find(filter)
       .populate('vendor', 'name mobile city')
       .populate('customer', 'name city state')
       .populate('load', 'totalWeight handlingCharges')
       .populate('sale', 'totalAmount totalBags')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .limit(maxRecords)
+      .lean();
     res.json(transactions);
   } catch (error) {
     res.status(500).json({ message: error.message });

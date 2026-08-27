@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus, Trash2, Banknote } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import PosMaterialInput from '../components/PosMaterialInput';
 import { formatCurrency } from '../utils/format';
+import { useDataRestored } from '../utils/useDataRestored';
 
 const emptyItem = { materialId: '', materialName: '', quantityKg: '', pricePerKg: '' };
 
@@ -13,9 +14,15 @@ export default function POS() {
   const [customerName, setCustomerName] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const loadMaterials = useCallback(() => {
     api.get('/materials').then((res) => setMaterials(res.data));
   }, []);
+
+  useEffect(() => {
+    loadMaterials();
+  }, [loadMaterials]);
+
+  useDataRestored(loadMaterials);
 
   const addItem = () => setItems([...items, { ...emptyItem }]);
 

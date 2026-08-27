@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { formatCurrency } from '../utils/format';
+import { matchesSearchFields } from '../utils/search';
 
 export default function PosMaterialInput({
   materials,
@@ -35,7 +36,7 @@ export default function PosMaterialInput({
 
   const trimmed = query.trim();
   const suggestions = trimmed
-    ? available.filter((m) => m.name.toLowerCase().includes(trimmed.toLowerCase()))
+    ? available.filter((m) => matchesSearchFields(m, ['name', 'nameTelugu'], trimmed))
     : available;
 
   const selectMaterial = (mat) => {

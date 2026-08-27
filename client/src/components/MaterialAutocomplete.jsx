@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Plus, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
+import { matchesSearchFields } from '../utils/search';
 
 export default function MaterialAutocomplete({
   materials,
@@ -32,7 +33,7 @@ export default function MaterialAutocomplete({
 
   const trimmed = query.trim();
   const suggestions = trimmed
-    ? materials.filter((m) => m.name.toLowerCase().includes(trimmed.toLowerCase()))
+    ? materials.filter((m) => matchesSearchFields(m, ['name', 'nameTelugu'], trimmed))
     : materials;
 
   const exactMatch = materials.some((m) => m.name.toLowerCase() === trimmed.toLowerCase());

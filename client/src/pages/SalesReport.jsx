@@ -3,6 +3,7 @@ import { FileBarChart, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../api';
 import { formatCurrency, formatDate } from '../utils/format';
+import { useDataRestored } from '../utils/useDataRestored';
 
 function formatWeight(kg) {
   return `${Number(kg).toFixed(1)} kg`;
@@ -44,6 +45,8 @@ export default function SalesReport() {
   useEffect(() => {
     fetchReport();
   }, [fetchReport]);
+
+  useDataRestored(fetchReport);
 
   const allRows = data?.rows || [];
   const rateOptions = useMemo(() => {

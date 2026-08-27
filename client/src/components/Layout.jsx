@@ -21,6 +21,8 @@ import {
 } from './TitleBar';
 import BrandLogo from './BrandLogo';
 import ChangePasswordModal from './ChangePasswordModal';
+import UtilConfirmModal from './UtilConfirmModal';
+import LogoutConfirmModal from './LogoutConfirmModal';
 import { warmRaituBillAssets } from '../utils/raituBillShared';
 import { runAtlasUtilAction } from '../utils/atlasNetwork';
 
@@ -473,26 +475,44 @@ export default function Layout({ children }) {
   const isMacElectron = isElectron && platform === 'darwin';
   const [menuOpen, setMenuOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [utilModalAction, setUtilModalAction] = useState(null);
+  const [utilBusy, setUtilBusy] = useState(false);
 
   useEffect(() => {
     warmRaituBillAssets();
   }, []);
 
-  const handleLogout = () => {
+  const openLogoutPrompt = () => setLogoutOpen(true);
+
+  const confirmLogout = () => {
+    setLogoutOpen(false);
     logout();
     navigate('/login');
   };
 
   const openChangePassword = () => setPasswordOpen(true);
   const closeMenu = () => setMenuOpen(false);
-  const atlasBusyRef = useRef(false);
 
   const handleUtilAction = (action) => {
-    if (atlasBusyRef.current) return;
-    atlasBusyRef.current = true;
-    runAtlasUtilAction(action).finally(() => {
-      atlasBusyRef.current = false;
-    });
+    setUtilModalAction(action);
+  };
+
+  const handleUtilConfirm = async () => {
+    if (!utilModalAction || utilBusy) return;
+    setUtilBusy(true);
+    try {
+      await runAtlasUtilAction(utilModalAction, { skipConfirm: true });
+    } finally {
+      setUtilBusy(false);
+      setUtilModalAction(null);
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+      if (typeof window.focus === 'function') {
+        window.focus();
+      }
+    }
   };
   const headerPadLeft = isMacElectron ? MAC_TRAFFIC_PAD : undefined;
   const chromeStyle = isElectron ? dragRegion : undefined;
@@ -526,14 +546,14 @@ export default function Layout({ children }) {
             <SalesTopNav
               onNavigate={closeMenu}
               user={user}
-              onLogout={handleLogout}
+              onLogout={openLogoutPrompt}
               onChangePassword={openChangePassword}
             />
           ) : (
             <AdminTopNav
               onNavigate={closeMenu}
               user={user}
-              onLogout={handleLogout}
+              onLogout={openLogoutPrompt}
               onChangePassword={openChangePassword}
               onUtilAction={handleUtilAction}
             />
@@ -562,14 +582,14 @@ export default function Layout({ children }) {
               {isSales ? (
                 <SalesMobileMenu
                   onClose={closeMenu}
-                  onLogout={handleLogout}
+                  onLogout={openLogoutPrompt}
                   onChangePassword={openChangePassword}
                   user={user}
                 />
               ) : (
                 <AdminMobileMenu
                   onClose={closeMenu}
-                  onLogout={handleLogout}
+                  onLogout={openLogoutPrompt}
                   onChangePassword={openChangePassword}
                   user={user}
                   onUtilAction={handleUtilAction}
@@ -593,6 +613,18 @@ export default function Layout({ children }) {
       </main>
 
       <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
+      <LogoutConfirmModal
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        onConfirm={confirmLogout}
+      />
+      <UtilConfirmModal
+        action={utilModalAction}
+        open={!!utilModalAction}
+        onClose={() => setUtilModalAction(null)}
+        onConfirm={handleUtilConfirm}
+        busy={utilBusy}
+      />
     </div>
   );
 }

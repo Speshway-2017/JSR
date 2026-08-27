@@ -25,13 +25,33 @@ const CONFIRM = {
     'Replace the local database with data from MongoDB Atlas? Unsaved local work will be lost.',
 };
 
-export async function runAtlasUtilAction(action) {
+export async function runAtlasUtilAction(action, { skipConfirm = false } = {}) {
   const verb = action === 'restore' ? 'restore' : 'backup';
   if (!hasInternet()) {
     toast.error(noInternetToast(verb));
     return;
   }
-  if (!window.confirm(CONFIRM[verb])) return;
+
+  if (!skipConfirm) {
+    // Defer execution slightly out of the active click call-stack to allow
+    // the browser/Electron renderer to finish pointer capture and mouseup events.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    let confirmed = false;
+    try {
+      confirmed = window.confirm(CONFIRM[verb]);
+    } finally {
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+      if (typeof window.focus === 'function') {
+        window.focus();
+      }
+    }
+
+    if (!confirmed) return;
+  }
+
   if (!hasInternet()) {
     toast.error(noInternetToast(verb));
     return;
@@ -44,6 +64,9 @@ export async function runAtlasUtilAction(action) {
       `${res.data.message} · ${res.data.collections} collections, ${res.data.documents} documents`,
       { id: toastId }
     );
+    if (verb === 'restore') {
+      window.dispatchEvent(new CustomEvent('jsr:data-restored'));
+    }
   } catch (err) {
     toast.error(
       isAtlasOfflineError(err)
@@ -51,5 +74,12 @@ export async function runAtlasUtilAction(action) {
         : err.response?.data?.message || err.message || `${verb} failed`,
       { id: toastId }
     );
+  } finally {
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    if (typeof window.focus === 'function') {
+      window.focus();
+    }
   }
 }

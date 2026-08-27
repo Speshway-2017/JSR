@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Phone, MapPin, ChevronRight, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency } from '../utils/format';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
+import { useDataRestored } from '../utils/useDataRestored';
 
 const emptyForm = {
   name: '',
@@ -33,13 +34,15 @@ export default function Vendors() {
     });
   }, [liveTelugu, teluguLoading, showForm]);
 
-  const fetchVendors = () => {
+  const fetchVendors = useCallback(() => {
     api.get('/vendors').then((res) => setVendors(res.data)).finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     fetchVendors();
-  }, []);
+  }, [fetchVendors]);
+
+  useDataRestored(fetchVendors);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

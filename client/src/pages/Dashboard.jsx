@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Users,
@@ -28,6 +28,7 @@ import {
 } from 'recharts';
 import api from '../api';
 import { formatCurrency, formatDate, formatKg } from '../utils/format';
+import { useDataRestored } from '../utils/useDataRestored';
 
 const COLORS = {
   primary: '#637d6c',
@@ -69,13 +70,20 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const loadOverview = useCallback(() => {
+    setLoading(true);
     api
       .get('/dashboard/overview')
       .then((res) => setData(res.data))
       .catch((err) => setError(err.response?.data?.message || 'Failed to load dashboard'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadOverview();
+  }, [loadOverview]);
+
+  useDataRestored(loadOverview);
 
   if (loading) {
     return <div className="animate-pulse text-primary-500 py-20 text-center">Loading business overview...</div>;

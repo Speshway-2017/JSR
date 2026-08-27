@@ -9,7 +9,7 @@ import './index.css';
 
 function Root() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <LicenseGate>
         <div className="h-[100dvh] box-border flex flex-col overflow-hidden">

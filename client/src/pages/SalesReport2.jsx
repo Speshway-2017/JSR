@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import api from '../api';
 import { formatDateOnly } from '../utils/format';
 import { RAMABHADRA, ensureRamabhadraInDocument } from '../utils/pdfFont';
+import { useDataRestored } from '../utils/useDataRestored';
 import {
   openBillPreviewTab,
   openSaleReport2Print,
@@ -42,6 +43,8 @@ export default function SalesReport2() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useDataRestored(load);
 
   const printReport = async () => {
     if (!data?.columns?.length) {

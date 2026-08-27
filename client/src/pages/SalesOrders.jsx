@@ -5,9 +5,11 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
-import { formatDate } from '../utils/format';
+import { formatCurrency, formatDate } from '../utils/format';
+import { matchesPrefix } from '../utils/search';
 import { buildMaterialColumns, BRAND, exportBrandedBagBagExcel, exportIndividualBagReportExcel, listPersonNames } from '../utils/salesOrderExcel';
 import { exportBrandedBagBagPdf, exportIndividualBagReportPdf, PDF_PAPER_SIZES } from '../utils/salesOrderPdf';
+import { useDataRestored } from '../utils/useDataRestored';
 
 function toUiEntries(entries = []) {
   return entries.map((e, i) => ({
@@ -38,7 +40,7 @@ function filterSuggestions(list, query, { requireQuery = false } = {}) {
   const q = query.trim().toLowerCase();
   if (!q) return requireQuery ? [] : list.slice(0, 8);
   return list
-    .filter((item) => item.toLowerCase().includes(q) && item.toLowerCase() !== q)
+    .filter((item) => matchesPrefix(item, q) && item.toLowerCase() !== q)
     .slice(0, 8);
 }
 
@@ -60,6 +62,8 @@ export function SalesBagReportsList() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useDataRestored(load);
 
   const handleDelete = async (id, title) => {
     if (!window.confirm(`Delete report "${title}"? This cannot be undone.`)) return;

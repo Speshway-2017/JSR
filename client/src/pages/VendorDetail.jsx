@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Phone, MapPin, CreditCard, Pencil, X, Save, FileText, Truck,
@@ -11,6 +11,7 @@ import { openCustomerSaleBillPdf } from '../utils/customerSaleBillPdf';
 import { openBillPreviewTab } from '../utils/raituBillShared';
 import { DEDUCTION_FIELDS, emptyRatesState, ratesPayload } from '../utils/deductionFields';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
+import { useDataRestored } from '../utils/useDataRestored';
 
 export default function VendorDetail() {
   const { id } = useParams();
@@ -38,7 +39,7 @@ export default function VendorDetail() {
     editing ? editForm.name : ''
   );
 
-  const fetchData = () => {
+  const fetchData = useCallback(() => {
     api.get(`/vendors/${id}`).then((res) => {
       setData(res.data);
       const v = res.data.vendor;
@@ -50,9 +51,11 @@ export default function VendorDetail() {
         address: v.address,
       });
     }).finally(() => setLoading(false));
-  };
+  }, [id]);
 
-  useEffect(() => { fetchData(); }, [id]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useDataRestored(fetchData);
 
   useEffect(() => {
     if (!editing) return;

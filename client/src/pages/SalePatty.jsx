@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatKg } from '../utils/format';
+import { matchesSearchFields } from '../utils/search';
 import { openVendorBillPdf } from '../utils/vendorBillPdf';
 import { DEDUCTION_FIELDS, emptyRatesState, ratesPayload } from '../utils/deductionFields';
+import { useDataRestored } from '../utils/useDataRestored';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -25,17 +27,13 @@ export default function SalePatty() {
   const selected = vendors.find((v) => v._id === vendorId);
 
   const suggestions = useMemo(() => {
-    const q = vendorQuery.trim().toLowerCase();
-    if (!q) return vendors.slice(0, 12);
+    if (!vendorQuery.trim()) return vendors.slice(0, 12);
     return vendors
-      .filter((v) => (v.name || '').toLowerCase().includes(q) || (v.city || '').toLowerCase().includes(q))
+      .filter((v) => matchesSearchFields(v, ['name', 'nameTelugu', 'city', 'mobile'], vendorQuery))
       .slice(0, 12);
   }, [vendors, vendorQuery]);
 
-  useEffect(() => {
-    setVendorId('');
-    setVendorQuery('');
-    setPreview(null);
+  const loadVendors = useCallback(() => {
     api
       .get('/loads/vendors-by-date', { params: { date } })
       .then((res) => setVendors(res.data))
@@ -44,6 +42,15 @@ export default function SalePatty() {
         toast.error('Failed to load vendors for date');
       });
   }, [date]);
+
+  useEffect(() => {
+    setVendorId('');
+    setVendorQuery('');
+    setPreview(null);
+    loadVendors();
+  }, [date, loadVendors]);
+
+  useDataRestored(loadVendors);
 
   useEffect(() => {
     if (!vendorId || !date) {

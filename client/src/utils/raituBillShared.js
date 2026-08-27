@@ -1,5 +1,5 @@
 import api from '../api';
-import { RAMABHADRA } from './pdfFont';
+import { RAMABHADRA, ramabhadraFontFaceCss } from './pdfFont';
 
 export const TE = {
   om: '\u0c13\u0c02 \u0c36\u0c4d\u0c30\u0c40 \u0c38\u0c4d\u0c35\u0c3e\u0c2e\u0c3f\u0c2f\u0c47 \u0c36\u0c30\u0c23\u0c02 \u0c05\u0c2f\u0c4d\u0c2f\u0c2a\u0c4d\u0c2a',
@@ -577,16 +577,8 @@ export function warmRaituBillAssets() {
  * Avoids html2canvas which blocked the app for ~1 minute.
  */
 export async function openRaituSheetPdf(innerMarkup, previewTab) {
-  const origin = window.location.origin;
   const watermarkSrc = ayyappaWatermarkSrc();
-  const fontCss = `
-@font-face {
-  font-family: '${RAMABHADRA}';
-  src: url('${origin}/fonts/Ramabhadra-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}`.trim();
+  const fontCss = await ramabhadraFontFaceCss();
 
   const sheetInner = typeof innerMarkup === 'function' ? innerMarkup(watermarkSrc) : innerMarkup;
 

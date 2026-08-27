@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Users, X, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -6,6 +6,8 @@ import api from '../api';
 import Toggle from '../components/Toggle';
 import { formatCurrency } from '../utils/format';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
+import { matchesSearchFields } from '../utils/search';
+import { useDataRestored } from '../utils/useDataRestored';
 
 const emptyForm = {
   name: '',
@@ -43,7 +45,7 @@ export default function Customers() {
     });
   }, [liveTelugu, teluguLoading, showForm]);
 
-  const fetchAll = () => {
+  const fetchAll = useCallback(() => {
     Promise.all([api.get('/customers'), api.get('/schedules')])
       .then(([custRes, schedRes]) => {
         setCustomers(custRes.data);
@@ -51,11 +53,13 @@ export default function Customers() {
       })
       .catch(() => toast.error('Failed to load customer list'))
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     fetchAll();
-  }, []);
+  }, [fetchAll]);
+
+  useDataRestored(fetchAll);
 
   const openAdd = () => {
     setEditing(null);
@@ -129,7 +133,6 @@ export default function Customers() {
   const scheduleName = (c) => c.schedule?.name || '—';
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
     return customers.filter((c) => {
       if (scheduleFilter) {
         const sid = String(c.schedule?._id || c.schedule || '');
@@ -137,11 +140,8 @@ export default function Customers() {
       }
       if (coolyFilter === 'on' && !c.handlingCharges) return false;
       if (coolyFilter === 'off' && c.handlingCharges) return false;
-      if (!q) return true;
-      const name = (c.name || '').toLowerCase();
-      const te = (c.nameTelugu || '').toLowerCase();
-      const mobile = (c.mobile || '').toLowerCase();
-      return name.includes(q) || te.includes(q) || mobile.includes(q);
+      if (!query.trim()) return true;
+      return matchesSearchFields(c, ['name', 'nameTelugu', 'mobile'], query);
     });
   }, [customers, query, scheduleFilter, coolyFilter]);
 

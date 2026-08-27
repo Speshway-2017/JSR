@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Banknote } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDate } from '../utils/format';
+import { matchesSearchFields } from '../utils/search';
+import { useDataRestored } from '../utils/useDataRestored';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -32,15 +34,10 @@ export default function CashEntry() {
   }, [partyId, partyType, customers, vendors]);
 
   const suggestions = useMemo(() => {
-    const q = nameQuery.trim().toLowerCase();
-    if (!q) return [];
+    if (!nameQuery.trim()) return [];
 
     const custHits = customers
-      .filter((c) => {
-        const name = (c.name || '').toLowerCase();
-        const te = (c.nameTelugu || '').toLowerCase();
-        return name.includes(q) || te.includes(q);
-      })
+      .filter((c) => matchesSearchFields(c, ['name', 'nameTelugu', 'mobile'], nameQuery))
       .map((c) => ({
         id: c._id,
         kind: 'customer',
@@ -51,12 +48,7 @@ export default function CashEntry() {
       }));
 
     const vendorHits = vendors
-      .filter((v) => {
-        const name = (v.name || '').toLowerCase();
-        const te = (v.nameTelugu || '').toLowerCase();
-        const city = (v.city || '').toLowerCase();
-        return name.includes(q) || te.includes(q) || city.includes(q);
-      })
+      .filter((v) => matchesSearchFields(v, ['name', 'nameTelugu', 'city', 'mobile'], nameQuery))
       .map((v) => ({
         id: v._id,
         kind: 'vendor',
@@ -81,7 +73,7 @@ export default function CashEntry() {
     ? Math.max(0, Number(selectedParty.creditBalance || 0) - (Number(amount) || 0))
     : 0;
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     const [custRes, vendorRes, entryRes] = await Promise.all([
       api.get('/customers'),
       api.get('/vendors'),
@@ -90,11 +82,13 @@ export default function CashEntry() {
     setCustomers(custRes.data);
     setVendors(vendorRes.data);
     setEntries(entryRes.data);
-  };
+  }, [entryDate]);
 
   useEffect(() => {
     refresh().catch(() => toast.error('Failed to load cash entry data'));
-  }, []);
+  }, [refresh]);
+
+  useDataRestored(refresh);
 
   useEffect(() => {
     api
