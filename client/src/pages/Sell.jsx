@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatDate } from '../utils/format';
 import { openBillPreviewTab, openRangeBillsNUp } from '../utils/rangeBillPrint';
 import { matchesSearchFields } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
@@ -134,6 +134,7 @@ export default function Sell({ path: windowPath }) {
           coolyRate: sale.coolyRate != null ? sale.coolyRate : sale.handlingCharges || 0,
           coolyPerBag: !!sale.coolyPerBag,
           amount: Number(line.totalAmount || 0) + (sale.handlingCharges || 0),
+          createdAt: sale.createdAt,
           sale,
           line,
         });
@@ -210,6 +211,11 @@ export default function Sell({ path: windowPath }) {
       const dir = sortDir === 'desc' ? -1 : 1;
       rows.sort((a, b) => {
         if (sortKey === 'amount') return (Number(a.amount) - Number(b.amount)) * dir;
+        if (sortKey === 'createdAt') {
+          const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return (da - db) * dir;
+        }
         const av = String(a[sortKey] || '').toLowerCase();
         const bv = String(b[sortKey] || '').toLowerCase();
         return av.localeCompare(bv, 'en', { numeric: true }) * dir;
@@ -630,15 +636,7 @@ export default function Sell({ path: windowPath }) {
   };
 
   const printNUp = async (perPage) => {
-    const ids = [];
-    const seen = new Set();
-    for (const row of displayedRows) {
-      const cid = String(row.customerId || '');
-      if (!cid || seen.has(cid)) continue;
-      seen.add(cid);
-      ids.push(cid);
-    }
-    if (!ids.length) {
+    if (!displayedRows.length) {
       toast.error('No sales to print');
       return;
     }
@@ -646,20 +644,72 @@ export default function Sell({ path: windowPath }) {
     setPrinting(true);
     const previewTab = openBillPreviewTab();
     try {
-      const res = await api.get('/reports/bills', {
-        params: { startDate: date, endDate: date },
+      let serverStatements = new Map();
+      try {
+        const res = await api.get('/reports/bills', {
+          params: { startDate: date, endDate: date },
+        });
+        serverStatements = new Map(
+          (res.data?.statements || []).map((st) => [String(st.customerId), st])
+        );
+      } catch (e) {
+        console.warn('Could not fetch /reports/bills, using current sales view data:', e);
+      }
+
+      const statementsMap = new Map();
+
+      for (const row of displayedRows) {
+        const cid = String(row.customerId || '');
+        if (!cid) continue;
+        if (!statementsMap.has(cid)) {
+          const serverSt = serverStatements.get(cid);
+          const fullCust = customers.find((c) => c._id === cid);
+          statementsMap.set(cid, {
+            customerId: cid,
+            name: row.name || fullCust?.name || '—',
+            nameTelugu: fullCust?.nameTelugu || serverSt?.nameTelugu || '',
+            opening: Number(serverSt?.opening) || 0,
+            sales: [],
+            payments: serverSt?.payments || [],
+            totalSale: 0,
+            totalPaid: Number(serverSt?.totalPaid) || 0,
+            closing: 0,
+          });
+        }
+
+        const st = statementsMap.get(cid);
+        const lineAmt = Number(row.amount) || 0;
+        st.sales.push({
+          date: row.createdAt || date,
+          material: row.item || 'Sale',
+          bags: Number(row.bags) || 0,
+          weight: Number(row.qty) || 0,
+          amount: lineAmt,
+        });
+      }
+
+      const statements = Array.from(statementsMap.values()).map((st) => {
+        const totalSale = Number(st.sales.reduce((acc, s) => acc + (Number(s.amount) || 0), 0).toFixed(2));
+        const totalPaid = Number((st.payments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0).toFixed(2));
+        const closing = Number((st.opening + totalSale - totalPaid).toFixed(2));
+        return {
+          ...st,
+          totalSale,
+          totalPaid,
+          closing,
+        };
       });
-      const byId = new Map((res.data?.statements || []).map((st) => [String(st.customerId), st]));
-      const statements = ids.map((id) => byId.get(id)).filter(Boolean);
+
       if (!statements.length) {
-        previewTab?.close();
+        if (previewTab && !previewTab.closed) previewTab.close();
         toast.error('No bills to print');
         return;
       }
+
       await openRangeBillsNUp(statements, perPage, previewTab);
       setPrintOpen(false);
     } catch (err) {
-      previewTab?.close();
+      if (previewTab && !previewTab.closed) previewTab.close();
       toast.error(err.response?.data?.message || err.message || 'Could not print bill');
     } finally {
       setPrinting(false);
@@ -667,7 +717,7 @@ export default function Sell({ path: windowPath }) {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-2">
+    <div className="flex flex-col flex-1 min-h-0 gap-2 h-full overflow-hidden">
       <div className="shrink-0">
         <h1 className="page-title">Sales</h1>
         <p className="text-primary-400 text-sm mt-0.5">
@@ -677,10 +727,10 @@ export default function Sell({ path: windowPath }) {
         </p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-3 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-3 flex-1 min-h-0 overflow-hidden">
       <form
         onSubmit={handleSave}
-        className="card border-2 border-primary-200 w-full lg:w-[26rem] xl:w-[28rem] shrink-0 min-h-0 max-h-[48vh] lg:max-h-none lg:h-full flex flex-col overflow-hidden"
+        className="card border-2 border-primary-200 w-full lg:w-[26rem] xl:w-[28rem] shrink-0 min-h-0 max-h-[48vh] lg:max-h-full h-full flex flex-col overflow-hidden"
       >
         <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-0.5">
         <div className="flex items-center gap-4 bg-primary-50/70 px-3 py-2 rounded-xl border border-primary-100 mb-1">
@@ -958,29 +1008,66 @@ export default function Sell({ path: windowPath }) {
         </div>
       </form>
 
-      <div className="card p-0 w-full min-w-0 flex-1 min-h-0 flex flex-col overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary-100 px-3 py-2 bg-accent-50 shrink-0">
-          {hasActiveFilters ? (
-            <div className="flex items-center gap-2 text-xs text-primary-600 bg-surface px-2.5 py-1 rounded-lg border border-primary-200">
-              <span className="font-medium">Filters active</span>
+      <div className="card p-0 w-full min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between gap-2 border-b border-primary-100 px-3 py-2 bg-accent-50 shrink-0 min-w-0">
+          <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto no-scrollbar py-0.5">
+            <select
+              className="bg-surface text-primary-700 text-xs font-medium border border-primary-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400/20 cursor-pointer min-w-[110px] max-w-[150px] truncate shrink-0"
+              value={filterCustomer}
+              onChange={(e) => setFilterCustomer(e.target.value)}
+            >
+              <option value="">All customers</option>
+              {availableCustomers.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.name} {c.nameTelugu ? `· ${c.nameTelugu}` : ''}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="bg-surface text-primary-700 text-xs font-medium border border-primary-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400/20 cursor-pointer min-w-[100px] max-w-[140px] truncate shrink-0"
+              value={filterVendor}
+              onChange={(e) => setFilterVendor(e.target.value)}
+            >
+              <option value="">All vendors</option>
+              {availableVendors.map((v) => (
+                <option key={v._id} value={v._id}>
+                  {v.name} {v.city ? `· ${v.city}` : ''}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="bg-surface text-primary-700 text-xs font-medium border border-primary-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400/20 cursor-pointer min-w-[100px] max-w-[130px] truncate shrink-0"
+              value={filterItem}
+              onChange={(e) => setFilterItem(e.target.value)}
+            >
+              <option value="">All items</option>
+              {availableItems.map((m) => (
+                <option key={m._id} value={m._id}>
+                  {m.name} {m.nameTelugu ? `· ${m.nameTelugu}` : ''}
+                </option>
+              ))}
+            </select>
+
+            {hasActiveFilters && (
               <button
                 type="button"
-                className="text-accent-700 font-semibold hover:underline"
+                className="text-xs font-medium text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg px-2 py-1 transition whitespace-nowrap shrink-0"
                 onClick={() => {
                   setFilterCustomer('');
                   setFilterVendor('');
                   setFilterItem('');
                 }}
               >
-                Clear all
+                Clear filters
               </button>
-            </div>
-          ) : (
-            <div />
-          )}
+            )}
+          </div>
+
           <button
             type="button"
-            className="btn-primary inline-flex items-center gap-1.5 !py-1.5 !px-3 text-sm ml-auto"
+            className="btn-primary inline-flex items-center gap-1.5 !py-1.5 !px-3 text-sm shrink-0 ml-auto"
             disabled={!flatRows.length || printing}
             onClick={() => setPrintOpen(true)}
           >
@@ -994,12 +1081,12 @@ export default function Sell({ path: windowPath }) {
             <tr className="bg-accent-200 text-accent-800 text-left">
               <th className="px-3 py-2.5 font-semibold">S No</th>
               <th className="px-3 py-2.5 font-semibold">
+                <SortLabel column="vendor">Vendor</SortLabel>
+              </th>
+              <th className="px-3 py-2.5 font-semibold">
                 <SortLabel column="item">Item</SortLabel>
               </th>
               <th className="px-3 py-2.5 font-semibold">Name</th>
-              <th className="px-3 py-2.5 font-semibold">
-                <SortLabel column="vendor">Vendor</SortLabel>
-              </th>
               <th className="px-3 py-2.5 font-semibold text-right">Bags</th>
               <th className="px-3 py-2.5 font-semibold text-right">Qty</th>
               <th className="px-3 py-2.5 font-semibold text-right">Rate</th>
@@ -1009,12 +1096,17 @@ export default function Sell({ path: windowPath }) {
                   Amount
                 </SortLabel>
               </th>
+              <th className="px-3 py-2.5 font-semibold whitespace-nowrap text-right">
+                <SortLabel column="createdAt" align="right">
+                  Entry Date & Time
+                </SortLabel>
+              </th>
             </tr>
           </thead>
           <tbody>
             {displayedRows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-primary-400">
+                <td colSpan={10} className="px-3 py-8 text-center text-primary-400">
                   {flatRows.length && hasActiveFilters
                     ? 'No sales match the selected filters'
                     : `No sales for this date yet`}
@@ -1038,6 +1130,7 @@ export default function Sell({ path: windowPath }) {
                     }
                   >
                     <td className="px-3 py-1.5 text-primary-500">{r.serial}</td>
+                    <td className="px-3 py-1.5 text-primary-700 whitespace-nowrap font-medium">{r.vendor}</td>
                     <td className="px-2 py-1.5 min-w-[8rem]">
                       <select
                         className={`${cell} font-medium text-primary-700`}
@@ -1080,7 +1173,6 @@ export default function Sell({ path: windowPath }) {
                         ))}
                       </select>
                     </td>
-                    <td className="px-3 py-1.5 text-primary-700 whitespace-nowrap">{r.vendor}</td>
                     <td className="px-2 py-1.5 w-20">
                       <input
                         type="text"
@@ -1189,6 +1281,9 @@ export default function Sell({ path: windowPath }) {
                     <td className="px-3 py-1.5 text-right tabular-nums font-medium text-primary-800">
                       {formatCurrency(r.amount)}
                     </td>
+                    <td className="px-3 py-1.5 text-xs text-primary-500 whitespace-nowrap text-right tabular-nums">
+                      {r.createdAt ? formatDate(r.createdAt) : '—'}
+                    </td>
                   </tr>
                 );
               })
@@ -1221,79 +1316,20 @@ export default function Sell({ path: windowPath }) {
           <div className="card w-full max-w-md space-y-4">
             <div className="flex items-center justify-between border-b border-primary-100 pb-2">
               <h2 className="text-lg font-bold text-primary-800">Print bills</h2>
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  className="text-xs font-semibold text-accent-700 hover:underline"
-                  onClick={() => {
-                    setFilterCustomer('');
-                    setFilterVendor('');
-                    setFilterItem('');
-                  }}
-                >
-                  Clear filters
-                </button>
-              )}
+              <button
+                type="button"
+                className="text-sm font-medium text-primary-400 hover:text-primary-700"
+                onClick={() => setPrintOpen(false)}
+              >
+                ✕
+              </button>
             </div>
 
             <p className="text-xs text-primary-500">
-              Filter sales by customer, vendor, or item. Unselected filters fetch all records.
+              Select print layout for the {displayedRows.length} filtered {displayedRows.length === 1 ? 'record' : 'records'}.
             </p>
 
-            <div className="space-y-3 bg-primary-50/50 p-3 rounded-xl border border-primary-100">
-              <div>
-                <label className="label text-xs">Filter by Customer</label>
-                <select
-                  className="input-field text-sm"
-                  value={filterCustomer}
-                  onChange={(e) => setFilterCustomer(e.target.value)}
-                >
-                  <option value="">All customers</option>
-                  {availableCustomers.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name} {c.nameTelugu ? `· ${c.nameTelugu}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="label text-xs">Filter by Vendor</label>
-                <select
-                  className="input-field text-sm"
-                  value={filterVendor}
-                  onChange={(e) => setFilterVendor(e.target.value)}
-                >
-                  <option value="">All vendors</option>
-                  {availableVendors.map((v) => (
-                    <option key={v._id} value={v._id}>
-                      {v.name} {v.city ? `· ${v.city}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="label text-xs">Filter by Item</label>
-                <select
-                  className="input-field text-sm"
-                  value={filterItem}
-                  onChange={(e) => setFilterItem(e.target.value)}
-                >
-                  <option value="">All items</option>
-                  {availableItems.map((m) => (
-                    <option key={m._id} value={m._id}>
-                      {m.name} {m.nameTelugu ? `· ${m.nameTelugu}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="pt-1 space-y-1.5">
-              <div className="flex items-center justify-between text-xs text-primary-500 font-medium">
-                <span>Print layout ({displayedRows.length} {displayedRows.length === 1 ? 'record' : 'records'})</span>
-              </div>
+            <div className="pt-1 space-y-2">
               <div className="grid grid-cols-3 gap-2">
                 {[2, 4, 6].map((n) => (
                   <button
@@ -1301,8 +1337,8 @@ export default function Sell({ path: windowPath }) {
                     type="button"
                     className={
                       n === 6
-                        ? 'btn-primary !py-2 !px-1.5 text-xs font-semibold justify-center whitespace-nowrap'
-                        : 'btn-secondary !py-2 !px-1.5 text-xs font-semibold justify-center whitespace-nowrap'
+                        ? 'btn-primary !py-2.5 !px-1.5 text-xs font-semibold justify-center whitespace-nowrap'
+                        : 'btn-secondary !py-2.5 !px-1.5 text-xs font-semibold justify-center whitespace-nowrap'
                     }
                     disabled={printing || !displayedRows.length}
                     onClick={() => printNUp(n)}
@@ -1313,10 +1349,10 @@ export default function Sell({ path: windowPath }) {
               </div>
             </div>
 
-            <div className="flex justify-end pt-1">
+            <div className="flex justify-end pt-2">
               <button
                 type="button"
-                className="text-sm font-medium text-primary-500 hover:text-primary-800"
+                className="btn-secondary !py-1.5 !px-4 text-xs font-medium"
                 onClick={() => setPrintOpen(false)}
               >
                 Close

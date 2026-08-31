@@ -256,11 +256,15 @@ table.lines tr.rule td { border-top: 1px solid #000; padding-top: 2px; }
 
     function render() {
       var size = measureBox();
+      if (!size.w || size.w < 50) size.w = 360;
+      if (!size.h || size.h < 50) size.h = Math.max(200, Math.floor(960 / PER));
       var parts = [];
       BILLS.forEach(function (bill) {
-        fragmentsFor(bill, size.w, size.h).forEach(function (html) { parts.push(html); });
+        var frags = fragmentsFor(bill, size.w, size.h);
+        frags.forEach(function (html) { parts.push(html); });
       });
       var stage = document.getElementById('stage');
+      if (!stage) return;
       stage.innerHTML = '';
       var count = Math.max(parts.length, 1);
       for (var p = 0; p < count; p += PER) {
@@ -273,31 +277,42 @@ table.lines tr.rule td { border-top: 1px solid #000; padding-top: 2px; }
       }
     }
 
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
-    else window.addEventListener('load', render);
+    render();
+    setTimeout(render, 10);
+    setTimeout(render, 150);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(render);
+    }
+    window.addEventListener('load', render);
+    window.addEventListener('resize', function () {
+      setTimeout(render, 50);
+    });
   </script>
 </body>
 </html>`;
 
-  const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
-  const showIn = (win) => {
-    if (!win || win.closed) return false;
+  let targetWin = previewTab;
+  if (!targetWin || targetWin.closed) {
+    targetWin = window.open('', '_blank');
+  }
+  if (!targetWin) {
+    throw new Error('Could not open bill window — allow popups and try again');
+  }
+  try {
+    targetWin.document.open();
+    targetWin.document.write(html);
+    targetWin.document.close();
+    targetWin.focus?.();
+  } catch {
     try {
-      win.location.href = blobUrl;
-      win.focus?.();
-      return true;
+      const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+      targetWin.location.href = blobUrl;
+      targetWin.focus?.();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
     } catch {
-      return false;
-    }
-  };
-  if (!showIn(previewTab)) {
-    const win = window.open(blobUrl, '_blank');
-    if (!win) {
-      URL.revokeObjectURL(blobUrl);
-      throw new Error('Could not open bill window — allow popups and try again');
+      throw new Error('Could not render bill window');
     }
   }
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
 }
 
 export { openBillPreviewTab };

@@ -627,32 +627,26 @@ ${BILL_CSS}
 </body>
 </html>`;
 
-  const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
-
-  const showIn = (win) => {
-    if (!win || win.closed) return false;
+  let targetWin = previewTab;
+  if (!targetWin || targetWin.closed) {
+    targetWin = window.open('', '_blank');
+  }
+  if (!targetWin) {
+    throw new Error('Could not open bill window — allow popups and try again');
+  }
+  try {
+    targetWin.document.open();
+    targetWin.document.write(html);
+    targetWin.document.close();
+    targetWin.focus?.();
+  } catch {
     try {
-      win.location.href = blobUrl;
-      win.focus?.();
-      return true;
+      const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+      targetWin.location.href = blobUrl;
+      targetWin.focus?.();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
     } catch {
-      return false;
-    }
-  };
-
-  if (!showIn(previewTab)) {
-    const win = window.open(blobUrl, '_blank');
-    if (!win) {
-      URL.revokeObjectURL(blobUrl);
-      throw new Error('Could not open bill window — allow popups and try again');
-    }
-    try {
-      win.focus?.();
-    } catch {
-      /* ignore */
+      throw new Error('Could not render bill window');
     }
   }
-
-  // Keep blob alive while the window loads; revoke later
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
 }
