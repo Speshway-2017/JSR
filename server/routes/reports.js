@@ -46,7 +46,7 @@ router.get('/ledger', async (req, res) => {
 
       const [txs, sales] = await Promise.all([
         Transaction.find({ vendor: vendorId })
-          .populate('sale', 'totalAmount createdAt lines totalBags')
+          .populate('sale', 'totalAmount createdAt lines totalBags totalWeight')
           .sort({ createdAt: 1 })
           .lean(),
         Sale.find({ vendor: vendorId })
@@ -72,7 +72,18 @@ router.get('/ledger', async (req, res) => {
 
       for (const sale of sales) {
         const saleAmt = Number(sale.lines?.reduce((s, l) => s + (l.totalAmount || 0), 0) || 0);
-        const mats = sale.lines?.map((l) => l.materialName).filter(Boolean).join(', ');
+        const mats = sale.lines
+          ?.map((l) => {
+            const bags = Number(l.bagCount) || (Array.isArray(l.bags) ? l.bags.length : 0) || 0;
+            const weight = Number(l.totalKg) || (Array.isArray(l.bags) ? l.bags.reduce((s, b) => s + (Number(b?.kgs || b) || 0), 0) : 0) || 0;
+            const name = l.materialName || 'Item';
+            const details = [];
+            if (bags) details.push(`${bags} ${bags === 1 ? 'bag' : 'bags'}`);
+            if (weight) details.push(`${weight % 1 === 0 ? weight : Number(weight.toFixed(1))} kg`);
+            return details.length ? `${name} (${details.join(', ')})` : name;
+          })
+          .filter(Boolean)
+          .join(' · ');
         items.push({
           date: new Date(sale.createdAt),
           created: new Date(sale.createdAt),
@@ -152,7 +163,7 @@ router.get('/ledger', async (req, res) => {
       customer: customerId,
       type: { $in: ['customer_credit', 'customer_payment'] },
     })
-      .populate('sale', 'totalAmount createdAt lines totalBags')
+      .populate('sale', 'totalAmount createdAt lines totalBags totalWeight')
       .sort({ createdAt: 1 })
       .lean();
 

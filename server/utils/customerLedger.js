@@ -51,15 +51,23 @@ export function particulars(tx) {
     if (lines.length) {
       const parts = lines.map((l) => {
         const bags = Number(l.bagCount) || (Array.isArray(l.bags) ? l.bags.length : 0) || 0;
+        const weight = Number(l.totalKg) || (Array.isArray(l.bags) ? l.bags.reduce((s, b) => s + (Number(b?.kgs || b) || 0), 0) : 0) || 0;
         const name = l.materialName || 'Item';
-        if (!bags) return name;
-        return `${name} (${bags} ${bags === 1 ? 'bag' : 'bags'})`;
+        if (!bags && !weight) return name;
+        const details = [];
+        if (bags) details.push(`${bags} ${bags === 1 ? 'bag' : 'bags'}`);
+        if (weight) details.push(`${weight % 1 === 0 ? weight : Number(weight.toFixed(1))} kg`);
+        return `${name} (${details.join(', ')})`;
       });
       return `Sale - ${parts.join(' · ')}`;
     }
     const totalBags = Number(sale?.totalBags) || 0;
-    if (totalBags && tx.description) {
-      return `${tx.description} (${totalBags} ${totalBags === 1 ? 'bag' : 'bags'})`;
+    const totalWeight = Number(sale?.totalWeight) || 0;
+    if ((totalBags || totalWeight) && tx.description) {
+      const details = [];
+      if (totalBags) details.push(`${totalBags} ${totalBags === 1 ? 'bag' : 'bags'}`);
+      if (totalWeight) details.push(`${totalWeight % 1 === 0 ? totalWeight : Number(totalWeight.toFixed(1))} kg`);
+      return `${tx.description} (${details.join(', ')})`;
     }
     return tx.description || 'Sale';
   }
