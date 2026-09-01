@@ -51,7 +51,7 @@ const adminTopMenus = [
     label: 'Inventory',
     items: [
       { to: '/cash-entry', label: 'Cash Entry' },
-      { to: '/sell', label: 'Sales' },
+      { to: '/sell', label: 'Sales Entry' },
       { to: '/purchase', label: 'Purchase' },
       { to: '/sale-patty', label: 'Sale Patty' },
     ],
@@ -71,7 +71,7 @@ const adminTopMenus = [
       { to: '/ledger', label: 'Ledger' },
       { to: '/outstanding', label: 'Outstanding' },
       { to: '/bill-print', label: 'Bill Print' },
-      { to: '/sales-report', label: 'Sales Report' },
+      { to: '/sales-report', label: 'Sales Checklist' },
       { to: '/sales-report-2', label: 'Day wise sale report' },
     ],
   },

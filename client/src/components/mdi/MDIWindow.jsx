@@ -164,7 +164,7 @@ export default function MDIWindow({ windowItem, children }) {
         onMouseDown={handleDragStart}
       />
 
-      <div className="flex-1 min-h-0 w-full flex flex-col bg-surface p-3 md:p-4 overflow-hidden">
+      <div className="flex-1 min-h-0 w-full flex flex-col bg-surface p-3 md:p-4 overflow-y-auto">
         {children}
       </div>
 

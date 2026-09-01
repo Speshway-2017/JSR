@@ -1,5 +1,5 @@
 import { RAMABHADRA, ramabhadraFontFaceCss } from './pdfFont';
-import { displayMaterialName, materialTeluguMap, openBillPreviewTab } from './raituBillShared';
+import { displayMaterialName, materialTeluguMap, openBillPreviewTab, writeToPrintWindow } from './raituBillShared';
 
 const JAMA = 'జమ';
 
@@ -224,9 +224,11 @@ table.lines tr.rule td { border-top: 1px solid #000; padding-top: 2px; }
 
     function fits(html, w, h) {
       var m = document.getElementById('measure');
+      if (!m) return true;
       m.style.width = w + 'px';
-      m.innerHTML = '<div class="cell" style="height:auto;overflow:visible;border:0">' + html + '</div>';
-      return m.firstElementChild.scrollHeight <= h - 1;
+      m.innerHTML = '<div class="cell" style="height:auto;overflow:visible;border:0;padding:4px 6px 5px;">' + html + '</div>';
+      var contentH = m.firstElementChild ? m.firstElementChild.scrollHeight : 0;
+      return contentH <= h + 5;
     }
 
     function fragmentsFor(bill, w, h) {
@@ -255,16 +257,25 @@ table.lines tr.rule td { border-top: 1px solid #000; padding-top: 2px; }
     }
 
     function render() {
+      var stage = document.getElementById('stage');
+      if (!stage) return;
+
+      if (!BILLS || !BILLS.length) {
+        stage.innerHTML = '<div style="text-align:center;padding:40px;font-size:15px;color:#555;">No bill records found for the selected date range.</div>';
+        return;
+      }
+
+      var defaultH = PER === 2 ? 1040 : PER === 4 ? 520 : 340;
       var size = measureBox();
-      if (!size.w || size.w < 50) size.w = 360;
-      if (!size.h || size.h < 50) size.h = Math.max(200, Math.floor(960 / PER));
+      if (!size.w || size.w < 50) size.w = 370;
+      if (!size.h || size.h < 50) size.h = defaultH;
+
       var parts = [];
       BILLS.forEach(function (bill) {
         var frags = fragmentsFor(bill, size.w, size.h);
         frags.forEach(function (html) { parts.push(html); });
       });
-      var stage = document.getElementById('stage');
-      if (!stage) return;
+
       stage.innerHTML = '';
       var count = Math.max(parts.length, 1);
       for (var p = 0; p < count; p += PER) {
@@ -277,42 +288,27 @@ table.lines tr.rule td { border-top: 1px solid #000; padding-top: 2px; }
       }
     }
 
-    render();
-    setTimeout(render, 10);
-    setTimeout(render, 150);
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(render);
+    try {
+      render();
+      setTimeout(render, 10);
+      setTimeout(render, 150);
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(render);
+      }
+      window.addEventListener('load', render);
+      window.addEventListener('resize', function () {
+        setTimeout(render, 50);
+      });
+    } catch (err) {
+      console.error('Render error:', err);
+      var stage = document.getElementById('stage');
+      if (stage) stage.innerHTML = '<div style="color:red;padding:20px;font-family:sans-serif;"><b>Render Error:</b> ' + (err.stack || err.message || err) + '</div>';
     }
-    window.addEventListener('load', render);
-    window.addEventListener('resize', function () {
-      setTimeout(render, 50);
-    });
   </script>
 </body>
 </html>`;
 
-  let targetWin = previewTab;
-  if (!targetWin || targetWin.closed) {
-    targetWin = window.open('', '_blank');
-  }
-  if (!targetWin) {
-    throw new Error('Could not open bill window — allow popups and try again');
-  }
-  try {
-    targetWin.document.open();
-    targetWin.document.write(html);
-    targetWin.document.close();
-    targetWin.focus?.();
-  } catch {
-    try {
-      const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
-      targetWin.location.href = blobUrl;
-      targetWin.focus?.();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-    } catch {
-      throw new Error('Could not render bill window');
-    }
-  }
+  return writeToPrintWindow(html, previewTab);
 }
 
 export { openBillPreviewTab };

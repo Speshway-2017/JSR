@@ -20,14 +20,14 @@ export default function MDIModalWindow({ open, title, iconName, onClose, childre
 
   return (
     <div
-      className="absolute inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/45 backdrop-blur-[1.5px] rounded-xl overflow-hidden select-none"
+      className="absolute inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/45 backdrop-blur-[1.5px] rounded-xl overflow-y-auto select-none"
       onClick={(e) => {
         // Prevent click-through to underlying parent page
         e.stopPropagation();
       }}
     >
       <div
-        className={`card w-full ${maxWidth} max-h-full flex flex-col space-y-3 shadow-2xl border border-primary-200 bg-surface z-50 my-auto animate-in fade-in zoom-in-95 duration-150 select-text overflow-hidden`}
+        className={`card w-full ${maxWidth} max-h-[90vh] flex flex-col space-y-3 shadow-2xl border border-primary-200 bg-surface z-50 my-auto animate-in fade-in zoom-in-95 duration-150 select-text overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
         {title && (

@@ -59,12 +59,10 @@ export default function BillPrint() {
       return;
     }
     setPrinting(true);
-    const previewTab = openBillPreviewTab();
     try {
-      await openRangeBillsNUp(data.statements, perPage, previewTab);
+      await openRangeBillsNUp(data.statements, perPage);
       setPrintOpen(false);
     } catch (err) {
-      if (previewTab) previewTab.close();
       toast.error(err.message || 'Failed to print');
     } finally {
       setPrinting(false);

@@ -201,7 +201,7 @@ router.get('/report-2', async (req, res) => {
             materialId,
             materialName,
             materialNameTelugu,
-            rateMap: new Map(),
+            entries: [],
             bagCount: 0,
             totalKg: 0,
           });
@@ -210,56 +210,46 @@ router.get('/report-2', async (req, res) => {
         const rate = Number(line.ratePerKg) || 0;
         const isByBag = line.saleType === 'by_bag' || (line.bagCount > 0 && (!line.bags || line.bags.length === 0) && Number(line.totalKg) === 0);
         const bags = bagKgList(line);
-        if (!mat.rateMap.has(rate)) {
-          mat.rateMap.set(rate, { rate, customerMap: new Map(), bagCount: 0, totalKg: 0, totalAmount: 0 });
+        const count = Number(line.bagCount) || bags.length || 1;
+        const lineTotalKg = Number(line.totalKg) || (typeof bags[0] === 'number' ? bags.reduce((s, n) => s + n, 0) : 0);
+
+        let lineAmount = Number(line.totalAmount) || 0;
+        if (!lineAmount) {
+          lineAmount = isByBag ? count * rate : lineTotalKg * rate;
         }
-        const group = mat.rateMap.get(rate);
-        if (!group.customerMap.has(customerId)) {
-          group.customerMap.set(customerId, {
-            customerId,
-            name: customerName,
-            bags: [],
-          });
-        }
-        const entry = group.customerMap.get(customerId);
-        if (isByBag || bags.length === 0) {
-          const count = Number(line.bagCount) || 1;
-          entry.bags.push(`${count} ${count === 1 ? 'Bag' : 'Bags'}`);
-        } else {
-          entry.bags.push(...bags);
-        }
-        group.bagCount += Number(line.bagCount) || bags.length || 0;
-        group.totalKg += Number(line.totalKg) || (typeof bags[0] === 'number' ? bags.reduce((s, n) => s + n, 0) : 0);
-        group.totalAmount += Number(line.totalAmount) || 0;
-        mat.bagCount += Number(line.bagCount) || bags.length || 0;
-        mat.totalKg += Number(line.totalKg) || 0;
+
+        const bagStrList = isByBag || bags.length === 0
+          ? [`${count} ${count === 1 ? 'Bag' : 'Bags'}`]
+          : bags;
+
+        mat.entries.push({
+          saleId: sale._id,
+          customerId,
+          name: customerName,
+          bags: bagStrList,
+          rate,
+          amount: Math.round(lineAmount),
+        });
+
+        mat.bagCount += count;
+        mat.totalKg += lineTotalKg;
       }
     }
 
-    const columns = [...materials.values()]
-      .map((mat) => ({
-        materialId: mat.materialId,
-        materialName: mat.materialName,
-        materialNameTelugu: mat.materialNameTelugu,
-        bagCount: mat.bagCount,
-        totalKg: Number(mat.totalKg.toFixed(1)),
-        rateGroups: [...mat.rateMap.values()]
-          .map((g) => ({
-            rate: g.rate,
-            bagCount: g.bagCount,
-            totalKg: Number(g.totalKg.toFixed(1)),
-            totalAmount: Number(g.totalAmount.toFixed(2)),
-            entries: [...g.customerMap.values()].map((e) => ({
-              customerId: e.customerId,
-              name: e.name,
-              bags: e.bags,
-              bagCount: e.bags.length,
-              totalKg: Number(e.bags.reduce((s, n) => s + (typeof n === 'number' ? n : 0), 0).toFixed(1)),
-            })),
-          }))
-          .sort((a, b) => b.rate - a.rate),
-      }))
-      .sort((a, b) => b.bagCount - a.bagCount || a.materialName.localeCompare(b.materialName));
+    const columns = [...materials.values()].map((mat) => ({
+      materialId: mat.materialId,
+      materialName: mat.materialName,
+      materialNameTelugu: mat.materialNameTelugu,
+      bagCount: mat.bagCount,
+      totalKg: Number(mat.totalKg.toFixed(1)),
+      entries: mat.entries,
+      rateGroups: [
+        {
+          rate: 0,
+          entries: mat.entries,
+        },
+      ],
+    }));
 
     res.json({ date: start, columns });
   } catch (error) {

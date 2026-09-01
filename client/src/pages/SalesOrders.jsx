@@ -670,7 +670,7 @@ export default function SalesOrders({ path: windowPath }) {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3 overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 gap-3 min-h-full overflow-y-auto">
       <div className="shrink-0 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">

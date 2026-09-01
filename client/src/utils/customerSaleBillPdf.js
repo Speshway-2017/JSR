@@ -9,6 +9,7 @@ import {
   openRaituSheetPdf,
   BILL_CSS,
   openBillPreviewTab,
+  writeToPrintWindow,
 } from './raituBillShared';
 import { RAMABHADRA, ramabhadraFontFaceCss } from './pdfFont';
 
@@ -206,25 +207,7 @@ ${BILL_CSS}
 </body>
 </html>`;
 
-  const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
-  const showIn = (win) => {
-    if (!win || win.closed) return false;
-    try {
-      win.location.href = blobUrl;
-      win.focus?.();
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  if (!showIn(previewTab)) {
-    const win = window.open(blobUrl, '_blank');
-    if (!win) {
-      URL.revokeObjectURL(blobUrl);
-      throw new Error('Could not open bill window — allow popups and try again');
-    }
-  }
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
+  return writeToPrintWindow(html, previewTab);
 }
 
 export { openBillPreviewTab };

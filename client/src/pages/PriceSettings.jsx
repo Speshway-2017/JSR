@@ -120,6 +120,31 @@ export default function PriceSettings() {
 
         <div className="pt-3 border-t border-primary-100 space-y-3">
           <div>
+            <h3 className="font-semibold text-primary-800 text-sm">Sales Cooly (సేల్స్ కూలీ)</h3>
+            <p className="text-xs text-primary-400">
+              Default cooly rate per bag fetched automatically into the Sales page when Cooly is applied
+            </p>
+          </div>
+          <div>
+            <label className="label text-xs">Sales Cooly (Per Bag)</label>
+            <div className="relative max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400 text-sm">
+                ₹
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                className="input-field !py-2 pl-7"
+                value={form.salesCoolyRate ?? '10'}
+                onChange={(e) => setForm({ ...form, salesCoolyRate: e.target.value })}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-3 border-t border-primary-100 space-y-3">
+          <div>
             <h3 className="font-semibold text-primary-800 text-sm">Bag less (తగ్గింపు / Bag tare weight deduction)</h3>
             <p className="text-xs text-primary-400">
               Default tare deduction in kg per bag subtracted from actual bag weight on రైతుపట్టి bills

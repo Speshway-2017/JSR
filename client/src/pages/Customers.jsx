@@ -17,6 +17,7 @@ const emptyForm = {
   mobile: '',
   schedule: '',
   credit: '',
+  debit: '',
   handlingCharges: false,
 };
 
@@ -78,6 +79,7 @@ export default function Customers() {
       mobile: c.mobile || '',
       schedule: c.schedule?._id || c.schedule || '',
       credit: '',
+      debit: '',
       handlingCharges: !!c.handlingCharges,
     });
     setShowForm(true);
@@ -102,14 +104,16 @@ export default function Customers() {
     setSaving(true);
     try {
       if (editing) {
-        const { credit, ...rest } = form;
+        const { credit, debit, ...rest } = form;
         await api.put(`/customers/${editing._id}`, rest);
         toast.success('Customer updated');
       } else {
         const creditAmount = form.credit === '' ? 0 : Number(form.credit);
+        const debitAmount = form.debit === '' ? 0 : Number(form.debit);
         await api.post('/customers', {
           ...form,
           credit: Number.isFinite(creditAmount) ? Math.max(0, creditAmount) : 0,
+          debit: Number.isFinite(debitAmount) ? Math.max(0, debitAmount) : 0,
         });
         toast.success('Customer added');
       }
@@ -230,22 +234,41 @@ export default function Customers() {
             )}
           </div>
           {!editing && (
-            <div>
-              <label className="label">Credit</label>
-              <input
-                className="input-field"
-                type="text"
-                inputMode="decimal"
-                placeholder="0"
-                value={form.credit}
-                onChange={(e) => {
-                  const raw = e.target.value.replace(/[^\d.]/g, '');
-                  setForm({ ...form, credit: raw });
-                }}
-              />
-              <p className="text-xs text-primary-400 mt-1">
-                If entered, this becomes the customer’s credit balance.
-              </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Credit</label>
+                <input
+                  className="input-field"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={form.credit}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^\d.]/g, '');
+                    setForm({ ...form, credit: raw });
+                  }}
+                />
+                <p className="text-xs text-primary-400 mt-1">
+                  If entered, this becomes the customer’s credit balance.
+                </p>
+              </div>
+              <div>
+                <label className="label">Debit</label>
+                <input
+                  className="input-field"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={form.debit}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^\d.]/g, '');
+                    setForm({ ...form, debit: raw });
+                  }}
+                />
+                <p className="text-xs text-primary-400 mt-1">
+                  If entered, this becomes the customer’s debit balance.
+                </p>
+              </div>
             </div>
           )}
           <Toggle

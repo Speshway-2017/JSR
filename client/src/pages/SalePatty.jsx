@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
@@ -22,7 +22,17 @@ export default function SalePatty() {
   const [preview, setPreview] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [rates, setRates] = useState(() => emptyRatesState());
-  const [saving, setSaving] = useState(false);
+  const vendorListRef = useRef(null);
+
+  useEffect(() => {
+    setHighlight(-1);
+  }, [vendorQuery, suggestions]);
+
+  useEffect(() => {
+    if (!suggestOpen || highlight < 0 || !vendorListRef.current) return;
+    const el = vendorListRef.current.querySelector(`[data-idx="${highlight}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [highlight, suggestOpen]);
 
   const selected = vendors.find((v) => v._id === vendorId);
 
@@ -152,19 +162,27 @@ export default function SalePatty() {
                 setHighlight((h) => (h < 0 ? 0 : Math.min(h + 1, suggestions.length - 1)));
               } else if (e.key === 'ArrowUp' && suggestions.length) {
                 e.preventDefault();
+                setSuggestOpen(true);
                 setHighlight((h) => (h <= 0 ? 0 : h - 1));
               } else if (e.key === 'Enter' && suggestOpen && suggestions.length) {
                 e.preventDefault();
                 pickVendor(suggestions[highlight >= 0 ? highlight : 0]);
+              } else if (e.key === 'Escape') {
+                setSuggestOpen(false);
+                setHighlight(-1);
               }
             }}
           />
           {suggestOpen && suggestions.length > 0 && (
-            <ul className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl border border-primary-200 bg-surface shadow-card">
+            <ul
+              ref={vendorListRef}
+              className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+            >
               {suggestions.map((v, idx) => (
                 <li key={v._id}>
                   <button
                     type="button"
+                    data-idx={idx}
                     className={`w-full text-left px-4 py-2.5 text-sm ${
                       idx === highlight
                         ? 'bg-primary-100 text-primary-900 font-medium'

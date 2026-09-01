@@ -15,11 +15,17 @@ export default function MaterialAutocomplete({
   const [query, setQuery] = useState(value || '');
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
   const wrapperRef = useRef(null);
+  const listRef = useRef(null);
 
   useEffect(() => {
     setQuery(value || '');
   }, [value]);
+
+  useEffect(() => {
+    setHighlight(-1);
+  }, [query, materials]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -38,6 +44,13 @@ export default function MaterialAutocomplete({
 
   const exactMatch = materials.some((m) => m.name.toLowerCase() === trimmed.toLowerCase());
   const showAddOption = trimmed.length > 0 && !exactMatch;
+  const totalOptionsCount = suggestions.length + (showAddOption ? 1 : 0);
+
+  useEffect(() => {
+    if (!open || highlight < 0 || !listRef.current) return;
+    const el = listRef.current.querySelector(`[data-idx="${highlight}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [highlight, open]);
 
   const selectMaterial = (mat) => {
     onChange({
@@ -47,6 +60,7 @@ export default function MaterialAutocomplete({
     });
     setQuery(mat.name);
     setOpen(false);
+    setHighlight(-1);
   };
 
   const handleAddNew = async () => {
@@ -72,6 +86,41 @@ export default function MaterialAutocomplete({
     setOpen(true);
   };
 
+  const onKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      if (totalOptionsCount === 0) return;
+      e.preventDefault();
+      setOpen(true);
+      setHighlight((h) => (h < 0 ? 0 : Math.min(h + 1, totalOptionsCount - 1)));
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      if (totalOptionsCount === 0) return;
+      e.preventDefault();
+      setOpen(true);
+      setHighlight((h) => (h <= 0 ? 0 : h - 1));
+      return;
+    }
+
+    if (e.key === 'Enter' && open) {
+      if (totalOptionsCount === 0) return;
+      e.preventDefault();
+      const idx = highlight >= 0 ? highlight : 0;
+      if (idx < suggestions.length) {
+        selectMaterial(suggestions[idx]);
+      } else if (showAddOption && idx === suggestions.length) {
+        handleAddNew();
+      }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      setOpen(false);
+      setHighlight(-1);
+    }
+  };
+
   return (
     <div ref={wrapperRef} className="relative">
       <label className="label">Material Name *</label>
@@ -81,6 +130,7 @@ export default function MaterialAutocomplete({
         value={query}
         onChange={handleInputChange}
         onFocus={() => setOpen(true)}
+        onKeyDown={onKeyDown}
         required={required}
         autoComplete="off"
       />
@@ -92,14 +142,21 @@ export default function MaterialAutocomplete({
       )}
 
       {open && (suggestions.length > 0 || showAddOption) && (
-        <div className="absolute z-20 left-0 right-0 mt-1 bg-surface border border-primary-200 rounded-xl shadow-card max-h-56 overflow-y-auto">
-          {suggestions.map((mat) => (
+        <div
+          ref={listRef}
+          className="absolute z-20 left-0 right-0 mt-1 bg-surface border border-primary-200 rounded-xl shadow-card max-h-56 overflow-y-auto"
+        >
+          {suggestions.map((mat, idx) => (
             <button
               key={mat._id}
               type="button"
+              data-idx={idx}
               onClick={() => selectMaterial(mat)}
-              className={`w-full text-left px-4 py-3 hover:bg-primary-50 transition text-primary-800 ${
-                materialId === mat._id ? 'bg-primary-50 font-semibold' : ''
+              onMouseEnter={() => setHighlight(idx)}
+              className={`w-full text-left px-4 py-3 transition text-primary-800 ${
+                idx === highlight || (highlight < 0 && materialId === mat._id)
+                  ? 'bg-primary-100 font-semibold text-primary-900'
+                  : 'hover:bg-primary-50'
               }`}
             >
               {mat.name}
@@ -109,9 +166,15 @@ export default function MaterialAutocomplete({
           {showAddOption && (
             <button
               type="button"
+              data-idx={suggestions.length}
               onClick={handleAddNew}
+              onMouseEnter={() => setHighlight(suggestions.length)}
               disabled={adding}
-              className="w-full text-left px-4 py-3 border-t border-primary-100 hover:bg-accent-50 text-primary-700 font-medium flex items-center gap-2"
+              className={`w-full text-left px-4 py-3 border-t border-primary-100 font-medium flex items-center gap-2 ${
+                highlight === suggestions.length
+                  ? 'bg-accent-100 text-primary-900'
+                  : 'hover:bg-accent-50 text-primary-700'
+              }`}
             >
               <Plus className="w-4 h-4 text-accent-400" />
               {adding ? 'Adding...' : `Add "${trimmed}"`}

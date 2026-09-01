@@ -19,15 +19,15 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { name, nameTelugu, mobile, schedule, address, handlingCharges, credit, creditBalance } = req.body;
+    const { name, nameTelugu, mobile, schedule, address, handlingCharges, credit, debit, creditBalance } = req.body;
     if (!name?.trim() || !schedule) {
       return res.status(400).json({ message: 'Name and schedule are required' });
     }
 
-    const openingCredit = Math.max(
-      0,
-      Number(credit !== undefined ? credit : creditBalance) || 0
-    );
+    const creditVal = Math.max(0, Number(credit !== undefined ? credit : creditBalance) || 0);
+    const debitVal = Math.max(0, Number(debit) || 0);
+
+    const startingBalance = debitVal > 0 ? debitVal : creditVal;
 
     const customer = await Customer.create({
       name: name.trim(),
@@ -36,16 +36,16 @@ router.post('/', async (req, res) => {
       schedule,
       address: address || '',
       handlingCharges: !!handlingCharges,
-      creditBalance: openingCredit,
+      creditBalance: startingBalance,
     });
 
-    if (openingCredit > 0) {
+    if (startingBalance > 0) {
       await Transaction.create({
         customer: customer._id,
         type: 'customer_credit',
-        amount: openingCredit,
-        description: `Opening credit — ${customer.name}`,
-        balanceAfter: openingCredit,
+        amount: startingBalance,
+        description: debitVal > 0 ? `Opening debit — ${customer.name}` : `Opening credit — ${customer.name}`,
+        balanceAfter: startingBalance,
       });
     }
 

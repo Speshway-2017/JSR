@@ -101,6 +101,12 @@ export default function CashEntry() {
     setHighlight(-1);
   }, [nameQuery, suggestions]);
 
+  useEffect(() => {
+    if (!suggestOpen || highlight < 0 || !listRef.current) return;
+    const el = listRef.current.querySelector(`[data-idx="${highlight}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [highlight, suggestOpen]);
+
   const pickParty = (item) => {
     setPartyType(item.kind);
     setPartyId(item.id);
@@ -313,6 +319,7 @@ export default function CashEntry() {
                 <li key={`${item.kind}-${item.id}`}>
                   <button
                     type="button"
+                    data-idx={idx}
                     className={`w-full text-left px-4 py-2.5 text-sm ${
                       idx === highlight
                         ? 'bg-primary-100 text-primary-900 font-medium'

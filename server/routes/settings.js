@@ -57,6 +57,9 @@ router.put('/', async (req, res) => {
     if (req.body.bagLessOver50 !== undefined) {
       settings.bagLessOver50 = Math.max(0, Number(req.body.bagLessOver50) || 0);
     }
+    if (req.body.salesCoolyRate !== undefined) {
+      settings.salesCoolyRate = Math.max(0, Number(req.body.salesCoolyRate) || 0);
+    }
 
     await settings.save();
     res.json(settingsResponse(settings));

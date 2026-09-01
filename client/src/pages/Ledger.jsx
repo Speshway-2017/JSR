@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
@@ -44,6 +44,52 @@ export default function Ledger() {
       .filter((p) => matchesSearchFields(p, ['name', 'nameTelugu', 'mobile', 'city'], nameQuery))
       .slice(0, 10);
   }, [parties, nameQuery]);
+
+  const [highlight, setHighlight] = useState(-1);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const listRef = useRef(null);
+
+  useEffect(() => {
+    setHighlight(-1);
+  }, [nameQuery, suggestions]);
+
+  useEffect(() => {
+    if (!suggestOpen || highlight < 0 || !listRef.current) return;
+    const el = listRef.current.querySelector(`[data-idx="${highlight}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [highlight, suggestOpen]);
+
+  const onNameKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      if (suggestions.length === 0) return;
+      e.preventDefault();
+      setSuggestOpen(true);
+      setHighlight((h) => (h < 0 ? 0 : Math.min(h + 1, suggestions.length - 1)));
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      if (suggestions.length === 0) return;
+      e.preventDefault();
+      setSuggestOpen(true);
+      setHighlight((h) => (h <= 0 ? 0 : h - 1));
+      return;
+    }
+    if (e.key === 'Enter' && suggestOpen && suggestions.length > 0) {
+      e.preventDefault();
+      const p = suggestions[highlight >= 0 ? highlight : 0];
+      if (p) {
+        setPartyId(p._id);
+        setNameQuery(p.name);
+        setSuggestOpen(false);
+        setHighlight(-1);
+      }
+      return;
+    }
+    if (e.key === 'Escape') {
+      setSuggestOpen(false);
+      setHighlight(-1);
+    }
+  };
 
   const selected = parties.find((p) => p._id === partyId);
 
@@ -96,7 +142,7 @@ export default function Ledger() {
       params.set('saleId', row.saleId);
       params.set('highlightSaleId', row.saleId);
     }
-    openWindow({ path: `/sell?${params.toString()}`, title: 'Sales' });
+    openWindow({ path: `/sell?${params.toString()}`, title: 'Sales Entry' });
   };
 
   return (
@@ -144,22 +190,39 @@ export default function Ledger() {
               onChange={(e) => {
                 setNameQuery(e.target.value);
                 setPartyId('');
+                setSuggestOpen(true);
               }}
+              onFocus={() => {
+                if (nameQuery.trim()) setSuggestOpen(true);
+              }}
+              onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
+              onKeyDown={onNameKeyDown}
               placeholder={`Search ${partyType === 'vendor' ? 'vendor' : 'customer'}…`}
               autoComplete="off"
             />
-            {!partyId && suggestions.length > 0 && (
-              <ul className="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-xl border border-primary-200 bg-surface shadow-card">
-                {suggestions.map((p) => (
+            {!partyId && suggestOpen && suggestions.length > 0 && (
+              <ul
+                ref={listRef}
+                className="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+              >
+                {suggestions.map((p, idx) => (
                   <li key={p._id}>
                     <button
                       type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-primary-50"
+                      data-idx={idx}
+                      className={`w-full text-left px-3 py-2 text-sm transition ${
+                        idx === highlight
+                          ? 'bg-primary-100 font-semibold text-primary-900'
+                          : 'hover:bg-primary-50 text-primary-800'
+                      }`}
                       onMouseDown={(ev) => {
                         ev.preventDefault();
                         setPartyId(p._id);
                         setNameQuery(p.name);
+                        setSuggestOpen(false);
+                        setHighlight(-1);
                       }}
+                      onMouseEnter={() => setHighlight(idx)}
                     >
                       {p.name}
                       {p.city ? (

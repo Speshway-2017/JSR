@@ -573,12 +573,42 @@ export function brandHeaderHtml(watermarkSrc, dateValue) {
 export function warmRaituBillAssets() {
   const img = new Image();
   img.src = ayyappaWatermarkSrc();
-  const link = document.createElement('link');
-  link.rel = 'preload';
-  link.as = 'font';
-  link.href = `${window.location.origin}/fonts/Ramabhadra-Regular.ttf`;
-  link.crossOrigin = 'anonymous';
-  document.head.appendChild(link);
+  const fontUrl = `${window.location.origin}/fonts/Ramabhadra-Regular.ttf`;
+  if (!document.querySelector(`link[href="${fontUrl}"]`)) {
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'font';
+    link.type = 'font/ttf';
+    link.href = fontUrl;
+    link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
+  }
+}
+
+export function writeToPrintWindow(html, previewTab) {
+  let win = previewTab && !previewTab.closed ? previewTab : null;
+  if (!win) {
+    win = window.open('', '_blank');
+  }
+  if (!win) {
+    throw new Error('Could not open bill window — allow popups and try again');
+  }
+  try {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus?.();
+  } catch (err) {
+    console.warn('document.write failed, falling back to data URL:', err);
+    try {
+      const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+      win.location.href = dataUrl;
+      win.focus?.();
+    } catch {
+      /* ignore */
+    }
+  }
+  return win;
 }
 
 /**
@@ -589,20 +619,25 @@ export async function openRaituSheetPdf(innerMarkup, previewTab) {
   const watermarkSrc = ayyappaWatermarkSrc();
   const fontCss = await ramabhadraFontFaceCss();
 
-  const sheetInner = typeof innerMarkup === 'function' ? innerMarkup(watermarkSrc) : innerMarkup;
+  const sheetInner =
+    innerMarkup ||
+    `
+    <p style="text-align:center;padding:24px;color:#666;">No bill content provided.</p>
+  `;
 
   const html = `<!DOCTYPE html>
 <html lang="te">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Bill</title>
+  <title>Bill Print</title>
   <style>
 ${fontCss}
 ${BILL_CSS}
 .sheet {
-  box-shadow: 0 8px 28px rgba(20, 83, 45, 0.12);
-  margin: 0 auto;
+  background-image: url("${watermarkSrc}");
+  background-position: center 58%;
+  background-repeat: no-repeat;
+  background-size: 320px auto;
 }
   </style>
 </head>
@@ -627,26 +662,5 @@ ${BILL_CSS}
 </body>
 </html>`;
 
-  let targetWin = previewTab;
-  if (!targetWin || targetWin.closed) {
-    targetWin = window.open('', '_blank');
-  }
-  if (!targetWin) {
-    throw new Error('Could not open bill window — allow popups and try again');
-  }
-  try {
-    targetWin.document.open();
-    targetWin.document.write(html);
-    targetWin.document.close();
-    targetWin.focus?.();
-  } catch {
-    try {
-      const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
-      targetWin.location.href = blobUrl;
-      targetWin.focus?.();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-    } catch {
-      throw new Error('Could not render bill window');
-    }
-  }
+  return writeToPrintWindow(html, previewTab);
 }

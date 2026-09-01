@@ -1,5 +1,5 @@
 import { RAMABHADRA, ramabhadraFontFaceCss } from './pdfFont';
-import { openBillPreviewTab } from './raituBillShared';
+import { openBillPreviewTab, writeToPrintWindow } from './raituBillShared';
 
 function esc(value) {
   return String(value ?? '')
@@ -36,15 +36,15 @@ export function saleReport2InnerHtml(data) {
     .map((col) => {
       const title = esc(col.materialName);
       const te = col.materialNameTelugu ? `<div class="te">${esc(col.materialNameTelugu)}</div>` : '';
-      const groups = (col.rateGroups || [])
-        .map((g) => {
-          const lines = (g.entries || [])
-            .map((e) => `<div class="line"><span class="who">${esc(e.name)}</span> - ${esc(fmtBags(e.bags))}</div>`)
-            .join('');
-          return `<div class="group">${lines}<div class="rate">${esc(fmtRate(g.rate))}</div></div>`;
+      const entries = col.entries || (col.rateGroups || []).flatMap((g) => g.entries || []);
+      const lines = entries
+        .map((e) => {
+          const bagsText = esc(fmtBags(e.bags));
+          const amt = e.amount != null ? e.amount : (e.totalAmount != null ? e.totalAmount : 0);
+          return `<div class="line"><span class="who">${esc(e.name)}</span> - ${bagsText} = rs ${amt}</div>`;
         })
         .join('');
-      return `<section class="mat"><div class="head">${title}${te}</div>${groups}</section>`;
+      return `<section class="mat"><div class="head">${title}${te}</div><div class="group">${lines}</div></section>`;
     })
     .join('');
 
@@ -126,17 +126,7 @@ export const SALE_REPORT_2_CSS = `
 }
 
 .rate {
-  width: 2.4em;
-  height: 2.4em;
-  margin: 6px auto 10px;
-  border: 1.5px solid #b91c1c;
-  border-radius: 50%;
-  color: #b91c1c;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
+  display: none !important;
 }
 
 .empty {
@@ -228,25 +218,7 @@ ${SALE_REPORT_2_CSS}
 </body>
 </html>`;
 
-  const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
-  const showIn = (win) => {
-    if (!win || win.closed) return false;
-    try {
-      win.location.href = blobUrl;
-      win.focus?.();
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  if (!showIn(previewTab)) {
-    const win = window.open(blobUrl, '_blank');
-    if (!win) {
-      URL.revokeObjectURL(blobUrl);
-      throw new Error('Could not open report window — allow popups and try again');
-    }
-  }
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
+  return writeToPrintWindow(html, previewTab);
 }
 
 export { openBillPreviewTab };

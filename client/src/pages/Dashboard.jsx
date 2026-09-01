@@ -464,10 +464,10 @@ export default function Dashboard() {
             <h2 className="text-lg font-bold text-primary-700">Recent Sales</h2>
             <button
               type="button"
-              onClick={() => openWindow({ path: '/sales-report', title: 'Sales Report' })}
+              onClick={() => openWindow({ path: '/sales-report', title: 'Sales Checklist' })}
               className="text-xs font-medium text-primary-500 hover:text-primary-700 cursor-pointer"
             >
-              Sales report →
+              Sales checklist →
             </button>
           </div>
           {recentSales.length === 0 ? (

@@ -72,6 +72,7 @@ export default function Sell({ path: windowPath }) {
   const [cooly, setCooly] = useState('0');
   const [coolyOn, setCoolyOn] = useState(false);
   const [coolyPerBag, setCoolyPerBag] = useState(true);
+  const [salesCoolyRate, setSalesCoolyRate] = useState('10');
   const [detail, setDetail] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingRowId, setSavingRowId] = useState('');
@@ -311,11 +312,14 @@ export default function Sell({ path: windowPath }) {
   };
 
   const loadMasterData = useCallback(() => {
-    Promise.all([api.get('/materials'), api.get('/customers'), api.get('/vendors')])
-      .then(([m, c, v]) => {
+    Promise.all([api.get('/materials'), api.get('/customers'), api.get('/vendors'), api.get('/settings')])
+      .then(([m, c, v, s]) => {
         setMaterials(m.data);
         setCustomers(c.data);
         setVendors(v.data);
+        if (s.data?.salesCoolyRate != null) {
+          setSalesCoolyRate(String(s.data.salesCoolyRate));
+        }
       })
       .catch(() => toast.error('Failed to load master data'));
   }, []);
@@ -367,16 +371,23 @@ export default function Sell({ path: windowPath }) {
       if (c) {
         setCustomerId(c._id);
         setNameQuery(c.name);
-        setCoolyOn(!!c.handlingCharges);
+        const hasCooly = !!c.handlingCharges;
+        setCoolyOn(hasCooly);
+        if (hasCooly) {
+          setCooly((prev) => (!prev || prev === '0' ? salesCoolyRate : prev));
+        }
       }
       queryApplied.current = true;
     }
-  }, [sales, customers, searchParams]);
+  }, [sales, customers, searchParams, salesCoolyRate]);
 
   useEffect(() => {
     if (!focusSaleId || !focusRowRef.current) return;
-    focusRowRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, [focusSaleId, flatRows.length]);
+    const timer = setTimeout(() => {
+      focusRowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [focusSaleId, displayedRows.length]);
 
   useEffect(() => {
     setHighlight(-1);
@@ -391,9 +402,14 @@ export default function Sell({ path: windowPath }) {
 
   useEffect(() => {
     if (fillingRef.current) return;
-    setCoolyOn(customerCoolyDefault);
-    if (!customerCoolyDefault) setCooly('0');
-  }, [customerId, customerCoolyDefault]);
+    const hasCooly = customerCoolyDefault;
+    setCoolyOn(hasCooly);
+    if (hasCooly) {
+      setCooly((prev) => (!prev || prev === '0' ? salesCoolyRate : prev));
+    } else {
+      setCooly('0');
+    }
+  }, [customerId, customerCoolyDefault, salesCoolyRate]);
 
   useEffect(() => {
     if (focusBagIdx == null) return;
@@ -409,13 +425,21 @@ export default function Sell({ path: windowPath }) {
     setNameQuery(c.name);
     setSuggestOpen(false);
     setHighlight(-1);
-    setCoolyOn(!!c.handlingCharges);
+    const hasCooly = !!c.handlingCharges;
+    setCoolyOn(hasCooly);
+    if (hasCooly) {
+      setCooly((prev) => (!prev || prev === '0' ? salesCoolyRate : prev));
+    } else {
+      setCooly('0');
+    }
     setFocusBagIdx(0);
   };
 
-  const clearEntry = () => {
+  const clearEntry = ({ clearFocus = true } = {}) => {
     setEditingSaleId('');
-    setFocusSaleId('');
+    if (clearFocus) {
+      setFocusSaleId('');
+    }
     setCustomerId('');
     setNameQuery('');
     setBagWeights(['']);
@@ -518,15 +542,25 @@ export default function Sell({ path: windowPath }) {
           },
         ],
       };
+      let savedSaleId = editingSaleId;
       if (editingSaleId) {
         await api.put(`/sales/${editingSaleId}`, payload);
         toast.success('Sale updated');
       } else {
-        await api.post('/sales', payload);
+        const res = await api.post('/sales', payload);
+        savedSaleId = res.data?._id;
         toast.success('Saved');
       }
-      clearEntry();
+      clearEntry({ clearFocus: false });
+      if (hasActiveFilters) {
+        setFilterCustomer('');
+        setFilterVendor('');
+        setFilterItem('');
+      }
       await loadDaySales();
+      if (savedSaleId) {
+        setFocusSaleId(savedSaleId);
+      }
       api.get('/customers').then((r) => setCustomers(r.data));
     } catch (err) {
       toast.error(err.response?.data?.message || 'Sale failed');
@@ -603,6 +637,7 @@ export default function Sell({ path: windowPath }) {
         lines,
       });
       await loadDaySales();
+      setFocusSaleId(sale._id);
       api.get('/customers').then((r) => setCustomers(r.data));
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Failed to update');
@@ -612,26 +647,44 @@ export default function Sell({ path: windowPath }) {
     }
   };
 
+  const custSuggestListRef = useRef(null);
+
+  useEffect(() => {
+    if (!suggestOpen || highlight < 0 || !custSuggestListRef.current) return;
+    const el = custSuggestListRef.current.querySelector(`[data-idx="${highlight}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [highlight, suggestOpen]);
+
   const onNameKeyDown = (e) => {
-    if (!suggestOpen || !suggestions.length) {
-      if (e.key === 'Enter') {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!suggestOpen) setSuggestOpen(true);
+      if (suggestions.length) {
+        setHighlight((h) => (h < 0 ? 0 : Math.min(h + 1, suggestions.length - 1)));
+      }
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (suggestions.length) {
+        setHighlight((h) => (h <= 0 ? 0 : h - 1));
+      }
+      return;
+    }
+    if (e.key === 'Enter') {
+      if (suggestOpen && suggestions.length) {
+        e.preventDefault();
+        const pick = highlight >= 0 ? suggestions[highlight] : suggestions[0];
+        if (pick) pickCustomer(pick);
+      } else {
         e.preventDefault();
         setFocusBagIdx(0);
       }
       return;
     }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlight((h) => Math.min(h + 1, suggestions.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlight((h) => Math.max(h - 1, 0));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const pick = highlight >= 0 ? suggestions[highlight] : suggestions[0];
-      if (pick) pickCustomer(pick);
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Escape') {
       setSuggestOpen(false);
+      setHighlight(-1);
     }
   };
 
@@ -642,7 +695,6 @@ export default function Sell({ path: windowPath }) {
     }
 
     setPrinting(true);
-    const previewTab = openBillPreviewTab();
     try {
       let serverStatements = new Map();
       try {
@@ -659,14 +711,16 @@ export default function Sell({ path: windowPath }) {
       const statementsMap = new Map();
 
       for (const row of displayedRows) {
-        const cid = String(row.customerId || '');
-        if (!cid) continue;
+        const rawCid = row.customerId?._id || row.customerId || row.sale?.customer?._id || row.sale?.customer;
+        const cid = typeof rawCid === 'string' ? rawCid : rawCid ? String(rawCid) : '';
+        if (!cid || cid === '[object Object]') continue;
+
         if (!statementsMap.has(cid)) {
           const serverSt = serverStatements.get(cid);
-          const fullCust = customers.find((c) => c._id === cid);
+          const fullCust = customers.find((c) => String(c._id) === cid);
           statementsMap.set(cid, {
             customerId: cid,
-            name: row.name || fullCust?.name || '—',
+            name: row.name && row.name !== '—' ? row.name : fullCust?.name || serverSt?.name || '—',
             nameTelugu: fullCust?.nameTelugu || serverSt?.nameTelugu || '',
             opening: Number(serverSt?.opening) || 0,
             sales: [],
@@ -701,15 +755,13 @@ export default function Sell({ path: windowPath }) {
       });
 
       if (!statements.length) {
-        if (previewTab && !previewTab.closed) previewTab.close();
         toast.error('No bills to print');
         return;
       }
 
-      await openRangeBillsNUp(statements, perPage, previewTab);
+      await openRangeBillsNUp(statements, perPage);
       setPrintOpen(false);
     } catch (err) {
-      if (previewTab && !previewTab.closed) previewTab.close();
       toast.error(err.response?.data?.message || err.message || 'Could not print bill');
     } finally {
       setPrinting(false);
@@ -717,9 +769,9 @@ export default function Sell({ path: windowPath }) {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-2 h-full overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 gap-2 min-h-full overflow-y-auto">
       <div className="shrink-0">
-        <h1 className="page-title">Sales</h1>
+        <h1 className="page-title">Sales Entry</h1>
         <p className="text-primary-400 text-sm mt-0.5">
           {editingSaleId
             ? 'Editing a sale from this date — change bags, rate, or customer, then save'
@@ -818,8 +870,21 @@ export default function Sell({ path: windowPath }) {
               className="input-field"
               value={nameQuery}
               onChange={(e) => {
-                setNameQuery(e.target.value);
-                setCustomerId('');
+                const val = e.target.value;
+                setNameQuery(val);
+                const match = customers.find(
+                  (c) => c.name.trim().toLowerCase() === val.trim().toLowerCase()
+                );
+                if (match) {
+                  setCustomerId(match._id);
+                  const hasCooly = !!match.handlingCharges;
+                  setCoolyOn(hasCooly);
+                  if (hasCooly) {
+                    setCooly((prev) => (!prev || prev === '0' ? salesCoolyRate : prev));
+                  }
+                } else {
+                  setCustomerId('');
+                }
                 setSuggestOpen(true);
               }}
               onFocus={() => setSuggestOpen(true)}
@@ -829,11 +894,15 @@ export default function Sell({ path: windowPath }) {
               autoComplete="off"
             />
             {suggestOpen && suggestions.length > 0 && (
-              <ul className="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-xl border border-primary-200 bg-surface shadow-card">
+              <ul
+                ref={custSuggestListRef}
+                className="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+              >
                 {suggestions.map((c, i) => (
                   <li key={c._id}>
                     <button
                       type="button"
+                      data-idx={i}
                       className={`w-full text-left px-3 py-2 text-sm ${
                         i === highlight ? 'bg-primary-100 text-primary-800' : 'hover:bg-primary-50'
                       }`}
@@ -939,7 +1008,15 @@ export default function Sell({ path: windowPath }) {
                 <input
                   type="checkbox"
                   checked={coolyOn}
-                  onChange={(e) => setCoolyOn(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setCoolyOn(checked);
+                    if (checked) {
+                      setCooly((prev) => (!prev || prev === '0' ? salesCoolyRate : prev));
+                    } else {
+                      setCooly('0');
+                    }
+                  }}
                 />
               </span>
               <span className="inline-flex items-center gap-1.5 font-normal text-primary-500">

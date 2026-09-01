@@ -26,6 +26,10 @@ export function emptyRatesState(source = {}) {
     source.bagLessOver50 !== undefined && source.bagLessOver50 !== null
       ? String(source.bagLessOver50)
       : '2';
+  state.salesCoolyRate =
+    source.salesCoolyRate !== undefined && source.salesCoolyRate !== null
+      ? String(source.salesCoolyRate)
+      : '10';
   return state;
 }
 
@@ -40,5 +44,6 @@ export function ratesPayload(state) {
   }
   body.bagLessUnder50 = Math.max(0, Number(state.bagLessUnder50) || 0);
   body.bagLessOver50 = Math.max(0, Number(state.bagLessOver50) || 0);
+  body.salesCoolyRate = Math.max(0, Number(state.salesCoolyRate) || 0);
   return body;
 }

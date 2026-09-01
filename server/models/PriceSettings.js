@@ -33,6 +33,7 @@ const priceSettingsSchema = new mongoose.Schema(
 
     bagLessUnder50: { type: Number, default: 1, min: 0 },
     bagLessOver50: { type: Number, default: 2, min: 0 },
+    salesCoolyRate: { type: Number, default: 10, min: 0 },
 
     // Legacy fields (kept for old documents; migrated on read)
     labour: { type: Number, default: 0, min: 0 },

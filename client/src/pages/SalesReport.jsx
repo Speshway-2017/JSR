@@ -120,8 +120,8 @@ export default function SalesReport() {
       { wch: 14 },
     ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Sales Report');
-    XLSX.writeFile(wb, `sales_report_${startDate}_to_${endDate}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales Checklist');
+    XLSX.writeFile(wb, `sales_checklist_${startDate}_to_${endDate}.xlsx`);
   };
 
   const dateError = startDate > endDate;
@@ -131,7 +131,7 @@ export default function SalesReport() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="page-title">Sales Report</h1>
+          <h1 className="page-title">Sales Checklist</h1>
           <p className="text-primary-400 text-sm mt-0.5">
             Filter by name, item, or rate
           </p>

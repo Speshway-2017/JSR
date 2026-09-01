@@ -7,7 +7,7 @@
     @apply bg-cream text-primary-600 antialiased;
   }
 
-  /* Hide scrollbars app-wide; scrolling still works (wheel / trackpad / touch) */
+  /* Hide scrollbars throughout the application while maintaining full scroll capability */
   html,
   body,
   * {
