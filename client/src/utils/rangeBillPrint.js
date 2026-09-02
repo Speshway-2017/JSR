@@ -1,79 +1,174 @@
 import { RAMABHADRA, ramabhadraFontFaceCss } from './pdfFont';
-import { displayMaterialName, materialTeluguMap, openBillPreviewTab, writeToPrintWindow } from './raituBillShared';
+import { TE, openBillPreviewTab, writeToPrintWindow, materialTeluguMap, displayMaterialName } from './raituBillShared';
 
-const JAMA = 'జమ';
-
-function fmtDate(d) {
-  const x = new Date(d);
-  if (Number.isNaN(x.getTime())) return '';
-  return `${x.getDate()}/${x.getMonth() + 1}`;
+function fmtNum(n) {
+  const v = Number(n) || 0;
+  if (Number.isInteger(v)) return String(v);
+  return v.toFixed(1).replace(/\.0$/, '');
 }
 
 function fmtMoney(n) {
   return Math.round(Number(n) || 0).toLocaleString('en-IN');
 }
 
-function fmtKg(n) {
-  const v = Number(n) || 0;
-  if (!v) return '';
-  return Number.isInteger(v) ? String(v) : v.toFixed(1).replace(/\.0$/, '');
+function formatDateShort(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}`;
 }
 
-function layoutFor(perPage) {
-  const n = perPage === 2 ? 2 : perPage === 4 ? 4 : 6;
-  return { n, cols: 2, rows: n / 2 };
+function esc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-function buildBillModel(st, teluguMap) {
-  const rows = [];
-  const opening = Number(st.opening) || 0;
-  if (opening) {
-    rows.push({ kind: 'opening', date: '', item: 'Opening', bags: '', kg: '', amount: fmtMoney(opening) });
+function chunkArray(arr, size) {
+  const res = [];
+  for (let i = 0; i < arr.length; i += size) {
+    res.push(arr.slice(i, i + size));
   }
-  for (const s of st.sales || []) {
-    rows.push({
-      kind: 'sale',
-      date: fmtDate(s.date),
-      item: displayMaterialName(s.material, teluguMap) || s.material || '',
-      bags: s.bags ? String(s.bags) : '',
-      kg: fmtKg(s.weight),
-      amount: fmtMoney(s.amount),
-    });
-  }
-  if ((st.sales || []).length) {
-    rows.push({ kind: 'total', item: 'Total', amount: fmtMoney(st.totalSale) });
-  }
-  for (const p of st.payments || []) {
-    rows.push({
-      kind: 'jama',
-      date: fmtDate(p.date),
-      item: JAMA,
-      bags: '',
-      kg: '',
-      amount: fmtMoney(p.amount),
-    });
-  }
-  if ((st.payments || []).length) {
-    rows.push({ kind: 'total', item: 'Total paid', amount: fmtMoney(st.totalPaid) });
-  }
-  rows.push({ kind: 'closing', item: 'Closing', amount: fmtMoney(st.closing) });
-  return {
-    name: st.name || '',
-    nameTelugu: st.nameTelugu && st.nameTelugu !== st.name ? st.nameTelugu : '',
-    rows,
-  };
+  return res;
 }
 
-/**
- * Print customer range statements N-up (2 / 4 / 6).
- * Black type only. Overflow continues in the next part; the next customer starts a new part.
- */
-export async function openRangeBillsNUp(statements, perPage = 6, previewTab) {
-  const { n, cols, rows } = layoutFor(perPage);
-  const teluguMap = await materialTeluguMap();
-  const bills = (statements || []).map((st) => buildBillModel(st, teluguMap));
-  const fontCss = await ramabhadraFontFaceCss();
-  const payload = JSON.stringify(bills).replace(/</g, '\\u003c');
+export function buildNUpCellContent(summaryRow, teluguMap) {
+  if (!summaryRow) return '';
+  const c = summaryRow.customer || {};
+  const nameEn = summaryRow.name || c.name || '—';
+  const nameTe = summaryRow.nameTelugu || c.nameTelugu || '';
+
+  const opening = Number(
+    summaryRow.opening != null
+      ? summaryRow.opening
+      : summaryRow.openingBalance != null
+      ? summaryRow.openingBalance
+      : 0
+  );
+
+  const sales = summaryRow.sales || [];
+  const calculatedSalesSum = sales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  const total = Number(
+    summaryRow.totalSale != null
+      ? summaryRow.totalSale
+      : summaryRow.salesTotal != null
+      ? summaryRow.salesTotal
+      : calculatedSalesSum
+  );
+
+  const totalPaid = Number(summaryRow.totalPaid || 0);
+
+  const closing = Number(
+    summaryRow.closing != null
+      ? summaryRow.closing
+      : summaryRow.closingBalance != null
+      ? summaryRow.closingBalance
+      : opening + total - totalPaid
+  );
+
+  let rowsHtml = '';
+
+  // 1. Opening balance row
+  rowsHtml += `<tr>
+    <td class="date"></td>
+    <td class="item">Opening</td>
+    <td class="num"></td>
+    <td class="num">${esc(fmtMoney(opening))}</td>
+  </tr>`;
+
+  // 2. Sales item rows
+  sales.forEach((s) => {
+    const rawName = s.material || s.materialName || '—';
+    const matName = s.materialNameTelugu || displayMaterialName(rawName, teluguMap);
+    const bagVal = s.bags != null ? s.bags : s.bagCount != null ? s.bagCount : 0;
+    const bagsStr = Number(bagVal) > 0 ? String(bagVal) : '';
+    const amtStr = s.amount != null ? fmtMoney(s.amount) : '0';
+    const itemDateStr = formatDateShort(s.date || summaryRow.date || summaryRow.startDate);
+
+    rowsHtml += `<tr>
+      <td class="date">${esc(itemDateStr)}</td>
+      <td class="item">${esc(matName)}</td>
+      <td class="num">${esc(bagsStr)}</td>
+      <td class="num">${esc(amtStr)}</td>
+    </tr>`;
+  });
+
+  // 3. Cooly row if distinct
+  const cooly = Number(summaryRow.coolyTotal || summaryRow.cooly || 0);
+  if (cooly > 0 && !sales.some((s) => String(s.material || s.materialName).toLowerCase() === 'cooly')) {
+    const itemDateStr = formatDateShort(summaryRow.date || summaryRow.startDate);
+    rowsHtml += `<tr>
+      <td class="date">${esc(itemDateStr)}</td>
+      <td class="item">Cooly</td>
+      <td class="num"></td>
+      <td class="num">${esc(fmtMoney(cooly))}</td>
+    </tr>`;
+  }
+
+  // 4. Total row
+  rowsHtml += `<tr class="rule">
+    <td class="date"></td>
+    <td class="item">Total</td>
+    <td class="num" colspan="2">${esc(fmtMoney(total))}</td>
+  </tr>`;
+
+  // 5. Closing row
+  rowsHtml += `<tr class="rule">
+    <td class="date"></td>
+    <td class="item">Closing</td>
+    <td class="num" colspan="2">${esc(fmtMoney(closing))}</td>
+  </tr>`;
+
+  return `
+  <div class="party">
+    ${esc(nameEn)}
+    ${nameTe ? `<span class="te">${esc(nameTe)}</span>` : ''}
+  </div>
+  <table class="lines">
+    <thead>
+      <tr class="th-row">
+        <th class="date">${esc(TE.tedi)}</th>
+        <th class="item">${esc(TE.itemCol)}</th>
+        <th class="num">${esc(TE.bag)}</th>
+        <th class="num">${esc(TE.mottham)}</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>`;
+}
+
+export async function openRangeBillsNUp(bills, perPage = 4, previewTab) {
+  const [fontCss, teluguMap] = await Promise.all([
+    ramabhadraFontFaceCss(),
+    materialTeluguMap(),
+  ]);
+
+  const n = perPage === 2 ? 2 : perPage === 6 ? 6 : 4;
+  const cols = 2;
+  const rows = n / cols;
+
+  const cellContents = bills.map((b) => buildNUpCellContent(b, teluguMap));
+  const pages = chunkArray(cellContents, n);
+
+  const pageHtml = pages
+    .map((pageCells) => {
+      const cells = [...pageCells];
+      while (cells.length < n) {
+        cells.push('');
+      }
+      return `<section class="page nup-${n}">
+        ${cells
+          .map((inner) => `<div class="cell${inner ? ' has-bill' : ''}">${inner}</div>`)
+          .join('')}
+      </section>`;
+    })
+    .join('');
 
   const html = `<!DOCTYPE html>
 <html lang="te">
@@ -83,226 +178,145 @@ export async function openRangeBillsNUp(statements, perPage = 6, previewTab) {
   <style>
 ${fontCss}
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-body {
+html, body { margin: 0; padding: 0; }
+body.bill-preview {
+  background: #f4f4f5;
+  color: #000000;
   font-family: '${RAMABHADRA}', 'Noto Sans Telugu', sans-serif;
   font-weight: 400;
+  min-height: 100vh;
 }
 .preview-toolbar {
-  position: sticky; top: 0; z-index: 5;
-  display: flex; justify-content: flex-end; gap: 8px;
-  padding: 8px 12px; background: #f4f4f4; border-bottom: 1px solid #ccc;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 10px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #d4d4d8;
 }
 .preview-toolbar button {
-  font: inherit; padding: 6px 12px; cursor: pointer;
-  border: 1px solid #333; background: #fff; color: #000;
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid #166534;
+  background: #166534;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 600;
 }
-.preview-toolbar button.primary { background: #111; color: #fff; }
-.stage { padding: 8px; }
+.preview-toolbar button.whatsapp {
+  background: #25D366;
+  color: #fff;
+  border-color: #25D366;
+  font-weight: 600;
+}
+.preview-toolbar button.whatsapp:hover {
+  background: #1eb956;
+}
+.preview-toolbar button.secondary {
+  background: #f4f4f5;
+  color: #111;
+  border: 1px solid #d4d4d8;
+  font-weight: 500;
+}
+.stage {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
 .page {
   width: 198mm;
-  height: 285mm;
+  min-height: 280mm;
   display: grid;
   grid-template-columns: repeat(${cols}, 1fr);
   grid-template-rows: repeat(${rows}, 1fr);
   page-break-after: always;
   break-after: page;
-  background: #fff;
-  border-top: 1px solid #000;
-  border-left: 1px solid #000;
+  background: #ffffff;
+  border-top: 1px solid #000000;
+  border-left: 1px solid #000000;
+  box-sizing: border-box;
 }
 .page:last-child { page-break-after: auto; break-after: auto; }
 .cell {
-  border-right: 1px solid #000;
-  border-bottom: 1px solid #000;
+  border-right: 1px solid #000000;
+  border-bottom: 1px solid #000000;
   overflow: hidden;
-  padding: 4px 6px 5px;
+  padding: 6px 8px;
   min-width: 0;
   min-height: 0;
+  box-sizing: border-box;
+  background: #ffffff;
+  position: relative;
 }
 .party {
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #000000;
   text-align: center;
-  border-bottom: 1px solid #000;
-  padding: 0 0 2px;
-  margin: 0 0 3px;
+  border-bottom: 1px solid #000000;
+  padding-bottom: 3px;
+  margin-bottom: 4px;
   line-height: 1.25;
 }
-.party .te { display: block; font-size: 12px; }
-.cont {
-  font-size: 10px;
-  text-align: center;
-  font-style: italic;
-  margin: 0 0 3px;
-}
+.party .te { display: block; font-size: 13px; font-weight: normal; color: #000000; }
 table.lines {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
-  line-height: 1.3;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #000000;
+}
+table.lines th {
+  padding: 2px 3px;
+  border-bottom: 1px solid #000000;
+  font-size: 12px;
+  font-weight: 700;
+  color: #000000;
+  text-align: left;
+}
+table.lines th.num {
+  text-align: right;
 }
 table.lines td {
-  padding: 0 2px 1px;
+  padding: 1px 3px;
   vertical-align: top;
+  color: #000000;
 }
-table.lines td.date { width: 1%; white-space: nowrap; }
-table.lines td.item { width: 100%; }
-table.lines td.num { width: 1%; white-space: nowrap; text-align: right; padding-left: 6px; }
-table.lines tr.rule td { border-top: 1px solid #000; padding-top: 2px; }
-.measure { position: absolute; left: -9999px; top: 0; visibility: hidden; }
+table.lines td.date { width: 1%; white-space: nowrap; color: #000000; }
+table.lines td.item { width: 100%; color: #000000; }
+table.lines td.num { width: 1%; white-space: nowrap; text-align: right; padding-left: 6px; color: #000000; }
+table.lines tr.rule td { border-top: 1px solid #000000; font-weight: 700; padding-top: 3px; color: #000000; }
 @media print {
   .preview-toolbar { display: none !important; }
+  body.bill-preview { background: #ffffff; }
   .stage { padding: 0; }
-  @page { size: A4 portrait; margin: 6mm; }
+  .page { box-shadow: none; margin: 0; }
+  @page { size: A4 portrait; margin: 5mm; }
 }
   </style>
 </head>
-<body>
-  <div class="preview-toolbar">
-    <button type="button" onclick="window.close()">Close</button>
-    <button type="button" style="background:#25D366;color:#fff;border-color:#25D366;font-weight:600;" onclick="sendWhatsAppBill()">Send WhatsApp</button>
-    <button type="button" class="primary" onclick="window.print()">Print / Save PDF</button>
+<body class="bill-preview">
+  <div class="preview-toolbar no-print">
+    <button type="button" class="secondary" onclick="window.close()">Close</button>
+    <button type="button" class="whatsapp" onclick="sendWhatsAppBill()">Send WhatsApp</button>
+    <button type="button" onclick="window.print()">Print / Save PDF</button>
   </div>
-  <div class="stage" id="stage"></div>
-  <div class="measure" id="measure"></div>
+  <div class="stage">
+    ${pageHtml}
+  </div>
   <script>
     function sendWhatsAppBill() {
-      var stage = document.getElementById('stage');
+      var stage = document.querySelector('.stage');
       var bodyText = stage ? stage.innerText : document.body.innerText;
       var lines = bodyText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
       var text = '*JSR AGRI TRADES - Customer Bills*\n-----------------------------------\n' + lines.slice(0, 40).join('\n') + '\n-----------------------------------\n*Thank you!* 🙏';
       window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
-    }
-
-    const BILLS = ${payload};
-    const PER = ${n};
-
-    function esc(s) {
-      return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    function rowHtml(r) {
-      var cls = (r.kind === 'total' || r.kind === 'closing' || r.kind === 'opening') ? ' class="rule"' : '';
-      return '<tr' + cls + '><td class="date">' + esc(r.date) + '</td><td class="item">' + esc(r.item) +
-        '</td><td class="num">' + esc(r.bags) +
-        '</td><td class="num">' + esc(r.amount) + '</td></tr>';
-    }
-
-    function headerHtml(bill, continued) {
-      var h = '<div class="party">' + esc(bill.name);
-      if (bill.nameTelugu) h += '<span class="te">' + esc(bill.nameTelugu) + '</span>';
-      h += '</div>';
-      if (continued) h += '<div class="cont">continue</div>';
-      return h;
-    }
-
-    function tableWrap(inner) {
-      return '<table class="lines"><tbody>' + inner + '</tbody></table>';
-    }
-
-    function cellHtml(inner) {
-      return '<div class="cell">' + inner + '</div>';
-    }
-
-    function measureBox() {
-      var page = document.createElement('div');
-      page.className = 'page';
-      page.style.position = 'absolute';
-      page.style.left = '-9999px';
-      var probe = document.createElement('div');
-      probe.className = 'cell';
-      page.appendChild(probe);
-      document.body.appendChild(page);
-      var size = { w: probe.clientWidth, h: probe.clientHeight };
-      page.remove();
-      return size;
-    }
-
-    function fits(html, w, h) {
-      var m = document.getElementById('measure');
-      if (!m) return true;
-      m.style.width = w + 'px';
-      m.innerHTML = '<div class="cell" style="height:auto;overflow:visible;border:0;padding:4px 6px 5px;">' + html + '</div>';
-      var contentH = m.firstElementChild ? m.firstElementChild.scrollHeight : 0;
-      return contentH <= h + 5;
-    }
-
-    function fragmentsFor(bill, w, h) {
-      var frags = [];
-      var i = 0;
-      var continued = false;
-      do {
-        var head = headerHtml(bill, continued);
-        var taken = [];
-        while (i < bill.rows.length) {
-          taken.push(bill.rows[i]);
-          if (!fits(head + tableWrap(taken.map(rowHtml).join('')), w, h)) {
-            taken.pop();
-            break;
-          }
-          i += 1;
-        }
-        if (!taken.length && i < bill.rows.length) {
-          taken.push(bill.rows[i]);
-          i += 1;
-        }
-        frags.push(head + tableWrap(taken.map(rowHtml).join('')));
-        continued = true;
-      } while (i < bill.rows.length);
-      return frags;
-    }
-
-    function render() {
-      var stage = document.getElementById('stage');
-      if (!stage) return;
-
-      if (!BILLS || !BILLS.length) {
-        stage.innerHTML = '<div style="text-align:center;padding:40px;font-size:15px;color:#555;">No bill records found for the selected date range.</div>';
-        return;
-      }
-
-      var defaultH = PER === 2 ? 1040 : PER === 4 ? 520 : 340;
-      var size = measureBox();
-      if (!size.w || size.w < 50) size.w = 370;
-      if (!size.h || size.h < 50) size.h = defaultH;
-
-      var parts = [];
-      BILLS.forEach(function (bill) {
-        var frags = fragmentsFor(bill, size.w, size.h);
-        frags.forEach(function (html) { parts.push(html); });
-      });
-
-      stage.innerHTML = '';
-      var count = Math.max(parts.length, 1);
-      for (var p = 0; p < count; p += PER) {
-        var page = document.createElement('section');
-        page.className = 'page';
-        for (var c = 0; c < PER; c++) {
-          page.insertAdjacentHTML('beforeend', cellHtml(parts[p + c] || ''));
-        }
-        stage.appendChild(page);
-      }
-    }
-
-    try {
-      render();
-      setTimeout(render, 10);
-      setTimeout(render, 150);
-      if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(render);
-      }
-      window.addEventListener('load', render);
-      window.addEventListener('resize', function () {
-        setTimeout(render, 50);
-      });
-    } catch (err) {
-      console.error('Render error:', err);
-      var stage = document.getElementById('stage');
-      if (stage) stage.innerHTML = '<div style="color:red;padding:20px;font-family:sans-serif;"><b>Render Error:</b> ' + (err.stack || err.message || err) + '</div>';
     }
   </script>
 </body>

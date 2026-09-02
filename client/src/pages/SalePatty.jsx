@@ -22,7 +22,17 @@ export default function SalePatty() {
   const [preview, setPreview] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [rates, setRates] = useState(() => emptyRatesState());
+  const [saving, setSaving] = useState(false);
   const vendorListRef = useRef(null);
+
+  const selected = vendors.find((v) => v._id === vendorId);
+
+  const suggestions = useMemo(() => {
+    if (!vendorQuery.trim()) return vendors.slice(0, 12);
+    return vendors
+      .filter((v) => matchesSearchFields(v, ['name', 'nameTelugu', 'city', 'mobile'], vendorQuery))
+      .slice(0, 12);
+  }, [vendors, vendorQuery]);
 
   useEffect(() => {
     setHighlight(-1);
@@ -33,15 +43,6 @@ export default function SalePatty() {
     const el = vendorListRef.current.querySelector(`[data-idx="${highlight}"]`);
     el?.scrollIntoView({ block: 'nearest' });
   }, [highlight, suggestOpen]);
-
-  const selected = vendors.find((v) => v._id === vendorId);
-
-  const suggestions = useMemo(() => {
-    if (!vendorQuery.trim()) return vendors.slice(0, 12);
-    return vendors
-      .filter((v) => matchesSearchFields(v, ['name', 'nameTelugu', 'city', 'mobile'], vendorQuery))
-      .slice(0, 12);
-  }, [vendors, vendorQuery]);
 
   const loadVendors = useCallback(() => {
     api

@@ -134,11 +134,11 @@ ${BILL_CSS}
 .nup-page:last-child { page-break-after: auto; }
 .nup-cell {
   overflow: hidden;
-  border: 0.4pt solid #86efac;
+  border: 1px solid #000;
   position: relative;
   min-width: 0;
   min-height: 0;
-  background: #e7f3e6;
+  background: #fff;
 }
 .nup-scale {
   width: 794px;

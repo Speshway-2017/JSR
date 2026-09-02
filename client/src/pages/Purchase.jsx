@@ -33,6 +33,15 @@ export default function Purchase() {
 
   const vendorListRef = useRef(null);
 
+  const selected = vendors.find((v) => v._id === vendorId);
+
+  const suggestions = useMemo(() => {
+    if (!vendorQuery.trim()) return [];
+    return vendors
+      .filter((v) => matchesSearchFields(v, ['name', 'nameTelugu', 'city', 'mobile'], vendorQuery))
+      .slice(0, 8);
+  }, [vendors, vendorQuery]);
+
   useEffect(() => {
     setHighlight(-1);
   }, [vendorQuery, suggestions]);
@@ -42,15 +51,6 @@ export default function Purchase() {
     const el = vendorListRef.current.querySelector(`[data-idx="${highlight}"]`);
     el?.scrollIntoView({ block: 'nearest' });
   }, [highlight, suggestOpen]);
-
-  const selected = vendors.find((v) => v._id === vendorId);
-
-  const suggestions = useMemo(() => {
-    if (!vendorQuery.trim()) return [];
-    return vendors
-      .filter((v) => matchesSearchFields(v, ['name', 'nameTelugu', 'city', 'mobile'], vendorQuery))
-      .slice(0, 8);
-  }, [vendors, vendorQuery]);
 
   const totals = useMemo(() => {
     let weight = 0;

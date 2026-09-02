@@ -1,5 +1,5 @@
 import api from '../api';
-import { RAMABHADRA, ramabhadraFontFaceCss } from './pdfFont';
+import { RAMABHADRA, ramabhadraFontFaceCss, loadRamabhadraBase64 } from './pdfFont';
 
 export const TE = {
   om: '\u0c13\u0c02 \u0c36\u0c4d\u0c30\u0c40 \u0c38\u0c4d\u0c35\u0c3e\u0c2e\u0c3f\u0c2f\u0c47 \u0c36\u0c30\u0c23\u0c02 \u0c05\u0c2f\u0c4d\u0c2f\u0c2a\u0c4d\u0c2a',
@@ -549,11 +549,6 @@ export function brandHeaderHtml(watermarkSrc, dateValue) {
   ).join('');
 
   return `
-    ${
-      watermarkSrc
-        ? `<div class="watermark-wrap"><img class="watermark" src="${watermarkSrc}" alt="" /></div>`
-        : ''
-    }
     <div class="sheet-header">
       <div class="staff">${staffHtml}</div>
       <div class="top-center">
@@ -569,20 +564,11 @@ export function brandHeaderHtml(watermarkSrc, dateValue) {
   `;
 }
 
-/** Prefetch watermark image so the first bill paints faster. */
+/** Prefetch watermark image and font so the first bill paints faster. */
 export function warmRaituBillAssets() {
   const img = new Image();
   img.src = ayyappaWatermarkSrc();
-  const fontUrl = `${window.location.origin}/fonts/Ramabhadra-Regular.ttf`;
-  if (!document.querySelector(`link[href="${fontUrl}"]`)) {
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.as = 'font';
-    link.type = 'font/ttf';
-    link.href = fontUrl;
-    link.crossOrigin = 'anonymous';
-    document.head.appendChild(link);
-  }
+  loadRamabhadraBase64().catch(() => {});
 }
 
 export function writeToPrintWindow(html, previewTab) {
@@ -620,8 +606,10 @@ export async function openRaituSheetPdf(innerMarkup, previewTab) {
   const fontCss = await ramabhadraFontFaceCss();
 
   const sheetInner =
-    innerMarkup ||
-    `
+    typeof innerMarkup === 'function'
+      ? innerMarkup(watermarkSrc)
+      : innerMarkup ||
+        `
     <p style="text-align:center;padding:24px;color:#666;">No bill content provided.</p>
   `;
 
@@ -634,10 +622,19 @@ export async function openRaituSheetPdf(innerMarkup, previewTab) {
 ${fontCss}
 ${BILL_CSS}
 .sheet {
+  position: relative;
+}
+.sheet::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
   background-image: url("${watermarkSrc}");
   background-position: center 58%;
   background-repeat: no-repeat;
-  background-size: 320px auto;
+  background-size: 380px auto;
+  opacity: 0.12;
+  pointer-events: none;
+  z-index: 0;
 }
   </style>
 </head>

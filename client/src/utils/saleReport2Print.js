@@ -40,8 +40,8 @@ export function saleReport2InnerHtml(data) {
       const lines = entries
         .map((e) => {
           const bagsText = esc(fmtBags(e.bags));
-          const amt = e.amount != null ? e.amount : (e.totalAmount != null ? e.totalAmount : 0);
-          return `<div class="line"><span class="who">${esc(e.name)}</span> - ${bagsText} = rs ${amt}</div>`;
+          const rateVal = e.rate != null ? e.rate : (e.amount != null ? e.amount : 0);
+          return `<div class="line"><span class="who">${esc(e.name)}</span> - ${bagsText} = rs <span class="price-red">${esc(rateVal)}</span></div>`;
         })
         .join('');
       return `<section class="mat"><div class="head">${title}${te}</div><div class="group">${lines}</div></section>`;
@@ -125,6 +125,11 @@ export const SALE_REPORT_2_CSS = `
   font-weight: 700;
 }
 
+.line .price-red {
+  color: #dc2626;
+  font-weight: 700;
+}
+
 .rate {
   display: none !important;
 }
@@ -162,6 +167,12 @@ export const SALE_REPORT_2_CSS = `
   .mat {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+  .line .price-red {
+    color: #dc2626 !important;
+    font-weight: 700 !important;
+    -webkit-print-color-adjust: exact;
+    color-adjust: exact;
   }
 }
 `;

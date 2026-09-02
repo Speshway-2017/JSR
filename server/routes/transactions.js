@@ -327,9 +327,15 @@ router.put('/cash-entry/:id', async (req, res) => {
 
 router.get('/cash-entries', async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, startDate, endDate } = req.query;
     const filter = { source: 'cash_entry' };
-    if (date) {
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.entryDate = { $gte: start, $lte: end };
+    } else if (date) {
       const start = new Date(date);
       start.setHours(0, 0, 0, 0);
       const end = new Date(date);

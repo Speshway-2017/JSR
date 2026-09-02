@@ -207,7 +207,7 @@ router.get('/report-2', async (req, res) => {
           });
         }
         const mat = materials.get(materialId);
-        const rate = Number(line.ratePerKg) || 0;
+        const rate = Number(line.ratePerKg != null ? line.ratePerKg : line.rate) || 0;
         const isByBag = line.saleType === 'by_bag' || (line.bagCount > 0 && (!line.bags || line.bags.length === 0) && Number(line.totalKg) === 0);
         const bags = bagKgList(line);
         const count = Number(line.bagCount) || bags.length || 1;

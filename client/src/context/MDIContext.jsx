@@ -22,6 +22,8 @@ export const MODULE_REGISTRY = {
   '/bill-print': { title: 'Bill Print', icon: 'Printer' },
   '/sales-report': { title: 'Sales Checklist', icon: 'FileBarChart' },
   '/sales-report-2': { title: 'Day wise sale report', icon: 'FileBarChart' },
+  '/cash-checklist': { title: 'Cash Checklist', icon: 'Banknote' },
+  '/less-checklist': { title: 'Less Checklist', icon: 'Receipt' },
   '/settings': { title: 'Price Settings', icon: 'Settings' },
   '/sales-orders': { title: 'Sales Orders', icon: 'ClipboardPen' },
   '/sales-materials': { title: 'Sales Materials', icon: 'Package' },

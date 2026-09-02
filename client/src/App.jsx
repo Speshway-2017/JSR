@@ -16,6 +16,8 @@ import Transactions from './pages/Transactions';
 import InventoryHistory from './pages/InventoryHistory';
 import SalesReport from './pages/SalesReport';
 import SalesReport2 from './pages/SalesReport2';
+import CashChecklist from './pages/CashChecklist';
+import LessChecklist from './pages/LessChecklist';
 import Ledger from './pages/Ledger';
 import Outstanding from './pages/Outstanding';
 import BillPrint from './pages/BillPrint';
@@ -69,6 +71,8 @@ export default function App() {
           <Route path="/bill-print" element={<BillPrint />} />
           <Route path="/sales-report" element={<SalesReport />} />
           <Route path="/sales-report-2" element={<SalesReport2 />} />
+          <Route path="/cash-checklist" element={<CashChecklist />} />
+          <Route path="/less-checklist" element={<LessChecklist />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

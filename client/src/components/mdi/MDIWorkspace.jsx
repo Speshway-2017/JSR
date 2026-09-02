@@ -21,6 +21,8 @@ import Outstanding from '../../pages/Outstanding';
 import BillPrint from '../../pages/BillPrint';
 import SalesReport from '../../pages/SalesReport';
 import SalesReport2 from '../../pages/SalesReport2';
+import CashChecklist from '../../pages/CashChecklist';
+import LessChecklist from '../../pages/LessChecklist';
 import PriceSettings from '../../pages/PriceSettings';
 import SalesOrders, { SalesBagReportsList } from '../../pages/SalesOrders';
 import SalesMaterials from '../../pages/SalesMaterials';
@@ -64,6 +66,10 @@ function renderModuleComponent(path) {
       return <SalesReport path={path} />;
     case '/sales-report-2':
       return <SalesReport2 path={path} />;
+    case '/cash-checklist':
+      return <CashChecklist path={path} />;
+    case '/less-checklist':
+      return <LessChecklist path={path} />;
     case '/settings':
       return <PriceSettings path={path} />;
     case '/sales-orders':

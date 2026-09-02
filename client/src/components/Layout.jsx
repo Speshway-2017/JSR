@@ -72,6 +72,8 @@ const adminTopMenus = [
       { to: '/outstanding', label: 'Outstanding' },
       { to: '/bill-print', label: 'Bill Print' },
       { to: '/sales-report', label: 'Sales Checklist' },
+      { to: '/cash-checklist', label: 'Cash Checklist' },
+      { to: '/less-checklist', label: 'Less Checklist' },
       { to: '/sales-report-2', label: 'Day wise sale report' },
     ],
   },

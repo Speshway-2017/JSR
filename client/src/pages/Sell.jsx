@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
-import { formatCurrency, formatDate } from '../utils/format';
+import { formatCurrency, formatDate, formatDateTimeSplit } from '../utils/format';
 import { openBillPreviewTab, openRangeBillsNUp } from '../utils/rangeBillPrint';
 import { matchesSearchFields } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
@@ -211,11 +211,30 @@ export default function Sell({ path: windowPath }) {
     if (sortKey) {
       const dir = sortDir === 'desc' ? -1 : 1;
       rows.sort((a, b) => {
-        if (sortKey === 'amount') return (Number(a.amount) - Number(b.amount)) * dir;
+        if (sortKey === 'vendor') {
+          const vComp = String(a.vendor || '').localeCompare(String(b.vendor || ''), 'en', { numeric: true });
+          if (vComp !== 0) return vComp * dir;
+          const iComp = String(a.item || '').localeCompare(String(b.item || ''), 'en', { numeric: true });
+          if (iComp !== 0) return iComp;
+          return Number(a.serial || 0) - Number(b.serial || 0);
+        }
+        if (sortKey === 'item') {
+          const vComp = String(a.vendor || '').localeCompare(String(b.vendor || ''), 'en', { numeric: true });
+          if (vComp !== 0) return vComp;
+          const iComp = String(a.item || '').localeCompare(String(b.item || ''), 'en', { numeric: true });
+          if (iComp !== 0) return iComp * dir;
+          return Number(a.serial || 0) - Number(b.serial || 0);
+        }
+        if (sortKey === 'amount') {
+          const diff = (Number(a.amount) || 0) - (Number(b.amount) || 0);
+          if (diff !== 0) return diff * dir;
+          return Number(a.serial || 0) - Number(b.serial || 0);
+        }
         if (sortKey === 'createdAt') {
           const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
           const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return (da - db) * dir;
+          if (da !== db) return (da - db) * dir;
+          return Number(a.serial || 0) - Number(b.serial || 0);
         }
         const av = String(a[sortKey] || '').toLowerCase();
         const bv = String(b[sortKey] || '').toLowerCase();
@@ -708,12 +727,20 @@ export default function Sell({ path: windowPath }) {
         console.warn('Could not fetch /reports/bills, using current sales view data:', e);
       }
 
+      const hasFilter = !!(filterItem || filterVendor || filterCustomer);
       const statementsMap = new Map();
 
       for (const row of displayedRows) {
         const rawCid = row.customerId?._id || row.customerId || row.sale?.customer?._id || row.sale?.customer;
-        const cid = typeof rawCid === 'string' ? rawCid : rawCid ? String(rawCid) : '';
-        if (!cid || cid === '[object Object]') continue;
+        let cid = '';
+        if (typeof rawCid === 'string' && rawCid.trim() && rawCid !== '[object Object]') {
+          cid = rawCid.trim();
+        } else if (rawCid && typeof rawCid === 'object' && rawCid._id) {
+          cid = String(rawCid._id);
+        } else if (row.name && row.name !== '—') {
+          cid = `name_${row.name.trim()}`;
+        }
+        if (!cid) continue;
 
         if (!statementsMap.has(cid)) {
           const serverSt = serverStatements.get(cid);
@@ -722,11 +749,11 @@ export default function Sell({ path: windowPath }) {
             customerId: cid,
             name: row.name && row.name !== '—' ? row.name : fullCust?.name || serverSt?.name || '—',
             nameTelugu: fullCust?.nameTelugu || serverSt?.nameTelugu || '',
-            opening: Number(serverSt?.opening) || 0,
+            opening: hasFilter ? 0 : Number(serverSt?.opening) || 0,
             sales: [],
-            payments: serverSt?.payments || [],
+            payments: hasFilter ? [] : serverSt?.payments || [],
             totalSale: 0,
-            totalPaid: Number(serverSt?.totalPaid) || 0,
+            totalPaid: hasFilter ? 0 : Number(serverSt?.totalPaid) || 0,
             closing: 0,
           });
         }
@@ -1168,15 +1195,10 @@ export default function Sell({ path: windowPath }) {
               <th className="px-3 py-2.5 font-semibold text-right">Qty</th>
               <th className="px-3 py-2.5 font-semibold text-right">Rate</th>
               <th className="px-3 py-2.5 font-semibold text-right">Cooly</th>
-              <th className="px-3 py-2.5 font-semibold text-right">
-                <SortLabel column="amount" align="right">
-                  Amount
-                </SortLabel>
-              </th>
-              <th className="px-3 py-2.5 font-semibold whitespace-nowrap text-right">
-                <SortLabel column="createdAt" align="right">
-                  Entry Date & Time
-                </SortLabel>
+              <th className="px-3 py-2.5 font-semibold text-right">Amount</th>
+              <th className="px-3 py-2 font-semibold text-right leading-tight whitespace-nowrap">
+                <div>Entry Date</div>
+                <div>Time</div>
               </th>
             </tr>
           </thead>
@@ -1318,48 +1340,22 @@ export default function Sell({ path: windowPath }) {
                         )}
                       </div>
                     </td>
-                    <td className="px-2 py-1.5 w-28">
-                      <div className="flex flex-col items-end gap-0.5">
-                        <label className="inline-flex items-center gap-1 text-[10px] text-primary-400 font-normal">
-                          <input
-                            type="checkbox"
-                            disabled={busy}
-                            checked={r.coolyPerBag}
-                            onChange={(e) => {
-                              persistTableRow(r, { coolyPerBag: e.target.checked }).catch((err) =>
-                                toast.error(err.message)
-                              );
-                            }}
-                          />
-                          Per bag
-                        </label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          disabled={busy}
-                          defaultValue={r.coolyRate || 0}
-                          key={`${r.saleId}-cooly-${r.coolyRate}-${r.coolyPerBag}`}
-                          className={`${cell} text-right tabular-nums`}
-                          onBlur={(e) => {
-                            const coolyRate = Number(e.target.value);
-                            if (coolyRate === Number(r.coolyRate || 0)) return;
-                            persistTableRow(r, { coolyRate }).catch((err) => toast.error(err.message));
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') e.currentTarget.blur();
-                          }}
-                        />
-                        <span className="text-[10px] text-primary-400 tabular-nums">
-                          {formatCurrency(r.cooly || 0)}
-                        </span>
-                      </div>
+                    <td className="px-3 py-1.5 text-right tabular-nums font-medium text-primary-700 whitespace-nowrap">
+                      {r.cooly ? formatCurrency(r.cooly) : '—'}
                     </td>
                     <td className="px-3 py-1.5 text-right tabular-nums font-medium text-primary-800">
                       {formatCurrency(r.amount)}
                     </td>
-                    <td className="px-3 py-1.5 text-xs text-primary-500 whitespace-nowrap text-right tabular-nums">
-                      {r.createdAt ? formatDate(r.createdAt) : '—'}
+                    <td className="px-3 py-1.5 text-xs text-primary-500 whitespace-nowrap text-right tabular-nums leading-tight">
+                      {(() => {
+                        const { dateStr, timeStr } = formatDateTimeSplit(r.createdAt);
+                        return (
+                          <>
+                            <div>{dateStr}</div>
+                            {timeStr && <div className="text-[11px] text-primary-400">{timeStr}</div>}
+                          </>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );
