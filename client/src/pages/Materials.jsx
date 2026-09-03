@@ -3,10 +3,7 @@ import { Plus, Package, X, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import MDIModalWindow from '../components/mdi/MDIModalWindow';
-import { formatCurrency } from '../utils/format';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
-
-const DEFAULT_RATE = '10';
 
 export default function Materials() {
   const [materials, setMaterials] = useState([]);
@@ -15,8 +12,8 @@ export default function Materials() {
   const [editing, setEditing] = useState(null);
   const [name, setName] = useState('');
   const [nameTelugu, setNameTelugu] = useState('');
-  const [ratePerKg, setRatePerKg] = useState(DEFAULT_RATE);
   const [saving, setSaving] = useState(false);
+  const [isTeluguCustomized, setIsTeluguCustomized] = useState(false);
 
   const { telugu: liveTelugu, loading: teluguLoading } = useTeluguPreview(
     showForm ? name : ''
@@ -26,11 +23,14 @@ export default function Materials() {
     if (!showForm) return;
     if (!name.trim()) {
       setNameTelugu('');
+      setIsTeluguCustomized(false);
       return;
     }
-    if (teluguLoading && !liveTelugu) return;
-    setNameTelugu(liveTelugu);
-  }, [liveTelugu, teluguLoading, showForm, name]);
+    if (!isTeluguCustomized) {
+      if (teluguLoading && !liveTelugu) return;
+      setNameTelugu(liveTelugu);
+    }
+  }, [liveTelugu, teluguLoading, showForm, name, isTeluguCustomized]);
 
   const fetchMaterials = () => {
     api
@@ -48,7 +48,7 @@ export default function Materials() {
     setEditing(null);
     setName('');
     setNameTelugu('');
-    setRatePerKg(DEFAULT_RATE);
+    setIsTeluguCustomized(false);
     setShowForm(true);
   };
 
@@ -56,11 +56,7 @@ export default function Materials() {
     setEditing(mat);
     setName(mat.name);
     setNameTelugu(mat.nameTelugu || '');
-    setRatePerKg(
-      mat.sellingPricePerKg === undefined || mat.sellingPricePerKg === null
-        ? DEFAULT_RATE
-        : String(mat.sellingPricePerKg)
-    );
+    setIsTeluguCustomized(!!mat.nameTelugu);
     setShowForm(true);
   };
 
@@ -69,7 +65,7 @@ export default function Materials() {
     setEditing(null);
     setName('');
     setNameTelugu('');
-    setRatePerKg(DEFAULT_RATE);
+    setIsTeluguCustomized(false);
   };
 
   const handleSubmit = async (e) => {
@@ -77,12 +73,6 @@ export default function Materials() {
     const trimmed = name.trim();
     if (!trimmed) {
       toast.error('Product name is required');
-      return;
-    }
-
-    const rate = Number(ratePerKg);
-    if (!Number.isFinite(rate) || rate < 0) {
-      toast.error('Enter a valid rate per kg');
       return;
     }
 
@@ -99,7 +89,6 @@ export default function Materials() {
     const payload = {
       name: trimmed,
       nameTelugu: nameTelugu.trim(),
-      sellingPricePerKg: rate,
     };
 
     setSaving(true);
@@ -151,36 +140,29 @@ export default function Materials() {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="label">Name *</label>
+            <label className="label">Name (English) *</label>
             <input
               className="input-field"
-              placeholder="e.g. Tomato"
+              placeholder="e.g. Potato"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
               autoFocus
             />
-            <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
-              {name.trim()
-                ? teluguLoading && !liveTelugu
-                  ? '…'
-                  : nameTelugu || liveTelugu || ''
-                : ''}
-            </p>
-            <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
           </div>
           <div>
-            <label className="label">Rate / Kg *</label>
+            <div className="flex items-center justify-between">
+              <label className="label">Name (Telugu) / పేరు (తెలుగు)</label>
+              {teluguLoading && <span className="text-xs text-primary-400">Translating...</span>}
+            </div>
             <input
               className="input-field"
-              type="text"
-              inputMode="decimal"
-              value={ratePerKg}
+              placeholder="e.g. బంగాళాదుంప"
+              value={nameTelugu}
               onChange={(e) => {
-                const raw = e.target.value.replace(/[^\d.]/g, '');
-                setRatePerKg(raw);
+                setNameTelugu(e.target.value);
+                setIsTeluguCustomized(true);
               }}
-              required
             />
           </div>
           <div className="flex gap-3 pt-1">
@@ -209,7 +191,6 @@ export default function Materials() {
               <thead>
                 <tr className="border-b border-primary-100 bg-primary-50/50">
                   <th className="text-left px-4 py-3 font-semibold text-primary-500">Item</th>
-                  <th className="text-left px-4 py-3 font-semibold text-primary-500">Rate/Kgs</th>
                   <th className="text-right px-4 py-3 font-semibold text-primary-500">Actions</th>
                 </tr>
               </thead>
@@ -221,9 +202,6 @@ export default function Materials() {
                         {mat.nameTelugu ? (
                           <p className="text-xs text-primary-500 mt-0.5">{mat.nameTelugu}</p>
                         ) : null}
-                      </td>
-                      <td className="px-4 py-3 text-primary-700 font-semibold">
-                        {formatCurrency(mat.sellingPricePerKg ?? 10)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1.5">

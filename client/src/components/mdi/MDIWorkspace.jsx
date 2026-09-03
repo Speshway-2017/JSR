@@ -19,10 +19,12 @@ import InventoryHistory from '../../pages/InventoryHistory';
 import Ledger from '../../pages/Ledger';
 import Outstanding from '../../pages/Outstanding';
 import BillPrint from '../../pages/BillPrint';
+import SalesPrint from '../../pages/SalesPrint';
 import SalesReport from '../../pages/SalesReport';
 import SalesReport2 from '../../pages/SalesReport2';
 import CashChecklist from '../../pages/CashChecklist';
 import LessChecklist from '../../pages/LessChecklist';
+import HamaliReport from '../../pages/HamaliReport';
 import PriceSettings from '../../pages/PriceSettings';
 import SalesOrders, { SalesBagReportsList } from '../../pages/SalesOrders';
 import SalesMaterials from '../../pages/SalesMaterials';
@@ -62,6 +64,8 @@ function renderModuleComponent(path) {
       return <Outstanding path={path} />;
     case '/bill-print':
       return <BillPrint path={path} />;
+    case '/sales-print':
+      return <SalesPrint path={path} />;
     case '/sales-report':
       return <SalesReport path={path} />;
     case '/sales-report-2':
@@ -70,6 +74,8 @@ function renderModuleComponent(path) {
       return <CashChecklist path={path} />;
     case '/less-checklist':
       return <LessChecklist path={path} />;
+    case '/hamali-report':
+      return <HamaliReport path={path} />;
     case '/settings':
       return <PriceSettings path={path} />;
     case '/sales-orders':

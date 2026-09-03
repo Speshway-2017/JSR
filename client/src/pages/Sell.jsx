@@ -7,6 +7,7 @@ import { formatCurrency, formatDate, formatDateTimeSplit } from '../utils/format
 import { openBillPreviewTab, openRangeBillsNUp } from '../utils/rangeBillPrint';
 import { matchesSearchFields } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
+import { useMDI } from '../context/MDIContext';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -19,6 +20,7 @@ function appliedCooly(rate, bags, perBag) {
 }
 
 export default function Sell({ path: windowPath }) {
+  const { openWindow } = useMDI();
   const [searchParams, setSearchParams] = useSearchParams();
   const effectiveSearchParams = useMemo(() => {
     if (windowPath && windowPath.includes('?')) {
@@ -72,7 +74,9 @@ export default function Sell({ path: windowPath }) {
   const [cooly, setCooly] = useState('0');
   const [coolyOn, setCoolyOn] = useState(false);
   const [coolyPerBag, setCoolyPerBag] = useState(true);
-  const [salesCoolyRate, setSalesCoolyRate] = useState('10');
+  const [salesCoolyRateByWeight, setSalesCoolyRateByWeight] = useState('17');
+  const [salesCoolyRateByBag, setSalesCoolyRateByBag] = useState('10');
+  const salesCoolyRate = saleType === 'by_bag' ? salesCoolyRateByBag : salesCoolyRateByWeight;
   const [detail, setDetail] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingRowId, setSavingRowId] = useState('');
@@ -261,7 +265,12 @@ export default function Sell({ path: windowPath }) {
 
   const toggleSort = (key) => {
     if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+      if (sortDir === 'asc') {
+        setSortDir('desc');
+      } else {
+        setSortKey('');
+        setSortDir('asc');
+      }
       return;
     }
     setSortKey(key);
@@ -274,7 +283,13 @@ export default function Sell({ path: windowPath }) {
     return (
       <button
         type="button"
-        title={active ? `Sorted ${sortDir === 'desc' ? 'descending' : 'ascending'} — click to reverse` : 'Click to sort'}
+        title={
+          active
+            ? sortDir === 'asc'
+              ? 'Sorted A-Z — click for Z-A'
+              : 'Sorted Z-A — click to remove sort'
+            : 'Click to sort'
+        }
         className={`inline-flex items-center gap-1 font-semibold ${align === 'right' ? 'w-full justify-end' : ''}`}
         onClick={() => toggleSort(column)}
       >
@@ -336,8 +351,15 @@ export default function Sell({ path: windowPath }) {
         setMaterials(m.data);
         setCustomers(c.data);
         setVendors(v.data);
-        if (s.data?.salesCoolyRate != null) {
-          setSalesCoolyRate(String(s.data.salesCoolyRate));
+        if (s.data?.salesCoolyRateByWeight != null) {
+          setSalesCoolyRateByWeight(String(s.data.salesCoolyRateByWeight));
+        } else if (s.data?.salesCoolyRate != null) {
+          setSalesCoolyRateByWeight(String(s.data.salesCoolyRate));
+        }
+        if (s.data?.salesCoolyRateByBag != null) {
+          setSalesCoolyRateByBag(String(s.data.salesCoolyRateByBag));
+        } else if (s.data?.salesCoolyRate != null) {
+          setSalesCoolyRateByBag(String(s.data.salesCoolyRate));
         }
       })
       .catch(() => toast.error('Failed to load master data'));
@@ -355,7 +377,18 @@ export default function Sell({ path: windowPath }) {
   useDataRestored(reloadAll);
 
   useEffect(() => {
+    const handleDataUpdated = () => {
+      reloadAll();
+    };
+    window.addEventListener('jsr_data_updated', handleDataUpdated);
+    return () => window.removeEventListener('jsr_data_updated', handleDataUpdated);
+  }, [reloadAll]);
+
+  useEffect(() => {
     loadDaySales().catch(() => setSales([]));
+    if (date) {
+      window.dispatchEvent(new CustomEvent('jsr_sales_date_changed', { detail: { date } }));
+    }
   }, [date]);
 
   useEffect(() => {
@@ -415,9 +448,12 @@ export default function Sell({ path: windowPath }) {
   useEffect(() => {
     if (fillingRef.current) return;
     if (material) {
-      setRate(String(material.sellingPricePerKg ?? ''));
+      const p = Number(material.sellingPricePerKg) || 0;
+      setRate(p > 0 ? String(p) : '');
+    } else {
+      setRate('');
     }
-  }, [materialId]);
+  }, [materialId, material]);
 
   useEffect(() => {
     if (fillingRef.current) return;
@@ -429,6 +465,13 @@ export default function Sell({ path: windowPath }) {
       setCooly('0');
     }
   }, [customerId, customerCoolyDefault, salesCoolyRate]);
+
+  useEffect(() => {
+    if (fillingRef.current) return;
+    if (coolyOn) {
+      setCooly(salesCoolyRate);
+    }
+  }, [saleType, salesCoolyRate]);
 
   useEffect(() => {
     if (focusBagIdx == null) return;
@@ -466,7 +509,12 @@ export default function Sell({ path: windowPath }) {
     setCoolyOn(false);
     setCoolyPerBag(true);
     setDetail('');
-    if (material) setRate(String(material.sellingPricePerKg ?? ''));
+    if (material) {
+      const p = Number(material.sellingPricePerKg) || 0;
+      setRate(p > 0 ? String(p) : '');
+    } else {
+      setRate('');
+    }
     nameRef.current?.focus();
     if (searchParams.get('saleId') || searchParams.get('customerId')) {
       setSearchParams({}, { replace: true });
@@ -577,6 +625,7 @@ export default function Sell({ path: windowPath }) {
         setFilterItem('');
       }
       await loadDaySales();
+      window.dispatchEvent(new CustomEvent('jsr_data_updated'));
       if (savedSaleId) {
         setFocusSaleId(savedSaleId);
       }
@@ -656,6 +705,7 @@ export default function Sell({ path: windowPath }) {
         lines,
       });
       await loadDaySales();
+      window.dispatchEvent(new CustomEvent('jsr_data_updated'));
       setFocusSaleId(sale._id);
       api.get('/customers').then((r) => setCustomers(r.data));
     } catch (err) {
@@ -1172,8 +1222,16 @@ export default function Sell({ path: windowPath }) {
           <button
             type="button"
             className="btn-primary inline-flex items-center gap-1.5 !py-1.5 !px-3 text-sm shrink-0 ml-auto"
-            disabled={!flatRows.length || printing}
-            onClick={() => setPrintOpen(true)}
+            disabled={!flatRows.length}
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (date) params.set('date', date);
+              if (filterCustomer) params.set('customer', filterCustomer);
+              if (filterVendor) params.set('vendor', filterVendor);
+              if (filterItem) params.set('item', filterItem);
+              params.set('t', Date.now().toString());
+              openWindow({ path: `/sales-print?${params.toString()}`, title: 'Sales Print' });
+            }}
           >
             <Printer className="h-4 w-4" />
             Print
@@ -1383,57 +1441,6 @@ export default function Sell({ path: windowPath }) {
         </div>
       </div>
       </div>
-
-      {printOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="card w-full max-w-md space-y-4">
-            <div className="flex items-center justify-between border-b border-primary-100 pb-2">
-              <h2 className="text-lg font-bold text-primary-800">Print bills</h2>
-              <button
-                type="button"
-                className="text-sm font-medium text-primary-400 hover:text-primary-700"
-                onClick={() => setPrintOpen(false)}
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-primary-500">
-              Select print layout for the {displayedRows.length} filtered {displayedRows.length === 1 ? 'record' : 'records'}.
-            </p>
-
-            <div className="pt-1 space-y-2">
-              <div className="grid grid-cols-3 gap-2">
-                {[2, 4, 6].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    className={
-                      n === 6
-                        ? 'btn-primary !py-2.5 !px-1.5 text-xs font-semibold justify-center whitespace-nowrap'
-                        : 'btn-secondary !py-2.5 !px-1.5 text-xs font-semibold justify-center whitespace-nowrap'
-                    }
-                    disabled={printing || !displayedRows.length}
-                    onClick={() => printNUp(n)}
-                  >
-                    {n} per page
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                className="btn-secondary !py-1.5 !px-4 text-xs font-medium"
-                onClick={() => setPrintOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

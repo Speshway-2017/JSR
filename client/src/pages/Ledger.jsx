@@ -132,6 +132,14 @@ export default function Ledger() {
 
   useDataRestored(reloadAll);
 
+  useEffect(() => {
+    const handleDataUpdated = () => {
+      reloadAll();
+    };
+    window.addEventListener('jsr_data_updated', handleDataUpdated);
+    return () => window.removeEventListener('jsr_data_updated', handleDataUpdated);
+  }, [reloadAll]);
+
   const openEntry = (row) => {
     const d = new Date(row.date).toISOString().slice(0, 10);
     const params = new URLSearchParams({ date: d });

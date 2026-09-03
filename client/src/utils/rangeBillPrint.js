@@ -83,7 +83,10 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
   // 2. Sales item rows
   sales.forEach((s) => {
     const rawName = s.material || s.materialName || '—';
-    const matName = s.materialNameTelugu || displayMaterialName(rawName, teluguMap);
+    const teName = s.materialNameTelugu || (teluguMap?.get ? teluguMap.get(String(rawName).trim().toLowerCase()) : teluguMap?.[String(rawName).trim().toLowerCase()]);
+    const matName = teName && teName.trim() && teName.trim().toLowerCase() !== String(rawName).trim().toLowerCase()
+      ? `${rawName} (${teName.trim()})`
+      : displayMaterialName(rawName, teluguMap);
     const bagVal = s.bags != null ? s.bags : s.bagCount != null ? s.bagCount : 0;
     const bagsStr = Number(bagVal) > 0 ? String(bagVal) : '';
     const amtStr = s.amount != null ? fmtMoney(s.amount) : '0';

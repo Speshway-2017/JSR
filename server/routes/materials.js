@@ -8,6 +8,10 @@ const router = express.Router();
 router.use(auth);
 router.use(requireRole('admin'));
 
+function escapeRegex(text) {
+  return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function parseRate(value) {
   if (value === undefined || value === null || value === '') return 10;
   const n = Number(value);
@@ -42,7 +46,7 @@ router.post('/', async (req, res) => {
       sellingPricePerKg !== undefined ? sellingPricePerKg : ratePerKg
     );
 
-    let material = await Material.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } });
+    let material = await Material.findOne({ name: { $regex: new RegExp(`^${escapeRegex(name.trim())}$`, 'i') } });
     if (material) {
       return res.status(400).json({ message: 'Product already exists' });
     }

@@ -31,6 +31,14 @@ export function emptyRatesFromSettings(settings = {}) {
     settings.salesCoolyRate !== undefined && settings.salesCoolyRate !== null
       ? Number(settings.salesCoolyRate)
       : 10;
+  rates.salesCoolyRateByWeight =
+    settings.salesCoolyRateByWeight !== undefined && settings.salesCoolyRateByWeight !== null
+      ? Number(settings.salesCoolyRateByWeight)
+      : rates.salesCoolyRate;
+  rates.salesCoolyRateByBag =
+    settings.salesCoolyRateByBag !== undefined && settings.salesCoolyRateByBag !== null
+      ? Number(settings.salesCoolyRateByBag)
+      : rates.salesCoolyRate;
   return rates;
 }
 

@@ -6,7 +6,6 @@ import api from '../api';
 import Toggle from '../components/Toggle';
 import MDIModalWindow from '../components/mdi/MDIModalWindow';
 import { formatCurrency } from '../utils/format';
-import { useTeluguPreview } from '../hooks/useTeluguPreview';
 import { matchesSearchFields } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
 import { useMDI } from '../context/MDIContext';
@@ -36,18 +35,6 @@ export default function Customers() {
   const [scheduleFilter, setScheduleFilter] = useState('');
   const [coolyFilter, setCoolyFilter] = useState('');
   const [page, setPage] = useState(1);
-  const { telugu: liveTelugu, loading: teluguLoading } = useTeluguPreview(
-    showForm ? form.name : ''
-  );
-
-  useEffect(() => {
-    if (!showForm) return;
-    setForm((prev) => {
-      if (!prev.name.trim()) return { ...prev, nameTelugu: '' };
-      if (teluguLoading && !liveTelugu) return prev;
-      return { ...prev, nameTelugu: liveTelugu };
-    });
-  }, [liveTelugu, teluguLoading, showForm]);
 
   const fetchAll = useCallback(() => {
     Promise.all([api.get('/customers'), api.get('/schedules')])
@@ -194,14 +181,6 @@ export default function Customers() {
               required
               autoFocus
             />
-            <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
-              {form.name.trim()
-                ? teluguLoading && !liveTelugu
-                  ? '…'
-                  : form.nameTelugu || liveTelugu || ''
-                : ''}
-            </p>
-            <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
           </div>
           <div>
             <label className="label">Phone</label>
@@ -296,7 +275,7 @@ export default function Customers() {
                 className="input-field !pl-9 !h-12"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search name, తెలుగు or mobile..."
+                placeholder="Search name or mobile..."
               />
             </div>
             <select
@@ -358,9 +337,6 @@ export default function Customers() {
                       >
                         {c.name}
                       </button>
-                      {c.nameTelugu ? (
-                        <p className="text-xs text-primary-500 mt-0.5">{c.nameTelugu}</p>
-                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-primary-600">{scheduleName(c)}</td>
                     <td className="px-4 py-3 text-primary-500">{c.mobile || '—'}</td>

@@ -5,7 +5,6 @@ import toast from 'react-hot-toast';
 import api from '../api';
 import MDIModalWindow from '../components/mdi/MDIModalWindow';
 import { formatCurrency } from '../utils/format';
-import { useTeluguPreview } from '../hooks/useTeluguPreview';
 import { useDataRestored } from '../utils/useDataRestored';
 import { useMDI } from '../context/MDIContext';
 
@@ -24,18 +23,6 @@ export default function Vendors() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
-  const { telugu: liveTelugu, loading: teluguLoading } = useTeluguPreview(
-    showForm ? form.name : ''
-  );
-
-  useEffect(() => {
-    if (!showForm) return;
-    setForm((prev) => {
-      if (!prev.name.trim()) return { ...prev, nameTelugu: '' };
-      if (teluguLoading && !liveTelugu) return prev;
-      return { ...prev, nameTelugu: liveTelugu };
-    });
-  }, [liveTelugu, teluguLoading, showForm]);
 
   const fetchVendors = useCallback(() => {
     api.get('/vendors').then((res) => setVendors(res.data)).finally(() => setLoading(false));
@@ -92,14 +79,6 @@ export default function Vendors() {
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
             />
-            <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
-              {form.name.trim()
-                ? teluguLoading && !liveTelugu
-                  ? '…'
-                  : form.nameTelugu || liveTelugu || ''
-                : ''}
-            </p>
-            <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
           </div>
           <div>
             <label className="label">Mobile Number *</label>
@@ -164,9 +143,6 @@ export default function Vendors() {
                   <h3 className="text-lg font-bold text-primary-800 group-hover:text-primary-600">
                     {vendor.name}
                   </h3>
-                  {vendor.nameTelugu ? (
-                    <p className="text-xs text-primary-500 mt-0.5">{vendor.nameTelugu}</p>
-                  ) : null}
                   <div className="flex items-center gap-1.5 text-primary-500 mt-1">
                     <Phone className="w-4 h-4" />
                     <span className="text-sm">{vendor.mobile}</span>

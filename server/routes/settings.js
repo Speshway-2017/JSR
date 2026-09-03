@@ -57,6 +57,12 @@ router.put('/', async (req, res) => {
     if (req.body.bagLessOver50 !== undefined) {
       settings.bagLessOver50 = Math.max(0, Number(req.body.bagLessOver50) || 0);
     }
+    if (req.body.salesCoolyRateByWeight !== undefined) {
+      settings.salesCoolyRateByWeight = Math.max(0, Number(req.body.salesCoolyRateByWeight) || 0);
+    }
+    if (req.body.salesCoolyRateByBag !== undefined) {
+      settings.salesCoolyRateByBag = Math.max(0, Number(req.body.salesCoolyRateByBag) || 0);
+    }
     if (req.body.salesCoolyRate !== undefined) {
       settings.salesCoolyRate = Math.max(0, Number(req.body.salesCoolyRate) || 0);
     }

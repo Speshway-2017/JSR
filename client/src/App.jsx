@@ -18,9 +18,11 @@ import SalesReport from './pages/SalesReport';
 import SalesReport2 from './pages/SalesReport2';
 import CashChecklist from './pages/CashChecklist';
 import LessChecklist from './pages/LessChecklist';
+import HamaliReport from './pages/HamaliReport';
 import Ledger from './pages/Ledger';
 import Outstanding from './pages/Outstanding';
 import BillPrint from './pages/BillPrint';
+import SalesPrint from './pages/SalesPrint';
 import SalesOrders, { SalesBagReportsList } from './pages/SalesOrders';
 import SalesMaterials from './pages/SalesMaterials';
 import Schedules from './pages/Schedules';
@@ -69,10 +71,12 @@ export default function App() {
           <Route path="/ledger" element={<Ledger />} />
           <Route path="/outstanding" element={<Outstanding />} />
           <Route path="/bill-print" element={<BillPrint />} />
+          <Route path="/sales-print" element={<SalesPrint />} />
           <Route path="/sales-report" element={<SalesReport />} />
           <Route path="/sales-report-2" element={<SalesReport2 />} />
           <Route path="/cash-checklist" element={<CashChecklist />} />
           <Route path="/less-checklist" element={<LessChecklist />} />
+          <Route path="/hamali-report" element={<HamaliReport />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

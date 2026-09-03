@@ -9,6 +9,10 @@ import { auth, requireRole } from '../middleware/auth.js';
 import { getAvailableKg, getLoadStockMap } from '../utils/loadStock.js';
 import { findOrCreateDayLoad, dayRange } from '../utils/loadBill.js';
 
+function escapeRegex(text) {
+  return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function resolveHandling({ handlingCharges, coolyRate, coolyPerBag, totalBags }) {
   const perBag = !!coolyPerBag;
   const rateRaw = coolyRate !== undefined && coolyRate !== null && coolyRate !== ''
@@ -34,13 +38,13 @@ async function processSaleLines(lines, load, { extraStockMap } = {}) {
     const { materialId, materialName, saleType, ratePerKg, bags, bagCount, totalKg } = line;
     const isByBag = saleType === 'by_bag';
 
-    let material = materialId ? await Material.findById(materialId) : null;
+    let material = materialId ? await Material.findById(materialId).catch(() => null) : null;
     if (!material && materialName) {
-      material = await Material.findOne({ name: { $regex: new RegExp(`^${materialName.trim()}$`, 'i') } });
+      material = await Material.findOne({ name: { $regex: new RegExp(`^${escapeRegex(materialName.trim())}$`, 'i') } });
     }
     if (!material) {
       const err = new Error(`Material not found: ${materialName || materialId}`);
-      err.status = 404;
+      err.status = 400;
       throw err;
     }
 
@@ -113,6 +117,10 @@ async function processSaleLines(lines, load, { extraStockMap } = {}) {
     materialsTotal += totalAmount;
     totalBags += lineBagCount;
     totalWeight += lineKg;
+
+    if (rate > 0) {
+      await Material.findByIdAndUpdate(material._id, { sellingPricePerKg: rate });
+    }
 
     processedLines.push({
       material: material._id,
@@ -593,7 +601,7 @@ router.put('/:id', async (req, res) => {
 
     res.json(populated);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.status || 400).json({ message: error.message });
   }
 });
 

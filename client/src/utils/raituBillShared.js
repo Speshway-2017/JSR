@@ -68,8 +68,20 @@ export async function materialTeluguMap() {
 }
 
 export function displayMaterialName(name, teluguMap) {
-  const te = teluguMap.get(String(name || '').trim().toLowerCase());
-  return te || name || '';
+  const raw = String(name || '').trim();
+  if (!raw) return '—';
+  let te = null;
+  if (teluguMap) {
+    if (typeof teluguMap.get === 'function') {
+      te = teluguMap.get(raw.toLowerCase());
+    } else if (typeof teluguMap === 'object') {
+      te = teluguMap[raw.toLowerCase()];
+    }
+  }
+  if (te && te.trim() && te.trim().toLowerCase() !== raw.toLowerCase()) {
+    return `${raw} (${te.trim()})`;
+  }
+  return raw;
 }
 
 /** Borderless items table for bill lines. */

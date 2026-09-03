@@ -125,20 +125,38 @@ export default function PriceSettings() {
               Default cooly rate per bag fetched automatically into the Sales page when Cooly is applied
             </p>
           </div>
-          <div>
-            <label className="label text-xs">Sales Cooly (Per Bag)</label>
-            <div className="relative max-w-xs">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400 text-sm">
-                ₹
-              </span>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                className="input-field !py-2 pl-7"
-                value={form.salesCoolyRate ?? '10'}
-                onChange={(e) => setForm({ ...form, salesCoolyRate: e.target.value })}
-              />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label text-xs font-semibold">Sales Cooly (By Weight)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400 text-sm">
+                  ₹
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  className="input-field !py-2 pl-7"
+                  value={form.salesCoolyRateByWeight ?? '17'}
+                  onChange={(e) => setForm({ ...form, salesCoolyRateByWeight: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="label text-xs font-semibold">Sales Cooly (By Bag)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400 text-sm">
+                  ₹
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  className="input-field !py-2 pl-7"
+                  value={form.salesCoolyRateByBag ?? '10'}
+                  onChange={(e) => setForm({ ...form, salesCoolyRateByBag: e.target.value })}
+                />
+              </div>
             </div>
           </div>
         </div>

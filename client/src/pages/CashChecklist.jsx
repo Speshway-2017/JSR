@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { FileBarChart, Download, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../api';
-import { formatCurrency, formatDate } from '../utils/format';
+import { formatCurrency, formatDate, formatDateOnly } from '../utils/format';
 import { useDataRestored } from '../utils/useDataRestored';
 import { openBillPreviewTab, writeToPrintWindow } from '../utils/raituBillShared';
 
@@ -41,35 +41,38 @@ export default function CashChecklist() {
     setLoading(true);
     try {
       const res = await api.get('/transactions/cash-entries', {
-        params: { startDate, endDate },
+        params: { endDate },
       });
       const raw = res.data || [];
       const parsed = raw
         .map((tx) => {
           const lessAmount = Number(tx.lessAmount) || 0;
-          const mainAmount = Math.max(0, (Number(tx.amount) || 0) - lessAmount);
           const party = tx.customer || tx.vendor;
           const pId = tx.customer?._id || tx.customer || tx.vendor?._id || tx.vendor || '';
           const partyType = tx.customer ? 'Customer' : tx.vendor ? 'Vendor' : '—';
+          const dt = new Date(tx.entryDate || tx.createdAt);
+          const dateStr = dt.toISOString().slice(0, 10);
           return {
             id: tx._id,
-            date: tx.entryDate || tx.createdAt,
+            date: dt,
+            dateStr,
             partyId: String(pId),
             partyName: party?.name || '—',
             partyNameTelugu: party?.nameTelugu || '',
             partyType,
             cashSide: tx.cashSide || 'credit',
-            amount: mainAmount,
+            amount: Number(tx.amount) || 0,
+            lessAmount: lessAmount,
           };
         })
-        .filter((item) => item.amount > 0);
+        .filter((item) => item.amount > 0 || item.lessAmount > 0);
       setAllEntries(parsed);
     } catch {
       setAllEntries([]);
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [endDate]);
 
   useEffect(() => {
     fetchEntries();
@@ -77,58 +80,128 @@ export default function CashChecklist() {
 
   useDataRestored(fetchEntries);
 
-  const filteredEntries = useMemo(() => {
-    return allEntries.filter((item) => {
-      if (partyId && item.partyId !== partyId) return false;
-      if (cashSideFilter && item.cashSide !== cashSideFilter) return false;
-      return true;
+  const { filteredEntries, openingBalance } = useMemo(() => {
+    let openBal = 0;
+    const periodList = [];
+
+    allEntries.forEach((item) => {
+      if (partyId && item.partyId !== partyId) return;
+      if (cashSideFilter && item.cashSide !== cashSideFilter) return;
+
+      if (item.dateStr < startDate) {
+        if (item.cashSide === 'credit') {
+          openBal += item.amount;
+        } else if (item.cashSide === 'debit') {
+          openBal -= item.amount;
+        }
+      } else if (item.dateStr <= endDate) {
+        periodList.push(item);
+      }
     });
-  }, [allEntries, partyId, cashSideFilter]);
+
+    return { filteredEntries: periodList, openingBalance: openBal };
+  }, [allEntries, startDate, endDate, partyId, cashSideFilter]);
 
   const summary = useMemo(() => {
-    const totalAmount = filteredEntries.reduce((sum, item) => sum + item.amount, 0);
+    let totalLess = 0;
+    let totalCredit = 0;
+    let totalDebit = 0;
+    filteredEntries.forEach((item) => {
+      totalLess += item.lessAmount || 0;
+      if (item.cashSide === 'credit') {
+        totalCredit += item.amount;
+      } else if (item.cashSide === 'debit') {
+        totalDebit += item.amount;
+      }
+    });
+    const closingBalance = openingBalance + totalCredit - totalDebit;
     return {
       count: filteredEntries.length,
-      totalAmount,
+      openingBalance,
+      totalLess,
+      totalCredit,
+      totalDebit,
+      closingBalance,
     };
-  }, [filteredEntries]);
+  }, [filteredEntries, openingBalance]);
 
   const exportExcel = () => {
-    if (!filteredEntries.length) return;
+    if (!filteredEntries.length && summary.openingBalance === 0) return;
 
-    const sheetRows = filteredEntries.map((item) => ({
-      'Date & Time': formatDate(item.date),
-      Name: item.partyName,
-      Type: `${item.partyType} (${item.cashSide === 'credit' ? 'Credit' : 'Debit'})`,
-      'Cash Amount (₹)': item.amount,
-    }));
+    const sheetRows = [];
+
+    // Opening balance row
+    sheetRows.push({
+      'Date & Time': `As of ${formatDateOnly(startDate)}`,
+      Name: 'Opening Balance',
+      Type: '—',
+      'Less (₹)': 0,
+      'Credit (₹)': summary.openingBalance > 0 ? summary.openingBalance : 0,
+      'Debit (₹)': summary.openingBalance < 0 ? Math.abs(summary.openingBalance) : 0,
+    });
+
+    filteredEntries.forEach((item) => {
+      sheetRows.push({
+        'Date & Time': formatDate(item.date),
+        Name: item.partyName,
+        Type: item.partyType,
+        'Less (₹)': item.lessAmount > 0 ? item.lessAmount : 0,
+        'Credit (₹)': item.cashSide === 'credit' ? item.amount : 0,
+        'Debit (₹)': item.cashSide === 'debit' ? item.amount : 0,
+      });
+    });
 
     sheetRows.push({});
     sheetRows.push({
-      'Date & Time': 'TOTAL',
+      'Date & Time': 'PERIOD TOTAL',
       Name: '',
       Type: `Records: ${summary.count}`,
-      'Cash Amount (₹)': summary.totalAmount,
+      'Less (₹)': summary.totalLess,
+      'Credit (₹)': summary.totalCredit,
+      'Debit (₹)': summary.totalDebit,
+    });
+    sheetRows.push({
+      'Date & Time': 'CLOSING BALANCE',
+      Name: '',
+      Type: '',
+      'Less (₹)': '',
+      'Credit (₹)': summary.closingBalance > 0 ? summary.closingBalance : 0,
+      'Debit (₹)': summary.closingBalance < 0 ? Math.abs(summary.closingBalance) : 0,
     });
 
     const ws = XLSX.utils.json_to_sheet(sheetRows);
-    ws['!cols'] = [{ wch: 22 }, { wch: 24 }, { wch: 20 }, { wch: 16 }];
+    ws['!cols'] = [{ wch: 22 }, { wch: 24 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 16 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Cash Checklist');
     XLSX.writeFile(wb, `cash_checklist_${startDate}_to_${endDate}.xlsx`);
   };
 
   const handlePrint = async () => {
-    if (!filteredEntries.length) return;
+    if (!filteredEntries.length && summary.openingBalance === 0) return;
     const previewTab = openBillPreviewTab();
+
+    const openBalRow = `
+      <tr style="background: #f0fdf4; font-weight: 600;">
+        <td>—</td>
+        <td>As of ${formatDateOnly(startDate)}</td>
+        <td><strong>Opening Balance</strong></td>
+        <td>—</td>
+        <td style="text-align: right;">—</td>
+        <td style="text-align: right; color: #15803d;">${summary.openingBalance > 0 ? formatCurrency(summary.openingBalance) : '—'}</td>
+        <td style="text-align: right; color: #1d4ed8;">${summary.openingBalance < 0 ? formatCurrency(Math.abs(summary.openingBalance)) : '—'}</td>
+      </tr>
+    `;
+
     const rowsHtml = filteredEntries
       .map(
         (e, i) => `<tr>
         <td>${i + 1}</td>
         <td>${formatDate(e.date)}</td>
         <td><strong>${e.partyName}</strong>${e.partyNameTelugu ? ` (${e.partyNameTelugu})` : ''}</td>
-        <td>${e.partyType} (${e.cashSide === 'credit' ? 'Credit' : 'Debit'})</td>
-        <td style="text-align: right; font-weight: 700;">${formatCurrency(e.amount)}</td>
+        <td>${e.partyType}</td>
+        <td style="text-align: right; color: #b45309;">${e.lessAmount > 0 ? formatCurrency(e.lessAmount) : '—'}</td>
+        <td style="text-align: right; font-weight: 700; color: #15803d;">${e.cashSide === 'credit' ? formatCurrency(e.amount) : '—'}</td>
+        <td style="text-align: right; font-weight: 700; color: #1d4ed8;">${e.cashSide === 'debit' ? formatCurrency(e.amount) : '—'}</td>
       </tr>`
       )
       .join('');
@@ -168,18 +241,28 @@ export default function CashChecklist() {
     <table>
       <thead>
         <tr>
-          <th style="width: 50px;">S No</th>
+          <th style="width: 40px;">S No</th>
           <th>Date & Time</th>
           <th>Name</th>
           <th>Type</th>
-          <th style="text-align: right;">Amount (₹)</th>
+          <th style="text-align: right;">Less (₹)</th>
+          <th style="text-align: right;">Credit (₹)</th>
+          <th style="text-align: right;">Debit (₹)</th>
         </tr>
       </thead>
       <tbody>
+        ${openBalRow}
         ${rowsHtml}
         <tr class="total-row">
-          <td colspan="4" style="text-align: right;">Total Cash Amount:</td>
-          <td style="text-align: right;">${formatCurrency(summary.totalAmount)}</td>
+          <td colspan="4" style="text-align: right;">Period Total (${summary.count} records):</td>
+          <td style="text-align: right; color: #b45309;">${formatCurrency(summary.totalLess)}</td>
+          <td style="text-align: right; color: #15803d;">${formatCurrency(summary.totalCredit)}</td>
+          <td style="text-align: right; color: #1d4ed8;">${formatCurrency(summary.totalDebit)}</td>
+        </tr>
+        <tr class="total-row" style="background: #e0f2fe; font-size: 15px;">
+          <td colspan="5" style="text-align: right; font-weight: 800;">Closing Balance:</td>
+          <td colspan="2" style="text-align: right; font-weight: 800; color: #0369a1;">${formatCurrency(summary.closingBalance)}</td>
+        </tr>
         </tr>
       </tbody>
     </table>
@@ -272,14 +355,26 @@ export default function CashChecklist() {
       </div>
 
       {hasRows && (
-        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
           <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between">
-            <span className="text-xs text-primary-400">Total Entries</span>
-            <span className="font-semibold text-primary-700">{summary.count}</span>
+            <span className="text-xs text-primary-400">Opening Balance</span>
+            <span className="font-semibold text-sky-700">{formatCurrency(summary.openingBalance)}</span>
           </div>
           <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between">
-            <span className="text-xs text-primary-400">Total Cash Amount</span>
-            <span className="font-semibold text-accent-600">{formatCurrency(summary.totalAmount)}</span>
+            <span className="text-xs text-primary-400">Total Credit</span>
+            <span className="font-semibold text-emerald-700">{formatCurrency(summary.totalCredit)}</span>
+          </div>
+          <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between">
+            <span className="text-xs text-primary-400">Total Debit</span>
+            <span className="font-semibold text-blue-700">{formatCurrency(summary.totalDebit)}</span>
+          </div>
+          <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between">
+            <span className="text-xs text-primary-400">Total Less</span>
+            <span className="font-semibold text-amber-700">{formatCurrency(summary.totalLess)}</span>
+          </div>
+          <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between bg-emerald-50/50 border-emerald-200">
+            <span className="text-xs text-emerald-800 font-medium">Closing Balance</span>
+            <span className="font-bold text-emerald-800 text-sm sm:text-base">{formatCurrency(summary.closingBalance)}</span>
           </div>
         </div>
       )}
@@ -289,7 +384,7 @@ export default function CashChecklist() {
           <div className="text-center py-12 text-primary-400 text-sm">Loading cash entries...</div>
         ) : dateError ? (
           <div className="text-center py-12 text-red-500 text-sm">Fix the date range</div>
-        ) : !filteredEntries.length ? (
+        ) : !filteredEntries.length && summary.openingBalance === 0 ? (
           <div className="text-center py-12">
             <FileBarChart className="w-10 h-10 text-primary-300 mx-auto mb-2" />
             <p className="text-primary-400 text-sm">No cash entries for this filter</p>
@@ -297,6 +392,10 @@ export default function CashChecklist() {
         ) : (
           <>
             <div className="md:hidden divide-y divide-primary-100">
+              <div className="px-4 py-3 bg-sky-50 flex justify-between text-xs font-semibold text-sky-800">
+                <span>Opening Balance (as of {formatDateOnly(startDate)})</span>
+                <span>{formatCurrency(summary.openingBalance)}</span>
+              </div>
               {filteredEntries.map((row) => (
                 <div key={row.id} className="px-4 py-3">
                   <div className="flex justify-between gap-2">
@@ -313,21 +412,34 @@ export default function CashChecklist() {
                       <p className="text-xs text-primary-500 mt-1">
                         {row.partyType} · {row.cashSide === 'credit' ? 'Credit' : 'Debit'}
                       </p>
+                      {row.lessAmount > 0 && (
+                        <p className="text-xs text-amber-700 font-medium">
+                          Less: {formatCurrency(row.lessAmount)}
+                        </p>
+                      )}
                     </div>
-                    <p className="font-semibold text-primary-700 shrink-0">
-                      {formatCurrency(row.amount)}
-                    </p>
+                    <div className="text-right shrink-0">
+                      {row.cashSide === 'credit' ? (
+                        <p className="font-bold text-emerald-700">
+                          Credit: {formatCurrency(row.amount)}
+                        </p>
+                      ) : (
+                        <p className="font-bold text-blue-700">
+                          Debit: {formatCurrency(row.amount)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
-              <div className="px-4 py-3 bg-primary-50 flex justify-between text-sm font-semibold text-primary-700">
-                <span>Total</span>
-                <span>{formatCurrency(summary.totalAmount)}</span>
+              <div className="px-4 py-3 bg-emerald-100 flex justify-between text-sm font-bold text-emerald-900">
+                <span>Closing Balance</span>
+                <span>{formatCurrency(summary.closingBalance)}</span>
               </div>
             </div>
 
             <div className="overflow-x-auto hidden md:block">
-              <table className="w-full text-left">
+              <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-primary-50/80 border-b border-primary-100">
                     <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">
@@ -337,20 +449,48 @@ export default function CashChecklist() {
                       Name
                     </th>
                     <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">
-                      Type / Side
+                      Type
                     </th>
                     <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">
-                      Cash Amount
+                      Less
+                    </th>
+                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">
+                      Credit
+                    </th>
+                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">
+                      Debit
                     </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-primary-100 text-sm">
+                  {/* Opening Balance Row */}
+                  <tr className="bg-sky-50/60 font-semibold border-b border-sky-100">
+                    <td className="py-2.5 px-4 text-sky-800 whitespace-nowrap text-xs">
+                      As of {formatDateOnly(startDate)}
+                    </td>
+                    <td className="py-2.5 px-4 text-sky-900 font-bold">
+                      Opening Balance
+                    </td>
+                    <td className="py-2.5 px-4 text-sky-700 font-medium">
+                      —
+                    </td>
+                    <td className="py-2.5 px-4 text-slate-400 text-right">
+                      —
+                    </td>
+                    <td className="py-2.5 px-4 text-emerald-700 text-right tabular-nums font-bold">
+                      {summary.openingBalance > 0 ? formatCurrency(summary.openingBalance) : '—'}
+                    </td>
+                    <td className="py-2.5 px-4 text-blue-700 text-right tabular-nums font-bold">
+                      {summary.openingBalance < 0 ? formatCurrency(Math.abs(summary.openingBalance)) : '—'}
+                    </td>
+                  </tr>
+
                   {filteredEntries.map((row) => (
-                    <tr key={row.id} className="border-b border-primary-50 hover:bg-primary-50/40">
-                      <td className="py-2.5 px-4 text-sm text-primary-600 whitespace-nowrap">
+                    <tr key={row.id} className="hover:bg-primary-50/40">
+                      <td className="py-2.5 px-4 text-primary-600 whitespace-nowrap">
                         {formatDate(row.date)}
                       </td>
-                      <td className="py-2.5 px-4 text-sm font-medium text-primary-700">
+                      <td className="py-2.5 px-4 font-semibold text-primary-800">
                         {row.partyName}
                         {row.partyNameTelugu && (
                           <span className="text-xs text-primary-400 font-normal ml-1">
@@ -358,22 +498,42 @@ export default function CashChecklist() {
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-4 text-sm text-primary-600">
-                        {row.partyType} · {row.cashSide === 'credit' ? 'Credit' : 'Debit'}
+                      <td className="py-2.5 px-4 text-primary-600 font-medium">
+                        {row.partyType}
                       </td>
-                      <td className="py-2.5 px-4 text-sm font-semibold text-primary-700 text-right tabular-nums">
-                        {formatCurrency(row.amount)}
+                      <td className="py-2.5 px-4 text-amber-700 text-right tabular-nums font-medium">
+                        {row.lessAmount > 0 ? formatCurrency(row.lessAmount) : '—'}
+                      </td>
+                      <td className="py-2.5 px-4 text-emerald-700 text-right tabular-nums font-bold">
+                        {row.cashSide === 'credit' ? formatCurrency(row.amount) : '—'}
+                      </td>
+                      <td className="py-2.5 px-4 text-blue-700 text-right tabular-nums font-bold">
+                        {row.cashSide === 'debit' ? formatCurrency(row.amount) : '—'}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-primary-50 border-t border-primary-200">
-                    <td colSpan={3} className="py-2.5 px-4 text-sm font-semibold text-primary-700">
-                      Total ({summary.count} records)
+                  <tr className="bg-primary-50 border-t-2 border-primary-200">
+                    <td colSpan={3} className="py-2.5 px-4 text-sm font-bold text-primary-800">
+                      Period Total ({summary.count} records)
                     </td>
-                    <td className="py-2.5 px-4 text-sm font-semibold text-accent-600 text-right">
-                      {formatCurrency(summary.totalAmount)}
+                    <td className="py-2.5 px-4 text-sm font-bold text-amber-700 text-right">
+                      {formatCurrency(summary.totalLess)}
+                    </td>
+                    <td className="py-2.5 px-4 text-sm font-bold text-emerald-700 text-right">
+                      {formatCurrency(summary.totalCredit)}
+                    </td>
+                    <td className="py-2.5 px-4 text-sm font-bold text-blue-700 text-right">
+                      {formatCurrency(summary.totalDebit)}
+                    </td>
+                  </tr>
+                  <tr className="bg-emerald-100/80 border-t-2 border-emerald-300">
+                    <td colSpan={4} className="py-3 px-4 text-base font-extrabold text-emerald-950">
+                      Closing Balance
+                    </td>
+                    <td colSpan={2} className="py-3 px-4 text-base font-extrabold text-emerald-900 text-right tabular-nums">
+                      {formatCurrency(summary.closingBalance)}
                     </td>
                   </tr>
                 </tfoot>

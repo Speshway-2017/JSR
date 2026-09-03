@@ -337,6 +337,135 @@ router.get('/outstanding', async (req, res) => {
 });
 
 /** Date-range customer statements for Bill Print (all customers). */
+/** Sales-only customer statements for Sales Entry print. */
+router.get('/sales-bills', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) {
+      return res.status(400).json({ message: 'Select a date range' });
+    }
+
+    const start = startOfDay(startDate);
+    const end = endOfDay(endDate);
+    if (start > end) {
+      return res.status(400).json({ message: 'Start date must be before or equal to end date' });
+    }
+
+    const sales = await Sale.find({ createdAt: { $gte: start, $lte: end } })
+      .populate('customer', 'name nameTelugu')
+      .populate('vendor', 'name city mobile')
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const byCustomer = new Map();
+
+    for (const sale of sales) {
+      const cid = sale.customer?._id || sale.customer;
+      if (!cid) continue;
+      const key = String(cid);
+
+      if (!byCustomer.has(key)) {
+        byCustomer.set(key, {
+          customerId: key,
+          name: sale.customer?.name || '—',
+          nameTelugu: sale.customer?.nameTelugu || '',
+          sales: [],
+        });
+      }
+
+      const bucket = byCustomer.get(key);
+      const vId = sale.vendor?._id ? String(sale.vendor._id) : String(sale.vendor || '');
+      const vName = sale.vendor?.name || '';
+      const lines = sale.lines || [];
+
+      if (lines.length) {
+        for (const line of lines) {
+          bucket.sales.push({
+            saleId: String(sale._id),
+            lineId: String(line._id || ''),
+            date: sale.createdAt,
+            material: line.materialName || 'Item',
+            materialId: line.material ? String(line.material) : '',
+            vendorId: vId,
+            vendorName: vName,
+            bags: Number(line.bagCount) || (line.bags?.length) || 0,
+            weight: Number(line.totalKg) || 0,
+            ratePerKg: line.ratePerKg || 0,
+            saleType: line.saleType || 'by_weight',
+            amount: Number(line.totalAmount) || 0,
+            handlingCharges: sale.handlingCharges || 0,
+            coolyRate: sale.coolyRate || 0,
+            coolyPerBag: sale.coolyPerBag || false,
+          });
+        }
+      } else if (Number(sale.totalAmount) > 0) {
+        bucket.sales.push({
+          saleId: String(sale._id),
+          date: sale.createdAt,
+          material: 'Sale',
+          vendorId: vId,
+          vendorName: vName,
+          bags: Number(sale.totalBags) || 0,
+          weight: Number(sale.totalWeight) || 0,
+          amount: Number(sale.totalAmount) || 0,
+          handlingCharges: sale.handlingCharges || 0,
+          coolyRate: sale.coolyRate || 0,
+          coolyPerBag: sale.coolyPerBag || false,
+        });
+      }
+
+      const cooly = Number(sale.handlingCharges) || 0;
+      if (cooly > 0) {
+        bucket.sales.push({
+          saleId: String(sale._id),
+          date: sale.createdAt,
+          material: 'Cooly',
+          vendorId: vId,
+          vendorName: vName,
+          bags: 0,
+          weight: 0,
+          amount: cooly,
+          isCoolyLine: true,
+          handlingCharges: cooly,
+          coolyRate: sale.coolyRate || 0,
+          coolyPerBag: sale.coolyPerBag || false,
+        });
+      }
+    }
+
+    const statements = [...byCustomer.values()]
+      .map((b) => {
+        const totalSale = b.sales.reduce((s, r) => s + r.amount, 0);
+        return {
+          customerId: b.customerId,
+          name: b.name,
+          nameTelugu: b.nameTelugu,
+          opening: 0,
+          sales: b.sales.map((r) => ({
+            ...r,
+            weight: Number(Number(r.weight).toFixed(1)),
+            amount: Number(Number(r.amount).toFixed(2)),
+          })),
+          payments: [],
+          totalSale: Number(totalSale.toFixed(2)),
+          totalPaid: 0,
+          closing: Number(totalSale.toFixed(2)),
+        };
+      })
+      .filter((s) => s.sales.length > 0)
+      .sort((a, b) => a.name.localeCompare(b.name, 'en'));
+
+    res.json({
+      startDate: start,
+      endDate: end,
+      statements,
+    });
+  } catch (error) {
+    res.status(500).json({ message: apiErrorMessage(error) });
+  }
+});
+
+/** Date-range customer statements for Bill Print (all customers). */
 router.get('/bills', async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -353,6 +482,7 @@ router.get('/bills', async (req, res) => {
     const [sales, txs] = await Promise.all([
       Sale.find({ createdAt: { $gte: start, $lte: end } })
         .populate('customer', 'name nameTelugu')
+        .populate('vendor', 'name city mobile')
         .sort({ createdAt: 1 })
         .lean(),
       Transaction.find({
@@ -384,12 +514,17 @@ router.get('/bills', async (req, res) => {
       const cid = sale.customer?._id || sale.customer;
       if (!cid) continue;
       const bucket = ensure(cid, sale.customer);
+      const vId = sale.vendor?._id ? String(sale.vendor._id) : String(sale.vendor || '');
+      const vName = sale.vendor?.name || '';
       const lines = sale.lines || [];
       if (lines.length) {
         for (const line of lines) {
           bucket.sales.push({
             date: sale.createdAt,
             material: line.materialName || 'Item',
+            materialId: line.material ? String(line.material) : '',
+            vendorId: vId,
+            vendorName: vName,
             bags: Number(line.bagCount) || (line.bags?.length) || 0,
             weight: Number(line.totalKg) || 0,
             amount: Number(line.totalAmount) || 0,
@@ -399,6 +534,8 @@ router.get('/bills', async (req, res) => {
         bucket.sales.push({
           date: sale.createdAt,
           material: 'Sale',
+          vendorId: vId,
+          vendorName: vName,
           bags: Number(sale.totalBags) || 0,
           weight: Number(sale.totalWeight) || 0,
           amount: Number(sale.totalAmount) || 0,

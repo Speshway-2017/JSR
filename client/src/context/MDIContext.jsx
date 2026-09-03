@@ -20,6 +20,7 @@ export const MODULE_REGISTRY = {
   '/ledger': { title: 'Ledger', icon: 'BookOpen' },
   '/outstanding': { title: 'Outstanding', icon: 'IndianRupee' },
   '/bill-print': { title: 'Bill Print', icon: 'Printer' },
+  '/sales-print': { title: 'Sales Print', icon: 'Printer' },
   '/sales-report': { title: 'Sales Checklist', icon: 'FileBarChart' },
   '/sales-report-2': { title: 'Day wise sale report', icon: 'FileBarChart' },
   '/cash-checklist': { title: 'Cash Checklist', icon: 'Banknote' },

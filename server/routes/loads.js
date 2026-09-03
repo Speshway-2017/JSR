@@ -11,6 +11,10 @@ const router = express.Router();
 router.use(auth);
 router.use(requireRole('admin'));
 
+function escapeRegex(text) {
+  return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function resolveMaterial({ materialId, materialName }) {
   if (materialId) {
     const byId = await Material.findById(materialId);
@@ -18,7 +22,7 @@ async function resolveMaterial({ materialId, materialName }) {
   }
   const name = materialName?.trim();
   if (!name) return null;
-  let material = await Material.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
+  let material = await Material.findOne({ name: { $regex: new RegExp(`^${escapeRegex(name)}$`, 'i') } });
   if (!material) material = await Material.create({ name });
   return material;
 }
