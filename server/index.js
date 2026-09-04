@@ -31,6 +31,7 @@ import dashboardRoutes from './routes/dashboard.js';
 import reportRoutes from './routes/reports.js';
 import utilRoutes from './routes/util.js';
 import licenseRoutes from './routes/license.js';
+import whatsappRoutes from './routes/whatsapp.js';
 import { licenseLockMiddleware, refreshLicense } from './utils/license.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,7 +46,8 @@ const STARTUP_TOKEN = process.env.JSR_STARTUP_TOKEN || '';
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.get('/api/health', (_, res) => {
   const dbOk = isDbReady();
@@ -88,6 +90,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/util', utilRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 // Serve React build for Electron / production desktop
 if (fs.existsSync(clientDist)) {

@@ -84,6 +84,7 @@ const adminTopMenus = [
     items: [
       { to: '/settings', label: 'Price Settings' },
       { to: '/shortcuts', label: 'Shortcut Settings' },
+      { to: '/whatsapp-settings', label: 'WhatsApp Settings' },
     ],
   },
   {

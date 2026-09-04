@@ -71,6 +71,26 @@ export async function openCustomerSaleBillPdf(sale, previewTab) {
   await openRaituSheetPdf(() => inner, previewTab);
 }
 
+export async function generateSingleCustomerBillHtml(sale) {
+  const inner = await customerBillInner(sale);
+  const fontCss = await ramabhadraFontFaceCss();
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    ${fontCss}
+    ${BILL_CSS}
+  </style>
+</head>
+<body style="font-family:'${RAMABHADRA}','Noto Sans Telugu',sans-serif;font-weight:400;background:#fff;margin:0;padding:10px;">
+  <div class="sheet" style="margin:0 auto;box-shadow:none;">
+    ${inner}
+  </div>
+</body>
+</html>`;
+}
+
 function chunk(items, size) {
   const out = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));

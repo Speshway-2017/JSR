@@ -5,6 +5,8 @@ import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
 import { openRangeBillsNUp } from '../utils/rangeBillPrint';
+import { generateSingleCustomerBillHtml } from '../utils/customerSaleBillPdf';
+import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
 import { useDataRestored } from '../utils/useDataRestored';
 
 function todayInputValue() {
@@ -301,13 +303,55 @@ export default function SalesPrint({ path: windowPath }) {
     }
   };
 
-  const handleSendWhatsApp = () => {
+  const handleSendWhatsApp = async () => {
     if (!selectedStatements.length) {
       toast.error('No sales selected');
       return;
     }
-    const text = `Sales bills for ${selectedStatements.length} customers (${startDate} to ${endDate}).`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+
+    setPrinting(true);
+    try {
+      for (const st of selectedStatements) {
+        const cid = String(st.customerId);
+        const matchedCust = customers.find(
+          (c) => String(c._id) === cid || c.name.toLowerCase() === String(st.name || '').trim().toLowerCase()
+        );
+        let phone = matchedCust?.mobile || st.mobile || '';
+
+        if (!phone) {
+          phone = window.prompt(`Please enter 10-digit WhatsApp phone number for customer "${st.name}":`, '');
+          if (!phone) {
+            toast.error(`Skipped ${st.name} (no phone number provided)`);
+            continue;
+          }
+        }
+
+        const saleObj = {
+          customer: matchedCust || { _id: st.customerId, name: st.name, nameTelugu: st.nameTelugu },
+          createdAt: startDate,
+          lines: st.sales || [],
+          handlingCharges: st.sales?.reduce((acc, s) => acc + (s.isCoolyLine ? (Number(s.amount) || 0) : 0), 0) || 0,
+          totalAmount: st.totalSale,
+        };
+
+        const html = await generateSingleCustomerBillHtml(saleObj);
+        const filename = `Sales_Bill_${st.name.replace(/[^a-zA-Z0-9]/g, '_')}_${startDate}.pdf`;
+
+        await sendWhatsAppBillPdf({
+          recipientPhone: phone,
+          recipientName: st.name,
+          htmlString: html,
+          filename,
+          caption: `Dear ${st.name}, your sales bill for date ${formatDateOnly(startDate)} total ₹${st.totalSale} is generated. Please find your bill attached below. Thank you, JSR Traders.`,
+          templateName: 'customer_sales_bill',
+          templateParams: [st.name, formatDateOnly(startDate), String(st.totalSale)],
+        });
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to send WhatsApp');
+    } finally {
+      setPrinting(false);
+    }
   };
 
   const openInlineEdit = (st, saleLine) => {
