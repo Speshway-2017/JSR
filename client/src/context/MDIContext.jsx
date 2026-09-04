@@ -45,6 +45,7 @@ export const MODULE_REGISTRY = {
   '/less-checklist': { title: 'Less Checklist', icon: 'Receipt' },
   '/settings': { title: 'Price Settings', icon: 'Settings' },
   '/shortcuts': { title: 'Shortcut Settings', icon: 'Keyboard' },
+  '/whatsapp-settings': { title: 'WhatsApp Settings', icon: 'MessageSquare' },
   '/sales-orders': { title: 'Sales Orders', icon: 'ClipboardPen' },
   '/sales-materials': { title: 'Sales Materials', icon: 'Package' },
   '/sales-orders/previous': { title: 'Previous Reports', icon: 'History' },

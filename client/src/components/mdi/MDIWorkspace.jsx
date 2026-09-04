@@ -29,6 +29,7 @@ import LessChecklist from '../../pages/LessChecklist';
 import HamaliReport from '../../pages/HamaliReport';
 import PriceSettings from '../../pages/PriceSettings';
 import ShortcutSettings from '../../pages/ShortcutSettings';
+import WhatsAppSettings from '../../pages/WhatsAppSettings';
 import SalesOrders, { SalesBagReportsList } from '../../pages/SalesOrders';
 import SalesMaterials from '../../pages/SalesMaterials';
 
@@ -83,6 +84,8 @@ function renderModuleComponent(path) {
       return <PriceSettings path={path} />;
     case '/shortcuts':
       return <ShortcutSettings path={path} />;
+    case '/whatsapp-settings':
+      return <WhatsAppSettings path={path} />;
     case '/sales-orders':
       return <SalesOrders path={path} />;
     case '/sales-materials':
