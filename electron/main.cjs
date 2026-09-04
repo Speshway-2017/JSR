@@ -1,7 +1,6 @@
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 
 const electron = require('electron');
-electron.app?.commandLine?.appendSwitch('disable-features', 'Autofill,AutofillServerCommunication');
 const {
   app,
   BrowserWindow,

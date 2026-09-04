@@ -1,13 +1,17 @@
 import React, { useRef } from 'react';
 import * as Icons from 'lucide-react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useMDI } from '../../context/MDIContext';
+import { useMDI, isPathAllowedForRole } from '../../context/MDIContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function MDIWindowTaskbar() {
   const { windows, activeWindowId, restoreWindow, minimizeWindow, focusWindow } = useMDI();
+  const { role } = useAuth();
   const scrollRef = useRef(null);
 
-  if (windows.length === 0) return null;
+  const visibleWindows = windows.filter((win) => isPathAllowedForRole(win.path, role));
+
+  if (visibleWindows.length === 0) return null;
 
   const scroll = (direction) => {
     if (scrollRef.current) {
@@ -25,7 +29,7 @@ export default function MDIWindowTaskbar() {
   return (
     <div className="h-10 shrink-0 bg-surface border-t border-primary-200 px-2 flex items-center gap-1 select-none z-30 shadow-card">
       <span className="text-[11px] font-bold uppercase tracking-wider text-primary-500 px-2 shrink-0 border-r border-primary-100 hidden sm:inline">
-        Open Modules ({windows.length}):
+        Open Modules ({visibleWindows.length}):
       </span>
 
       <button
@@ -43,7 +47,7 @@ export default function MDIWindowTaskbar() {
         className="flex-1 flex items-center gap-1.5 overflow-x-auto scroll-smooth py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
-        {windows.map((win) => {
+        {visibleWindows.map((win) => {
           const IconComponent = Icons[win.iconName] || Icons.Package;
           const isActive = win.id === activeWindowId && !win.isMinimized;
 

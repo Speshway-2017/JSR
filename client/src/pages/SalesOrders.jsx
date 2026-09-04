@@ -48,6 +48,7 @@ function filterSuggestions(list, query, { requireQuery = false } = {}) {
 /** List of saved reports */
 export function SalesBagReportsList() {
   const { openWindow } = useMDI();
+  const navigate = useNavigate();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -77,6 +78,11 @@ export function SalesBagReportsList() {
     }
   };
 
+  const handleOpenReport = (path, title) => {
+    openWindow({ path, title });
+    navigate(path);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -86,7 +92,7 @@ export function SalesBagReportsList() {
         </div>
         <button
           type="button"
-          onClick={() => openWindow({ path: '/sales-orders', title: 'New Report' })}
+          onClick={() => handleOpenReport('/sales-orders', 'New Report')}
           className="btn-primary !py-2 !px-4 !text-sm cursor-pointer"
         >
           <FilePlus className="w-4 h-4" /> New report
@@ -100,7 +106,7 @@ export function SalesBagReportsList() {
           <p className="text-primary-400 text-sm">No saved reports yet.</p>
           <button
             type="button"
-            onClick={() => openWindow({ path: '/sales-orders', title: 'New Report' })}
+            onClick={() => handleOpenReport('/sales-orders', 'New Report')}
             className="btn-primary inline-flex items-center gap-2 mt-4 cursor-pointer"
           >
             <FilePlus className="w-4 h-4" /> Create first report
@@ -131,7 +137,7 @@ export function SalesBagReportsList() {
                         <button
                           type="button"
                           className="btn-secondary !py-1.5 !px-2.5 !text-xs cursor-pointer"
-                          onClick={() => openWindow({ path: `/sales-orders/${r._id}?mode=view`, title: `View: ${r.title || 'Report'}` })}
+                          onClick={() => handleOpenReport(`/sales-orders/${r._id}?mode=view`, `View: ${r.title || 'Report'}`)}
                           title="View"
                         >
                           <Eye className="w-3.5 h-3.5" /> View
@@ -139,7 +145,7 @@ export function SalesBagReportsList() {
                         <button
                           type="button"
                           className="btn-secondary !py-1.5 !px-2.5 !text-xs cursor-pointer"
-                          onClick={() => openWindow({ path: `/sales-orders/${r._id}`, title: `Edit: ${r.title || 'Report'}` })}
+                          onClick={() => handleOpenReport(`/sales-orders/${r._id}`, `Edit: ${r.title || 'Report'}`)}
                           title="Edit"
                         >
                           <Pencil className="w-3.5 h-3.5" /> Edit
@@ -297,6 +303,9 @@ export default function SalesOrders({ path: windowPath }) {
       setLoading(false);
       return;
     }
+    setReportId(id);
+    setTitle('');
+    setEntries([]);
     setLoading(true);
     api
       .get(`/sales-bag-reports/${id}`)

@@ -12,6 +12,7 @@ import CustomerDetail from './pages/CustomerDetail';
 import Sell from './pages/Sell';
 import Materials from './pages/Materials';
 import PriceSettings from './pages/PriceSettings';
+import ShortcutSettings from './pages/ShortcutSettings';
 import Transactions from './pages/Transactions';
 import InventoryHistory from './pages/InventoryHistory';
 import SalesReport from './pages/SalesReport';
@@ -66,6 +67,7 @@ export default function App() {
           <Route path="/sell" element={<Sell />} />
           <Route path="/materials" element={<Materials />} />
           <Route path="/settings" element={<PriceSettings />} />
+          <Route path="/shortcuts" element={<ShortcutSettings />} />
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/inventory" element={<InventoryHistory />} />
           <Route path="/ledger" element={<Ledger />} />

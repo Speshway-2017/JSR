@@ -30,7 +30,7 @@ export default function PriceSettings() {
       setForm(emptyRatesState(res.data));
       toast.success('Price settings saved');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save');
+      toast.error(err.response?.data?.message || 'Failed to save settings');
     } finally {
       setSaving(false);
     }

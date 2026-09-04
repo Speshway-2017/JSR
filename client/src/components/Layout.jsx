@@ -83,6 +83,7 @@ const adminTopMenus = [
     label: 'Settings',
     items: [
       { to: '/settings', label: 'Price Settings' },
+      { to: '/shortcuts', label: 'Shortcut Settings' },
     ],
   },
   {

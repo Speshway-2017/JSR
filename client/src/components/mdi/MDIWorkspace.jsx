@@ -1,8 +1,10 @@
 import React from 'react';
 import { AlertTriangle, X } from 'lucide-react';
-import { useMDI } from '../../context/MDIContext';
+import { useMDI, isPathAllowedForRole } from '../../context/MDIContext';
+import { useAuth } from '../../context/AuthContext';
 import MDIWindow from './MDIWindow';
 import MDIWindowTaskbar from './MDIWindowTaskbar';
+import MDITaskSwitcherOverlay from './MDITaskSwitcherOverlay';
 import Dashboard from '../../pages/Dashboard';
 import Customers from '../../pages/Customers';
 import CustomerDetail from '../../pages/CustomerDetail';
@@ -26,6 +28,7 @@ import CashChecklist from '../../pages/CashChecklist';
 import LessChecklist from '../../pages/LessChecklist';
 import HamaliReport from '../../pages/HamaliReport';
 import PriceSettings from '../../pages/PriceSettings';
+import ShortcutSettings from '../../pages/ShortcutSettings';
 import SalesOrders, { SalesBagReportsList } from '../../pages/SalesOrders';
 import SalesMaterials from '../../pages/SalesMaterials';
 
@@ -78,6 +81,8 @@ function renderModuleComponent(path) {
       return <HamaliReport path={path} />;
     case '/settings':
       return <PriceSettings path={path} />;
+    case '/shortcuts':
+      return <ShortcutSettings path={path} />;
     case '/sales-orders':
       return <SalesOrders path={path} />;
     case '/sales-materials':
@@ -91,6 +96,9 @@ function renderModuleComponent(path) {
 
 export default function MDIWorkspace({ fallbackChildren }) {
   const { windows, confirmCloseId, cancelCloseModal, confirmCloseModal } = useMDI();
+  const { role } = useAuth();
+
+  const visibleWindows = windows.filter((win) => isPathAllowedForRole(win.path, role));
 
   return (
     <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden bg-cream">
@@ -102,7 +110,7 @@ export default function MDIWorkspace({ fallbackChildren }) {
         </div>
 
         {/* Floating Internal Windows */}
-        {windows.map((win) => (
+        {visibleWindows.map((win) => (
           <MDIWindow key={win.id} windowItem={win}>
             {renderModuleComponent(win.path)}
           </MDIWindow>
@@ -111,6 +119,9 @@ export default function MDIWorkspace({ fallbackChildren }) {
 
       {/* Bottom Taskbar Strip for Open/Minimized Module Windows */}
       <MDIWindowTaskbar />
+
+      {/* Windows Alt+Tab / Ctrl+Tab Live Task Switcher Preview Overlay */}
+      <MDITaskSwitcherOverlay />
 
       {/* Unsaved Changes Confirmation Modal */}
       {confirmCloseId && (
