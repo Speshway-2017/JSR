@@ -52,18 +52,18 @@ export const MODULE_REGISTRY = {
 };
 
 export const DEFAULT_SHORTCUTS = {
-  F1: { type: 'window', action: 'toggle_maximize', label: 'Maximize / Restore Active Window' },
-  F2: { type: 'window', action: 'minimize_active', label: 'Minimize Active Window' },
-  F3: { type: 'window', action: 'close_active', label: 'Close Active Window' },
-  F4: { type: 'module', path: '/sell', title: 'Sales Entry', label: 'Sales Entry' },
-  F5: { type: 'module', path: '/cash-entry', title: 'Cash Entry', label: 'Cash Entry' },
-  F6: { type: 'module', path: '/ledger', title: 'Ledger', label: 'Ledger' },
-  F7: { type: 'module', path: '/transactions', title: 'Transactions', label: 'Transactions' },
-  F8: { type: 'module', path: '/purchase', title: 'Purchase', label: 'Purchase' },
-  F9: { type: 'module', path: '/sell', title: 'Sales Entry', label: 'Sales Entry' },
-  F10: { type: 'module', path: '/sale-patty', title: 'Sale Patty', label: 'Sale Patty' },
-  F11: { type: 'window', action: 'minimize_all', label: 'Minimize All Windows' },
-  F12: { type: 'module', path: '/customers', title: 'Customer List', label: 'Customer List' },
+  F1: { type: 'none', action: 'none', label: 'None / Disabled' },
+  F2: { type: 'none', action: 'none', label: 'None / Disabled' },
+  F3: { type: 'none', action: 'none', label: 'None / Disabled' },
+  F4: { type: 'none', action: 'none', label: 'None / Disabled' },
+  F5: { type: 'none', action: 'none', label: 'None / Disabled' },
+  F6: { type: 'none', action: 'none', label: 'None / Disabled' },
+  F7: { type: 'none', action: 'none', label: 'None / Disabled' },
+  F8: { type: 'none', action: 'none', label: 'None / Disabled' },
+  F9: { type: 'none', action: 'none', label: 'None / Disabled' },
+  F10: { type: 'none', action: 'none', label: 'None / Disabled' },
+  F11: { type: 'none', action: 'none', label: 'None / Disabled' },
+  F12: { type: 'none', action: 'none', label: 'None / Disabled' },
 };
 
 export const AVAILABLE_SHORTCUT_OPTIONS = [
