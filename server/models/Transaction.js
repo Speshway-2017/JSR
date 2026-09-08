@@ -12,6 +12,7 @@ const transactionSchema = new mongoose.Schema(
     amount: { type: Number, required: true },
     lessAmount: { type: Number, default: 0, min: 0 },
     cashSide: { type: String, enum: ['credit', 'debit'] },
+    paymentType: { type: String, default: 'Cash', trim: true },
     entryDate: { type: Date, default: Date.now },
     source: { type: String, default: '', trim: true },
     description: { type: String, required: true },

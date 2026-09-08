@@ -50,14 +50,14 @@ router.get('/history', async (req, res) => {
     const [purchases, sales, loads] = await Promise.all([
       Purchase.find(purchaseFilter)
         .populate('vendor', 'name city')
-        .sort({ purchaseDate: -1, createdAt: -1 }),
+        .sort({ purchaseDate: 1, createdAt: 1 }),
       Sale.find(saleFilter)
         .populate('vendor', 'name city')
-        .sort({ createdAt: -1 }),
+        .sort({ createdAt: 1 }),
       Load.find(loadFilter)
         .populate('vendor', 'name city')
         .populate('materials.material', 'name')
-        .sort({ loadDate: -1, createdAt: -1 }),
+        .sort({ loadDate: 1, createdAt: 1 }),
     ]);
 
     const rows = [];
@@ -76,7 +76,7 @@ router.get('/history', async (req, res) => {
           vendorName: purchase.vendor?.name || 'Unknown',
           vendorId: purchase.vendor?._id || purchase.vendor,
           totalWeight: Number(line.totalKg) || 0,
-          bagCount: 0,
+          bagCount: Number(line.bags) || 0,
           ratePerKg: Number(line.ratePerKg) || 0,
           amount: Number(line.amount) || 0,
           handlingCharges: 0,
@@ -157,7 +157,7 @@ router.get('/history', async (req, res) => {
       }
     }
 
-    rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+    rows.sort((a, b) => new Date(a.date) - new Date(b.date));
 
     const summary = rows.reduce(
       (acc, row) => ({

@@ -92,8 +92,8 @@ export default function SalesReport() {
       'Date & Time': formatDate(row.date),
       Name: row.customerName,
       Item: row.materialName,
-      Rate: row.ratePerKg,
       Bags: row.bagCount,
+      Rate: row.ratePerKg,
       'Weight (kg)': row.saleType === 'by_bag' || !row.totalWeight ? '—' : row.totalWeight,
       'Total Price (₹)': row.totalAmount,
     }));
@@ -103,8 +103,8 @@ export default function SalesReport() {
       'Date & Time': 'TOTAL',
       Name: '',
       Item: '',
-      Rate: '',
       Bags: summary.totalBags,
+      Rate: '',
       'Weight (kg)': summary.totalWeight,
       'Total Price (₹)': summary.totalAmount,
     });
@@ -246,7 +246,7 @@ export default function SalesReport() {
                       <p className="text-xs text-primary-400">{row.customerName}</p>
                       <p className="text-xs text-primary-400 mt-0.5">{formatDate(row.date)}</p>
                       <p className="text-xs text-primary-500 mt-1">
-                        Rate {row.ratePerKg} · {row.bagCount} bags · {formatWeight(row.totalWeight)}
+                        {row.bagCount} bags · Rate {row.ratePerKg} · {formatWeight(row.totalWeight)}
                       </p>
                     </div>
                     <p className="font-semibold text-primary-700 shrink-0">{formatCurrency(row.totalAmount)}</p>
@@ -266,8 +266,8 @@ export default function SalesReport() {
                     <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">Date & Time</th>
                     <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">Name</th>
                     <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">Item</th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">Rate</th>
                     <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">Bags</th>
+                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">Rate</th>
                     <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">Weight</th>
                     <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">Total Price</th>
                   </tr>
@@ -278,8 +278,8 @@ export default function SalesReport() {
                       <td className="py-2.5 px-4 text-sm text-primary-600 whitespace-nowrap">{formatDate(row.date)}</td>
                       <td className="py-2.5 px-4 text-sm font-medium text-primary-700">{row.customerName}</td>
                       <td className="py-2.5 px-4 text-sm text-primary-600">{row.materialName}</td>
-                      <td className="py-2.5 px-4 text-sm text-primary-600 text-right tabular-nums">{row.ratePerKg}</td>
                       <td className="py-2.5 px-4 text-sm text-primary-600 text-right">{row.bagCount}</td>
+                      <td className="py-2.5 px-4 text-sm text-primary-600 text-right tabular-nums">{row.ratePerKg}</td>
                       <td className="py-2.5 px-4 text-sm text-primary-600 text-right">{row.saleType === 'by_bag' || !row.totalWeight ? '—' : formatWeight(row.totalWeight)}</td>
                       <td className="py-2.5 px-4 text-sm font-semibold text-primary-700 text-right">
                         {formatCurrency(row.totalAmount)}
@@ -289,8 +289,9 @@ export default function SalesReport() {
                 </tbody>
                 <tfoot>
                   <tr className="bg-primary-50 border-t border-primary-200">
-                    <td colSpan={4} className="py-2.5 px-4 text-sm font-semibold text-primary-700">Total</td>
+                    <td colSpan={3} className="py-2.5 px-4 text-sm font-semibold text-primary-700">Total</td>
                     <td className="py-2.5 px-4 text-sm font-semibold text-primary-700 text-right">{summary.totalBags}</td>
+                    <td className="py-2.5 px-4 text-sm font-semibold text-primary-700 text-right"></td>
                     <td className="py-2.5 px-4 text-sm font-semibold text-primary-700 text-right">
                       {formatWeight(summary.totalWeight)}
                     </td>

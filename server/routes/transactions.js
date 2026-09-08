@@ -23,7 +23,7 @@ router.get('/', async (req, res) => {
       .populate('customer', 'name city state')
       .populate('load', 'totalWeight handlingCharges')
       .populate('sale', 'totalAmount totalBags')
-      .sort({ createdAt: -1 })
+      .sort({ entryDate: 1, createdAt: 1 })
       .limit(maxRecords)
       .lean();
     res.json(transactions);
@@ -124,8 +124,9 @@ async function reverseCashBalance(tx) {
 
 /** Applies cash entry to party balance and returns fields to store on the transaction. */
 async function applyCashEntry(body) {
-  const { customerId, vendorId, partyType, amount, less, cashSide, entryDate, description } = body;
+  const { customerId, vendorId, partyType, amount, less, cashSide, paymentType, entryDate, description } = body;
   const side = String(cashSide || 'credit').toLowerCase();
+  const payType = paymentType || 'Cash';
   const kind =
     partyType === 'vendor'
       ? 'vendor'
@@ -188,6 +189,7 @@ async function applyCashEntry(body) {
         amount: applied,
         lessAmount: side === 'credit' ? lessAmount : 0,
         cashSide: side,
+        paymentType: payType,
         entryDate: when,
         source: 'cash_entry',
         description: description || `${parts.join(' · ')} — ${customer.name}`,
@@ -233,6 +235,7 @@ async function applyCashEntry(body) {
       amount: applied,
       lessAmount: side === 'debit' ? lessAmount : 0,
       cashSide: side,
+      paymentType: payType,
       entryDate: when,
       source: 'cash_entry',
       description: description || `${parts.join(' · ')} — ${vendor.name}`,
@@ -251,6 +254,7 @@ function cashEntrySnapshot(tx) {
     amount: mainAmount,
     less: lessAmount,
     cashSide: tx.cashSide,
+    paymentType: tx.paymentType || 'Cash',
     entryDate: tx.entryDate,
     description: tx.description,
   };
@@ -300,6 +304,7 @@ router.put('/cash-entry/:id', async (req, res) => {
       tx.amount = result.fields.amount;
       tx.lessAmount = result.fields.lessAmount;
       tx.cashSide = result.fields.cashSide;
+      tx.paymentType = result.fields.paymentType;
       tx.entryDate = result.fields.entryDate;
       tx.description = result.fields.description;
       tx.balanceAfter = result.fields.balanceAfter;
@@ -346,7 +351,7 @@ router.get('/cash-entries', async (req, res) => {
     const transactions = await Transaction.find(filter)
       .populate('customer', 'name nameTelugu creditBalance')
       .populate('vendor', 'name nameTelugu creditBalance')
-      .sort({ entryDate: -1, createdAt: -1 });
+      .sort({ entryDate: 1, createdAt: 1 });
     res.json(transactions);
   } catch (error) {
     res.status(500).json({ message: error.message });

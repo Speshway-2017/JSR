@@ -63,9 +63,9 @@ router.get('/:id', async (req, res) => {
 
     const sales = await Sale.find({ customer: customer._id })
       .populate('vendor', 'name nameTelugu city')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
 
-    const transactions = await Transaction.find({ customer: customer._id }).sort({ createdAt: -1 });
+    const transactions = await Transaction.find({ customer: customer._id }).sort({ createdAt: 1 });
 
     res.json({ customer, sales, transactions });
   } catch (error) {

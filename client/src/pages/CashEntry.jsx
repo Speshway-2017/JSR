@@ -21,11 +21,18 @@ export default function CashEntry() {
   const [amount, setAmount] = useState('');
   const [less, setLess] = useState('');
   const [cashSide, setCashSide] = useState('credit');
+  const [paymentType, setPaymentType] = useState('Cash');
   const [saving, setSaving] = useState(false);
   const [savingRowId, setSavingRowId] = useState('');
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
   const listRef = useRef(null);
+  const dateRef = useRef(null);
+  const typeRef = useRef(null);
+  const nameRef = useRef(null);
+  const amountRef = useRef(null);
+  const lessRef = useRef(null);
+  const saveRef = useRef(null);
 
   const selectedParty = useMemo(() => {
     if (!partyId || !partyType) return null;
@@ -115,6 +122,10 @@ export default function CashEntry() {
     setCashSide(item.kind === 'vendor' ? 'debit' : 'credit');
     setSuggestOpen(false);
     setHighlight(-1);
+    setTimeout(() => {
+      amountRef.current?.focus();
+      amountRef.current?.select();
+    }, 50);
   };
 
   const clearFormAmounts = () => {
@@ -156,6 +167,7 @@ export default function CashEntry() {
         amount: mainAmount,
         less: lessEnabled ? lessAmount : 0,
         cashSide,
+        paymentType,
         entryDate,
       };
       if (partyType === 'customer') payload.customerId = partyId;
@@ -171,7 +183,11 @@ export default function CashEntry() {
       setPartyId('');
       setPartyType('');
       setNameQuery('');
+      setPaymentType('Cash');
       await refresh();
+      setTimeout(() => {
+        nameRef.current?.focus();
+      }, 50);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save cash entry');
     } finally {
@@ -193,14 +209,59 @@ export default function CashEntry() {
       setHighlight((h) => (h <= 0 ? 0 : h - 1));
       return;
     }
-    if (e.key === 'Enter' && suggestOpen && suggestions.length > 0) {
-      e.preventDefault();
-      pickParty(suggestions[highlight >= 0 ? highlight : 0]);
-      return;
+    if (e.key === 'Enter') {
+      if (suggestOpen && suggestions.length > 0) {
+        e.preventDefault();
+        pickParty(suggestions[highlight >= 0 ? highlight : 0]);
+        return;
+      }
+      if (partyId) {
+        e.preventDefault();
+        amountRef.current?.focus();
+        amountRef.current?.select();
+        return;
+      }
     }
     if (e.key === 'Escape') {
       setSuggestOpen(false);
       setHighlight(-1);
+    }
+  };
+
+  const handleFormKeyDown = (e) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    const target = e.target;
+    if (target === nameRef.current) return;
+
+    if (target === dateRef.current) {
+      e.preventDefault();
+      typeRef.current?.focus();
+      return;
+    }
+
+    if (target === typeRef.current) {
+      e.preventDefault();
+      nameRef.current?.focus();
+      nameRef.current?.select();
+      return;
+    }
+
+    if (target === amountRef.current) {
+      if (lessEnabled) {
+        e.preventDefault();
+        lessRef.current?.focus();
+        lessRef.current?.select();
+      } else {
+        e.preventDefault();
+        saveRef.current?.focus();
+      }
+      return;
+    }
+
+    if (target === lessRef.current) {
+      e.preventDefault();
+      saveRef.current?.focus();
+      return;
     }
   };
 
@@ -222,6 +283,7 @@ export default function CashEntry() {
     const cur = rowAmounts(tx);
     const partyType = patch.partyType ?? (cur.isVendor ? 'vendor' : 'customer');
     const cashSide = patch.cashSide ?? tx.cashSide;
+    const payType = patch.paymentType ?? tx.paymentType ?? 'Cash';
     const amount =
       patch.amount != null ? patch.amount : cashSide === 'credit' ? cur.credit : cur.debit;
     const lessAllowed =
@@ -232,6 +294,7 @@ export default function CashEntry() {
     const payload = {
       partyType,
       cashSide,
+      paymentType: payType,
       amount,
       less: lessAllowed ? less : 0,
       entryDate,
@@ -265,11 +328,12 @@ export default function CashEntry() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="card space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="card space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="label">Date *</label>
             <input
+              ref={dateRef}
               type="date"
               className="input-field"
               value={entryDate}
@@ -280,6 +344,7 @@ export default function CashEntry() {
           <div>
             <label className="label">Type *</label>
             <select
+              ref={typeRef}
               className="input-field"
               value={cashSide}
               onChange={(e) => setCashSide(e.target.value)}
@@ -288,11 +353,27 @@ export default function CashEntry() {
               <option value="debit">Debit</option>
             </select>
           </div>
+          <div>
+            <label className="label">Type of Payment *</label>
+            <select
+              className="input-field"
+              value={paymentType}
+              onChange={(e) => setPaymentType(e.target.value)}
+            >
+              <option value="Cash">Cash</option>
+              <option value="PhonePe">PhonePe</option>
+              <option value="Google Pay">Google Pay</option>
+              <option value="Card">Card</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
         </div>
 
         <div className="relative">
           <label className="label">Name *</label>
           <input
+            ref={nameRef}
             className="input-field"
             value={nameQuery}
             placeholder="Type customer or vendor name…"
@@ -380,6 +461,7 @@ export default function CashEntry() {
           <div>
             <label className="label">Amount *</label>
             <input
+              ref={amountRef}
               className="input-field"
               type="text"
               inputMode="decimal"
@@ -392,6 +474,7 @@ export default function CashEntry() {
           <div>
             <label className="label">Less</label>
             <input
+              ref={lessRef}
               className="input-field"
               type="text"
               inputMode="decimal"
@@ -417,7 +500,7 @@ export default function CashEntry() {
           </div>
         )}
 
-        <button type="submit" className="btn-primary w-full sm:w-auto sm:px-10" disabled={saving}>
+        <button ref={saveRef} type="submit" className="btn-primary w-full sm:w-auto sm:px-10" disabled={saving}>
           {saving ? 'Saving…' : 'Save'}
         </button>
       </form>
@@ -435,7 +518,7 @@ export default function CashEntry() {
               <thead>
                 <tr className="border-b border-primary-100 bg-primary-50/50">
                   <th className="text-left px-4 py-2.5 font-semibold text-primary-500">Name</th>
-                  <th className="text-left px-4 py-2.5 font-semibold text-primary-500">Detail</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-primary-500">Type of Payment</th>
                   <th className="text-right px-4 py-2.5 font-semibold text-primary-500">Credit</th>
                   <th className="text-right px-4 py-2.5 font-semibold text-primary-500">Debit</th>
                   <th className="text-right px-4 py-2.5 font-semibold text-primary-500">Less</th>
@@ -492,7 +575,23 @@ export default function CashEntry() {
                           {cur.isVendor ? 'Vendor' : 'Customer'}
                         </span>
                       </td>
-                      <td className="px-4 py-1.5 text-primary-500">Cash</td>
+                      <td className="px-2 py-1.5 min-w-[8rem]">
+                        <select
+                          className={`${cell} font-medium text-primary-700`}
+                          value={tx.paymentType || 'Cash'}
+                          disabled={busy}
+                          onChange={(e) => {
+                            persistRow(tx, { paymentType: e.target.value }).catch(() => {});
+                          }}
+                        >
+                          <option value="Cash">Cash</option>
+                          <option value="PhonePe">PhonePe</option>
+                          <option value="Google Pay">Google Pay</option>
+                          <option value="Card">Card</option>
+                          <option value="Bank Transfer">Bank Transfer</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </td>
                       <td className="px-2 py-1.5 w-28">
                         <input
                           type="text"

@@ -126,13 +126,15 @@ app.use((err, _req, res, next) => {
     err.name === 'MongoNetworkError' ||
     /ECONNREFUSED.*27018|buffering timed out|topology was destroyed/i.test(msg)
   ) {
+    if (res.headersSent) return next(err);
     return res.status(503).json({
       message:
         'Database connection lost. Close JSR fully, wait a few seconds, then open it again.',
     });
   }
-  console.error(err);
-  res.status(err.status || 500).json({ message: msg || 'Server error' });
+  console.error('[API Error]:', err);
+  if (res.headersSent) return next(err);
+  res.status(err.status || err.statusCode || 500).json({ message: msg || 'Server error' });
 });
 
 const PORT = process.env.PORT || 5000;

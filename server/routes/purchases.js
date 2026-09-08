@@ -40,7 +40,7 @@ router.get('/', async (req, res) => {
 
     const purchases = await Purchase.find(filter)
       .populate('vendor', 'name city mobile')
-      .sort({ purchaseDate: -1, createdAt: -1 });
+      .sort({ purchaseDate: 1, createdAt: 1 });
     res.json(purchases);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -69,23 +69,45 @@ router.post('/', async (req, res) => {
     const processed = [];
     let totalAmount = 0;
     let totalWeight = 0;
+    let totalBags = 0;
 
     for (const line of lines) {
       const material = await resolveMaterial(line);
-      const totalKg = Number(line.totalKg);
+      const purchaseType = line.purchaseType === 'by_bag' ? 'by_bag' : 'by_weight';
+      const isByBag = purchaseType === 'by_bag';
+      const bags = Math.floor(Number(line.bags)) || 0;
+      const totalKg = Number(line.totalKg) || 0;
       const ratePerKg = Number(line.ratePerKg);
-      if (!material || !totalKg || totalKg <= 0) {
-        return res.status(400).json({ message: 'Each line needs product and weight' });
+
+      if (!material) {
+        return res.status(400).json({ message: 'Each line needs a product' });
       }
-      if (Number.isNaN(ratePerKg) || ratePerKg < 0) {
-        return res.status(400).json({ message: 'Enter a valid rate per kg' });
+
+      if (isByBag) {
+        if (!bags || bags <= 0) {
+          return res.status(400).json({ message: 'Enter number of bags for by-bag product line' });
+        }
+        if (Number.isNaN(ratePerKg) || ratePerKg < 0) {
+          return res.status(400).json({ message: 'Enter a valid rate per bag' });
+        }
+      } else {
+        if (!totalKg || totalKg <= 0) {
+          return res.status(400).json({ message: 'Enter weight for by-weight product line' });
+        }
+        if (Number.isNaN(ratePerKg) || ratePerKg < 0) {
+          return res.status(400).json({ message: 'Enter a valid rate per kg' });
+        }
       }
-      const amount = Number((totalKg * ratePerKg).toFixed(2));
+
+      const amount = Number((isByBag ? bags * ratePerKg : totalKg * ratePerKg).toFixed(2));
       totalAmount += amount;
       totalWeight += totalKg;
+      totalBags += bags;
       processed.push({
         material: material._id,
         materialName: material.name,
+        purchaseType,
+        bags,
         totalKg,
         ratePerKg,
         amount,
@@ -99,6 +121,7 @@ router.post('/', async (req, res) => {
       vendor: vendorId,
       purchaseDate: when,
       lines: processed,
+      totalBags,
       totalAmount,
       totalWeight,
       notes: notes || '',

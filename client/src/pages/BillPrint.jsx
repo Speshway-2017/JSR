@@ -31,6 +31,7 @@ export default function BillPrint({ path: windowPath }) {
   const [filterCustomer, setFilterCustomer] = useState(effectiveSearchParams.get('customer') || '');
   const [filterVendor, setFilterVendor] = useState(effectiveSearchParams.get('vendor') || '');
   const [filterItem, setFilterItem] = useState(effectiveSearchParams.get('item') || '');
+  const [filterSchedule, setFilterSchedule] = useState(effectiveSearchParams.get('schedule') || '');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function BillPrint({ path: windowPath }) {
     const pCust = effectiveSearchParams.get('customer');
     const pVend = effectiveSearchParams.get('vendor');
     const pItem = effectiveSearchParams.get('item');
+    const pSched = effectiveSearchParams.get('schedule');
     if (pDate) {
       setStartDate(pDate);
       setEndDate(pDate);
@@ -45,6 +47,7 @@ export default function BillPrint({ path: windowPath }) {
     if (pCust !== null && pCust !== undefined) setFilterCustomer(pCust);
     if (pVend !== null && pVend !== undefined) setFilterVendor(pVend);
     if (pItem !== null && pItem !== undefined) setFilterItem(pItem);
+    if (pSched !== null && pSched !== undefined) setFilterSchedule(pSched);
   }, [windowPath, effectiveSearchParams]);
 
   const [materials, setMaterials] = useState([]);
@@ -164,6 +167,26 @@ export default function BillPrint({ path: windowPath }) {
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true }));
   }, [data]);
 
+  const availableSchedules = useMemo(() => {
+    if (!data?.statements) return [];
+    const map = new Map();
+    for (const st of data.statements) {
+      const sId = st.scheduleId ? String(st.scheduleId) : '';
+      const sName = st.scheduleName ? String(st.scheduleName).trim() : '';
+      if (sId || sName) {
+        const key = sId || sName;
+        if (!map.has(key)) {
+          map.set(key, {
+            _id: key,
+            id: sId,
+            name: sName || 'Schedule',
+          });
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true }));
+  }, [data]);
+
   // Reset filter selection if it's no longer present in available options for current date range
   useEffect(() => {
     if (filterCustomer && !availableCustomers.some((c) => c._id === filterCustomer || c.name === filterCustomer)) {
@@ -175,7 +198,15 @@ export default function BillPrint({ path: windowPath }) {
     if (filterItem && !availableItems.some((i) => i._id === filterItem || i.name.toLowerCase() === filterItem.toLowerCase())) {
       setFilterItem('');
     }
-  }, [availableCustomers, availableVendors, availableItems, filterCustomer, filterVendor, filterItem]);
+    if (
+      filterSchedule &&
+      !availableSchedules.some(
+        (s) => s._id === filterSchedule || s.id === filterSchedule || s.name.toLowerCase() === filterSchedule.toLowerCase()
+      )
+    ) {
+      setFilterSchedule('');
+    }
+  }, [availableCustomers, availableVendors, availableItems, availableSchedules, filterCustomer, filterVendor, filterItem, filterSchedule]);
 
   const filteredStatements = useMemo(() => {
     if (!data?.statements) return [];
@@ -199,6 +230,14 @@ export default function BillPrint({ path: windowPath }) {
         );
         if (!hasItem) return false;
       }
+      if (filterSchedule) {
+        const stSchedId = String(st.scheduleId || '');
+        const stSchedName = String(st.scheduleName || '').trim().toLowerCase();
+        const target = String(filterSchedule || '').trim().toLowerCase();
+        const matchId = stSchedId && stSchedId === filterSchedule;
+        const matchName = stSchedName && stSchedName === target;
+        if (!matchId && !matchName) return false;
+      }
       return true;
     });
 
@@ -207,7 +246,8 @@ export default function BillPrint({ path: windowPath }) {
       list = list.filter((st) => {
         const custMatch =
           matchesPrefix(st.name, q) ||
-          matchesPrefix(st.nameTelugu, q);
+          matchesPrefix(st.nameTelugu, q) ||
+          matchesPrefix(st.scheduleName, q);
         const salesMatch = (st.sales || []).some(
           (s) =>
             matchesPrefix(s.material, q) ||
@@ -234,7 +274,14 @@ export default function BillPrint({ path: windowPath }) {
     }
 
     return list;
-  }, [data, filterCustomer, filterVendor, filterItem, searchQuery, sortKey, sortDir]);
+  }, [data, filterCustomer, filterVendor, filterItem, filterSchedule, searchQuery, sortKey, sortDir]);
+
+  // Keep selection synchronized with active filtered statements
+  useEffect(() => {
+    if (data?.statements) {
+      setSelectedCids(new Set(filteredStatements.map((st) => String(st.customerId))));
+    }
+  }, [filteredStatements, data]);
 
   const selectedStatements = useMemo(() => {
     return filteredStatements.filter((st) => selectedCids.has(String(st.customerId)));
@@ -313,7 +360,7 @@ export default function BillPrint({ path: windowPath }) {
           customer: matchedCust || { _id: st.customerId, name: st.name, nameTelugu: st.nameTelugu },
           createdAt: startDate,
           lines: st.sales || [],
-          handlingCharges: st.sales?.reduce((acc, s) => acc + (s.isCoolyLine ? (Number(s.amount) || 0) : 0), 0) || 0,
+          handlingCharges: st.sales?.reduce((acc, s) => acc + (Number(s.cooly) || (s.isCoolyLine ? Number(s.amount) || 0 : 0)), 0) || 0,
           totalAmount: st.totalSale,
         };
 
@@ -445,11 +492,24 @@ export default function BillPrint({ path: windowPath }) {
             ))}
           </select>
 
+          <select
+            className="input-field !h-10 !py-0 w-full sm:w-44 text-sm"
+            value={filterSchedule}
+            onChange={(e) => setFilterSchedule(e.target.value)}
+          >
+            <option value="">All schedules ({availableSchedules.length})</option>
+            {availableSchedules.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+
           <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="w-4 h-4 text-primary-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search customer, vendor, item..."
+              placeholder="Search customer, vendor, item, schedule..."
               className="input-field !h-10 !py-1 pl-9 pr-7 text-sm w-full"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -465,7 +525,7 @@ export default function BillPrint({ path: windowPath }) {
             )}
           </div>
 
-          {(filterCustomer || filterVendor || filterItem || searchQuery.trim()) && (
+          {(filterCustomer || filterVendor || filterItem || filterSchedule || searchQuery.trim()) && (
             <button
               type="button"
               className="text-xs font-medium text-amber-700 hover:text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2"
@@ -473,6 +533,7 @@ export default function BillPrint({ path: windowPath }) {
                 setFilterCustomer('');
                 setFilterVendor('');
                 setFilterItem('');
+                setFilterSchedule('');
                 setSearchQuery('');
               }}
             >
@@ -554,8 +615,10 @@ export default function BillPrint({ path: windowPath }) {
                         </td>
                         <td className="px-2 py-1.5 text-primary-800">
                           <div className="font-semibold text-xs leading-snug truncate max-w-[110px]">{st.name}</div>
-                          {st.nameTelugu ? (
-                            <span className="text-[11px] text-primary-400 truncate block">{st.nameTelugu}</span>
+                          {st.nameTelugu || st.scheduleName ? (
+                            <span className="text-[11px] text-primary-400 truncate block">
+                              {[st.nameTelugu, st.scheduleName ? `(${st.scheduleName})` : ''].filter(Boolean).join(' ')}
+                            </span>
                           ) : null}
                         </td>
                         <td className="px-2 py-1.5 text-right text-primary-700 font-semibold tabular-nums text-xs">
@@ -616,8 +679,10 @@ export default function BillPrint({ path: windowPath }) {
                   >
                     <div className="text-center border-b border-primary-100 pb-2">
                       <p className="font-bold text-primary-900 text-base">{st.name}</p>
-                      {st.nameTelugu ? (
-                        <p className="text-xs text-primary-500 font-medium">{st.nameTelugu}</p>
+                      {st.nameTelugu || st.scheduleName ? (
+                        <p className="text-xs text-primary-500 font-medium">
+                          {[st.nameTelugu, st.scheduleName ? `· ${st.scheduleName}` : ''].filter(Boolean).join(' ')}
+                        </p>
                       ) : null}
                     </div>
 
@@ -641,7 +706,9 @@ export default function BillPrint({ path: windowPath }) {
                           <td className="py-1 px-1"></td>
                           <td className="py-1 px-1 text-right font-semibold">{formatCurrency(st.opening)}</td>
                         </tr>
-                        {(st.sales || []).map((s, idx) => {
+                        {(st.sales || [])
+                          .filter((s) => String(s.material || '').toLowerCase() !== 'cooly' && !s.isCoolyLine)
+                          .map((s, idx) => {
                           const baseAmount = Number(s.amount) || 0;
                           const coolyAmt = Number(s.cooly) || Number(s.handlingCharges) || 0;
                           const lineTotal = baseAmount + coolyAmt;

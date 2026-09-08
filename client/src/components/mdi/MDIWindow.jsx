@@ -147,10 +147,10 @@ export default function MDIWindow({ windowItem, children }) {
       onMouseDown={() => {
         if (!isActive) focusWindow(id);
       }}
-      className={`rounded-xl border flex flex-col bg-surface shadow-2xl overflow-hidden transition-shadow duration-150 ${
+      className={`rounded-xl flex flex-col bg-surface overflow-hidden transition-all duration-150 ${
         isActive
-          ? 'border-primary-400 ring-2 ring-primary-300/40 shadow-card'
-          : 'border-primary-200/90 shadow-md opacity-98'
+          ? 'border-2 border-primary-900 ring-2 ring-primary-700/60 shadow-[0_20px_60px_rgba(0,0,0,0.35)] z-40'
+          : 'border-2 border-primary-600/90 shadow-xl opacity-98 hover:border-primary-700'
       }`}
     >
       <WindowTitleBar

@@ -76,7 +76,7 @@ router.get('/overview', async (_req, res) => {
       Sale.find({ createdAt: { $gte: trendStart } })
         .populate('customer', 'name')
         .populate('vendor', 'name')
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: 1 })
         .lean(),
       Purchase.find({ purchaseDate: { $gte: trendStart } })
         .populate('vendor', 'name')

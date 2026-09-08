@@ -16,10 +16,10 @@ export default function WindowTitleBar({
 
   return (
     <div
-      className={`h-9 px-3 flex items-center justify-between select-none cursor-move rounded-t-xl transition-colors duration-150 ${
+      className={`h-9 px-3 flex items-center justify-between select-none cursor-move rounded-t-[10px] transition-colors duration-150 border-b ${
         isActive
-          ? 'bg-primary-700 text-white shadow-sm'
-          : 'bg-primary-100 text-primary-700 hover:bg-primary-150'
+          ? 'bg-primary-800 text-white border-primary-900 shadow-sm'
+          : 'bg-primary-200 text-primary-900 border-primary-400 hover:bg-primary-300'
       }`}
       onMouseDown={onMouseDown}
       onDoubleClick={onToggleMaximize}

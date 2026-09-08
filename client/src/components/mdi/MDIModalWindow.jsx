@@ -27,7 +27,7 @@ export default function MDIModalWindow({ open, title, iconName, onClose, childre
       }}
     >
       <div
-        className={`card w-full ${maxWidth} max-h-[90vh] flex flex-col space-y-3 shadow-2xl border border-primary-200 bg-surface z-50 my-auto animate-in fade-in zoom-in-95 duration-150 select-text overflow-hidden`}
+        className={`card w-full ${maxWidth} max-h-[90vh] flex flex-col space-y-3 shadow-2xl border-2 border-primary-800 bg-surface z-50 my-auto animate-in fade-in zoom-in-95 duration-150 select-text overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
         {title && (

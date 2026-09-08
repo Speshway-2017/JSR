@@ -279,6 +279,51 @@ export default function Sell({ path: windowPath }) {
     setSortDir('asc');
   };
 
+  const handleGridKeyDown = (e, rowIdx, colIdx) => {
+    const { key } = e;
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) return;
+
+    let targetRow = rowIdx;
+    let targetCol = colIdx;
+
+    if (key === 'ArrowDown') {
+      targetRow = rowIdx + 1;
+    } else if (key === 'ArrowUp') {
+      targetRow = rowIdx - 1;
+    } else if (key === 'ArrowRight') {
+      targetCol = colIdx + 1;
+    } else if (key === 'ArrowLeft') {
+      targetCol = colIdx - 1;
+    }
+
+    const targetEl = document.querySelector(`[data-table-row="${targetRow}"][data-table-col="${targetCol}"]`);
+    if (targetEl) {
+      e.preventDefault();
+      targetEl.focus();
+      if (typeof targetEl.select === 'function') {
+        setTimeout(() => {
+          try { targetEl.select(); } catch (_) {}
+        }, 0);
+      }
+    } else if (key === 'ArrowDown' || key === 'ArrowUp') {
+      const rowCells = document.querySelectorAll(`[data-table-row="${targetRow}"]`);
+      if (rowCells.length > 0) {
+        e.preventDefault();
+        const closestCell = Array.from(rowCells).reduce((prev, curr) => {
+          const prevCol = parseInt(prev.getAttribute('data-table-col') || '0', 10);
+          const currCol = parseInt(curr.getAttribute('data-table-col') || '0', 10);
+          return Math.abs(currCol - colIdx) < Math.abs(prevCol - colIdx) ? curr : prev;
+        });
+        closestCell.focus();
+        if (typeof closestCell.select === 'function') {
+          setTimeout(() => {
+            try { closestCell.select(); } catch (_) {}
+          }, 0);
+        }
+      }
+    }
+  };
+
   const SortLabel = ({ column, children, align = 'left' }) => {
     const active = sortKey === column;
     const Icon = active ? (sortDir === 'desc' ? ArrowDown : ArrowUp) : ArrowUpDown;
@@ -1279,6 +1324,37 @@ export default function Sell({ path: windowPath }) {
                 const busy = savingRowId === r.saleId;
                 const cell =
                   'w-full bg-transparent rounded-lg border border-transparent hover:border-primary-200 focus:border-primary-400 focus:bg-surface outline-none px-1.5 py-1 disabled:opacity-60';
+
+                const handleGridKeyDown = (e, colIdx) => {
+                  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    return;
+                  }
+                  let targetRow = i;
+                  let targetCol = colIdx;
+
+                  if (e.key === 'ArrowUp') {
+                    targetRow = Math.max(0, i - 1);
+                  } else if (e.key === 'ArrowDown') {
+                    targetRow = Math.min(displayedRows.length - 1, i + 1);
+                  } else if (e.key === 'ArrowLeft') {
+                    targetCol = Math.max(0, colIdx - 1);
+                  } else if (e.key === 'ArrowRight') {
+                    targetCol = Math.min(9, colIdx + 1);
+                  }
+
+                  if (targetRow === i && targetCol === colIdx) return;
+
+                  e.preventDefault();
+                  const selector = `[data-table-row="${targetRow}"][data-table-col="${targetCol}"]`;
+                  const el = document.querySelector(selector);
+                  if (el) {
+                    el.focus();
+                    if (typeof el.select === 'function') {
+                      el.select();
+                    }
+                  }
+                };
+
                 return (
                   <tr
                     key={`${r.saleId}-${r.lineIndex}`}
@@ -1291,10 +1367,29 @@ export default function Sell({ path: windowPath }) {
                           : 'bg-primary-50/40'
                     }
                   >
-                    <td className="px-3 py-1.5 text-primary-500">{r.serial}</td>
-                    <td className="px-3 py-1.5 text-primary-700 whitespace-nowrap font-medium">{r.vendor}</td>
+                    <td
+                      tabIndex={0}
+                      data-table-row={i}
+                      data-table-col={0}
+                      onKeyDown={(e) => handleGridKeyDown(e, 0)}
+                      className="px-3 py-1.5 text-primary-500 outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                    >
+                      {r.serial}
+                    </td>
+                    <td
+                      tabIndex={0}
+                      data-table-row={i}
+                      data-table-col={1}
+                      onKeyDown={(e) => handleGridKeyDown(e, 1)}
+                      className="px-3 py-1.5 text-primary-700 whitespace-nowrap font-medium outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                    >
+                      {r.vendor}
+                    </td>
                     <td className="px-2 py-1.5 min-w-[8rem]">
                       <select
+                        data-table-row={i}
+                        data-table-col={2}
+                        onKeyDown={(e) => handleGridKeyDown(e, 2)}
                         className={`${cell} font-medium text-primary-700`}
                         value={r.materialId}
                         disabled={busy}
@@ -1316,6 +1411,9 @@ export default function Sell({ path: windowPath }) {
                     </td>
                     <td className="px-2 py-1.5 min-w-[9rem]">
                       <select
+                        data-table-row={i}
+                        data-table-col={3}
+                        onKeyDown={(e) => handleGridKeyDown(e, 3)}
                         className={`${cell} text-primary-700`}
                         value={r.customerId}
                         disabled={busy}
@@ -1337,6 +1435,8 @@ export default function Sell({ path: windowPath }) {
                     </td>
                     <td className="px-2 py-1.5 w-20">
                       <input
+                        data-table-row={i}
+                        data-table-col={4}
                         type="text"
                         inputMode="numeric"
                         autoComplete="off"
@@ -1350,15 +1450,26 @@ export default function Sell({ path: windowPath }) {
                           persistTableRow(r, { bags }).catch((err) => toast.error(err.message));
                         }}
                         onKeyDown={(e) => {
+                          handleGridKeyDown(e, 4);
                           if (e.key === 'Enter') e.currentTarget.blur();
                         }}
                       />
                     </td>
                     <td className="px-2 py-1.5 w-24">
                       {r.isByBag ? (
-                        <div className="text-right text-primary-400 font-medium py-1">—</div>
+                        <div
+                          tabIndex={0}
+                          data-table-row={i}
+                          data-table-col={5}
+                          onKeyDown={(e) => handleGridKeyDown(e, 5)}
+                          className="text-right text-primary-400 font-medium py-1 outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                        >
+                          —
+                        </div>
                       ) : (
                         <input
+                          data-table-row={i}
+                          data-table-col={5}
                           type="text"
                           inputMode="decimal"
                           autoComplete="off"
@@ -1372,6 +1483,7 @@ export default function Sell({ path: windowPath }) {
                             persistTableRow(r, { qty }).catch((err) => toast.error(err.message));
                           }}
                           onKeyDown={(e) => {
+                            handleGridKeyDown(e, 5);
                             if (e.key === 'Enter') e.currentTarget.blur();
                           }}
                         />
@@ -1380,6 +1492,8 @@ export default function Sell({ path: windowPath }) {
                     <td className="px-2 py-1.5 w-24">
                       <div className="flex flex-col items-end">
                         <input
+                          data-table-row={i}
+                          data-table-col={6}
                           type="text"
                           inputMode="decimal"
                           autoComplete="off"
@@ -1393,6 +1507,7 @@ export default function Sell({ path: windowPath }) {
                             persistTableRow(r, { rate }).catch((err) => toast.error(err.message));
                           }}
                           onKeyDown={(e) => {
+                            handleGridKeyDown(e, 6);
                             if (e.key === 'Enter') e.currentTarget.blur();
                           }}
                         />
@@ -1403,13 +1518,31 @@ export default function Sell({ path: windowPath }) {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums font-medium text-primary-700 whitespace-nowrap">
+                    <td
+                      tabIndex={0}
+                      data-table-row={i}
+                      data-table-col={7}
+                      onKeyDown={(e) => handleGridKeyDown(e, 7)}
+                      className="px-3 py-1.5 text-right tabular-nums font-medium text-primary-700 whitespace-nowrap outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                    >
                       {r.cooly ? formatCurrency(r.cooly) : '—'}
                     </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums font-medium text-primary-800">
+                    <td
+                      tabIndex={0}
+                      data-table-row={i}
+                      data-table-col={8}
+                      onKeyDown={(e) => handleGridKeyDown(e, 8)}
+                      className="px-3 py-1.5 text-right tabular-nums font-medium text-primary-800 outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                    >
                       {formatCurrency(r.amount)}
                     </td>
-                    <td className="px-3 py-1.5 text-xs text-primary-500 whitespace-nowrap text-right tabular-nums leading-tight">
+                    <td
+                      tabIndex={0}
+                      data-table-row={i}
+                      data-table-col={9}
+                      onKeyDown={(e) => handleGridKeyDown(e, 9)}
+                      className="px-3 py-1.5 text-xs text-primary-500 whitespace-nowrap text-right tabular-nums leading-tight outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                    >
                       {(() => {
                         const { dateStr, timeStr } = formatDateTimeSplit(r.createdAt);
                         return (

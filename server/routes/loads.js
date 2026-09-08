@@ -149,7 +149,7 @@ router.get('/', async (req, res) => {
     const loads = await Load.find(filter)
       .populate('vendor', 'name nameTelugu city mobile')
       .populate('materials.material', 'name sellingPricePerKg')
-      .sort({ loadDate: -1, createdAt: -1 });
+      .sort({ loadDate: 1, createdAt: 1 });
 
     let enriched = await enrichLoadsStatus(loads);
     if (status === 'pending') {

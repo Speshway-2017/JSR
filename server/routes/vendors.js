@@ -125,16 +125,16 @@ router.get('/:id', async (req, res) => {
 
     const loads = await Load.find({ vendor: vendor._id })
       .populate('materials.material', 'name sellingPricePerKg')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
 
     const enrichedLoads = await enrichLoadsStatus(loads);
 
     const sales = await Sale.find({ vendor: vendor._id })
       .populate('customer', 'name nameTelugu city')
       .populate('load', 'createdAt totalWeight')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
 
-    const transactions = await Transaction.find({ vendor: vendor._id }).sort({ createdAt: -1 });
+    const transactions = await Transaction.find({ vendor: vendor._id }).sort({ createdAt: 1 });
 
     res.json({ vendor, loads: enrichedLoads, sales, transactions });
   } catch (error) {

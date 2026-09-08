@@ -9,13 +9,23 @@ function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function Outstanding() {
+export default function Outstanding({ path: windowPath }) {
   const today = todayInputValue();
   const [date, setDate] = useState(today);
   const [scheduleId, setScheduleId] = useState('');
   const [schedules, setSchedules] = useState([]);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (windowPath && windowPath.includes('?')) {
+      const sp = new URLSearchParams(windowPath.split('?')[1]);
+      const pDate = sp.get('date');
+      const pSched = sp.get('scheduleId');
+      if (pDate) setDate(pDate);
+      if (pSched) setScheduleId(pSched);
+    }
+  }, [windowPath]);
 
   useEffect(() => {
     api
@@ -39,6 +49,10 @@ export default function Outstanding() {
       setLoading(false);
     }
   }, [date, scheduleId]);
+
+  useEffect(() => {
+    loadReport();
+  }, [loadReport]);
 
   useDataRestored(loadReport);
 

@@ -9,7 +9,7 @@ export function getSocket() {
     const socketUrl = isHttp ? window.location.origin : 'http://127.0.0.1:5000';
 
     socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: Infinity,

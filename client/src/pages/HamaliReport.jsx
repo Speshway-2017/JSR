@@ -4,6 +4,15 @@ import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
 import { useDataRestored } from '../utils/useDataRestored';
+import { openBillPreviewTab, writeToPrintWindow } from '../utils/raituBillShared';
+
+function esc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -137,7 +146,153 @@ export default function HamaliReport({ path: windowPath }) {
   }, [sales]);
 
   const handlePrint = () => {
-    window.print();
+    const previewTab = openBillPreviewTab();
+    const formattedDate = formatDateOnly(date);
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Hamali Report - ${formattedDate}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 16px; background: #ffffff; color: #111827; }
+    .preview-toolbar {
+      position: sticky; top: 0; z-index: 5;
+      display: flex; justify-content: flex-end; gap: 10px;
+      padding: 10px 16px; background: #ffffff; border-bottom: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 16px;
+    }
+    .preview-toolbar button {
+      font: inherit; font-size: 14px; font-weight: 500;
+      padding: 8px 16px; cursor: pointer; border-radius: 6px;
+      border: 1px solid #d1d5db; background: #ffffff; color: #374151;
+    }
+    .preview-toolbar button.primary { background: #166534; border-color: #166534; color: #ffffff; font-weight: 600; }
+    .preview-toolbar button.primary:hover { background: #15803d; }
+    .header { text-align: center; border-bottom: 2px solid #111827; padding-bottom: 12px; margin-bottom: 16px; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 800; color: #064e3b; }
+    .header p { margin: 4px 0 0 0; font-size: 13px; color: #4b5563; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+    .kpi-card { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; background: #f9fafb; }
+    .kpi-card.total { background: #ecfdf5; border-color: #a7f3d0; border-left: 4px solid #10b981; }
+    .kpi-card .label { font-size: 11px; font-weight: 600; color: #4b5563; margin-bottom: 4px; }
+    .kpi-card.total .label { color: #047857; }
+    .kpi-card .val { font-size: 18px; font-weight: 800; color: #111827; }
+    .kpi-card.total .val { font-size: 20px; color: #064e3b; }
+    .kpi-card .sub { font-size: 10px; font-weight: 600; color: #047857; margin-top: 4px; }
+    .section-title { font-size: 14px; font-weight: 700; color: #111827; margin-bottom: 8px; margin-top: 16px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+    th, td { border: 1px solid #d1d5db; padding: 6px 10px; }
+    th { background: #f3f4f6; font-weight: 700; color: #374151; }
+    tr:nth-child(even) { background: #f9fafb; }
+    .total-row { background: #d1fae5 !important; font-weight: 800; }
+    .total-row td { border-top: 2px solid #059669; color: #064e3b; }
+    @media print {
+      @page { size: portrait; margin: 8mm; }
+      body { padding: 0; }
+      .preview-toolbar { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-toolbar">
+    <button type="button" onclick="window.close()">Close</button>
+    <button type="button" class="primary" onclick="window.print()">Print / Save PDF</button>
+  </div>
+
+  <div class="header">
+    <h1>JSR AGRI TRADES - Hamali Report (కూలీ నివేదిక)</h1>
+    <p>Calculated Cooly / Hamali charges for sales on <strong>${formattedDate}</strong></p>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card total">
+      <div class="label">Total Hamali Price</div>
+      <div class="val">${formatCurrency(hamaliCalc.totalHamali)}</div>
+      <div class="sub">Final calculated cooly</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Sales by Weight</div>
+      <div class="val">${hamaliCalc.byWeightBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
+      <div class="sub">8 × ${hamaliCalc.byWeightBags} = ${formatCurrency(hamaliCalc.amtByWeight)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Sales by Bag</div>
+      <div class="val">${hamaliCalc.byBagBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
+      <div class="sub">5 × ${hamaliCalc.byBagBags} = ${formatCurrency(hamaliCalc.amtByBag)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Weight Sales + Cooly</div>
+      <div class="val">${hamaliCalc.byWeightCoolyBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
+      <div class="sub">15 × ${hamaliCalc.byWeightCoolyBags} = ${formatCurrency(hamaliCalc.amtByWeightCooly)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Bag Sales + Cooly</div>
+      <div class="val">${hamaliCalc.byBagCoolyBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
+      <div class="sub">6 × ${hamaliCalc.byBagCoolyBags} = ${formatCurrency(hamaliCalc.amtByBagCooly)}</div>
+    </div>
+  </div>
+
+  <div class="section-title">Formula Calculation Breakdown</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Formula Component Description</th>
+        <th>Sale Type</th>
+        <th>Cooly Applied</th>
+        <th style="text-align: right;">No. of Bags</th>
+        <th style="text-align: right;">Rate / Bag</th>
+        <th style="text-align: right;">Calculated Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="font-weight: 600;">8 × (number of bags sales happened by weight)</td>
+        <td>By Weight</td>
+        <td>All</td>
+        <td style="text-align: right; font-weight: 700;">${hamaliCalc.byWeightBags}</td>
+        <td style="text-align: right;">₹8</td>
+        <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByWeight)}</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 600;">5 × (number of bags sales happened by bags)</td>
+        <td>By Bag</td>
+        <td>All</td>
+        <td style="text-align: right; font-weight: 700;">${hamaliCalc.byBagBags}</td>
+        <td style="text-align: right;">₹5</td>
+        <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByBag)}</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 600;">15 × (number of bags sold to customer by weight with cooly)</td>
+        <td>By Weight</td>
+        <td style="color: #047857; font-weight: 600;">Yes (Cooly Checked)</td>
+        <td style="text-align: right; font-weight: 700;">${hamaliCalc.byWeightCoolyBags}</td>
+        <td style="text-align: right;">₹15</td>
+        <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByWeightCooly)}</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 600;">6 × (number of bags sold to customer by bags with cooly)</td>
+        <td>By Bag</td>
+        <td style="color: #047857; font-weight: 600;">Yes (Cooly Checked)</td>
+        <td style="text-align: right; font-weight: 700;">${hamaliCalc.byBagCoolyBags}</td>
+        <td style="text-align: right;">₹6</td>
+        <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByBagCooly)}</td>
+      </tr>
+      <tr class="total-row">
+        <td style="font-size: 13px;">TOTAL HAMALI / COOLY PRICE</td>
+        <td>—</td>
+        <td>—</td>
+        <td style="text-align: right; font-size: 13px;">${hamaliCalc.totalSaleBags} bags</td>
+        <td style="text-align: right;">—</td>
+        <td style="text-align: right; font-size: 14px;">${formatCurrency(hamaliCalc.totalHamali)}</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>`;
+
+    writeToPrintWindow(html, previewTab);
   };
 
   return (
@@ -333,14 +488,13 @@ export default function HamaliReport({ path: windowPath }) {
                 <th className="py-2.5 px-4 text-center">Sale Type</th>
                 <th className="py-2.5 px-4 text-center">Cooly Status</th>
                 <th className="py-2.5 px-4 text-right">Bags</th>
-                <th className="py-2.5 px-4 text-right">Weight (kg)</th>
                 <th className="py-2.5 px-4 text-right">Hamali Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-primary-100 text-xs font-medium">
               {hamaliCalc.rowDetails.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-primary-400 font-normal">
+                  <td colSpan={8} className="py-8 text-center text-primary-400 font-normal">
                     No sales records found for {formatDateOnly(date)}
                   </td>
                 </tr>
@@ -368,7 +522,6 @@ export default function HamaliReport({ path: windowPath }) {
                       )}
                     </td>
                     <td className="py-2.5 px-4 text-right font-bold text-primary-900">{row.bags}</td>
-                    <td className="py-2.5 px-4 text-right text-primary-600">{row.weight > 0 ? row.weight : '—'}</td>
                     <td className="py-2.5 px-4 text-right font-bold text-emerald-700">
                       {formatCurrency(row.hamaliTotal)}
                     </td>

@@ -32,68 +32,143 @@ function fmtRate(n) {
 
 export function saleReport2InnerHtml(data) {
   const columns = data?.columns || [];
-  const blocks = columns
-    .map((col) => {
-      const title = esc(col.materialName);
-      const te = col.materialNameTelugu ? `<div class="te">${esc(col.materialNameTelugu)}</div>` : '';
-      const entries = col.entries || (col.rateGroups || []).flatMap((g) => g.entries || []);
-      const lines = entries
-        .map((e) => {
-          const bagsText = esc(fmtBags(e.bags));
-          const rateVal = e.rate != null ? e.rate : (e.amount != null ? e.amount : 0);
-          return `<div class="line"><span class="who">${esc(e.name)}</span> - ${bagsText} = rs <span class="price-red">${esc(rateVal)}</span></div>`;
+  if (!columns.length) {
+    return `<div class="sheet"><p class="empty">No sales for this date</p></div>`;
+  }
+
+  const totalBags = data?.totalBags != null
+    ? data.totalBags
+    : columns.reduce((acc, col) => acc + (col.bagCount || 0), 0);
+  const totalKg = data?.totalWeight != null
+    ? data.totalWeight
+    : Number(columns.reduce((acc, col) => acc + (col.totalKg || 0), 0).toFixed(1));
+
+  const grandTotalText = (totalBags > 0 || totalKg > 0)
+    ? `Total: <strong>${totalBags} Bags</strong>${totalKg > 0 ? ` | <strong>${totalKg} kg</strong>` : ''}`
+    : '';
+
+  // 5 columns x ~23 lines per column = ~115 lines max per A4 landscape sheet (172mm height)
+  const LINES_PER_PAGE = 115;
+  const pageChunks = [];
+  let currentChunk = [];
+  let currentLines = 0;
+
+  for (const col of columns) {
+    const entries = col.entries || (col.rateGroups || []).flatMap((g) => g.entries || []);
+    const matLineCount = 4 + entries.length;
+
+    if (currentChunk.length > 0 && currentLines + matLineCount > LINES_PER_PAGE) {
+      pageChunks.push(currentChunk);
+      currentChunk = [];
+      currentLines = 0;
+    }
+
+    currentChunk.push(col);
+    currentLines += matLineCount;
+  }
+
+  if (currentChunk.length > 0) {
+    pageChunks.push(currentChunk);
+  }
+
+  const totalPages = pageChunks.length;
+
+  return pageChunks
+    .map((chunk, pageIdx) => {
+      const blocks = chunk
+        .map((col) => {
+          const title = esc(col.materialName);
+          const te = col.materialNameTelugu ? `<div class="te">${esc(col.materialNameTelugu)}</div>` : '';
+          const entries = col.entries || (col.rateGroups || []).flatMap((g) => g.entries || []);
+          const lines = entries
+            .map((e) => {
+              const bagsText = esc(fmtBags(e.bags));
+              const rateVal = e.rate != null ? e.rate : (e.amount != null ? e.amount : 0);
+              const whoText = e.vendorName
+                ? `${esc(e.name)} <span class="vendor-tag">(${esc(e.vendorName)})</span>`
+                : esc(e.name);
+              return `<div class="line"><span class="who">${whoText}</span> - ${bagsText} = rs <span class="price-red">${esc(rateVal)}</span></div>`;
+            })
+            .join('');
+          const colBags = col.bagCount || entries.reduce((s, e) => s + (e.count || (Array.isArray(e.bags) ? e.bags.length : 1)), 0);
+          const colKg = col.totalKg || Number(entries.reduce((s, e) => s + (e.weight || 0), 0).toFixed(1));
+          const colSummary = `<div class="col-summary">Tot: <strong>${colBags} Bags</strong>${colKg > 0 ? `, <strong>${colKg} kg</strong>` : ''}</div>`;
+          return `<section class="mat"><div class="head">${title}${te}</div><div class="group">${lines}</div>${colSummary}</section>`;
         })
         .join('');
-      return `<section class="mat"><div class="head">${title}${te}</div><div class="group">${lines}</div></section>`;
-    })
-    .join('');
 
-  return `<div class="sheet">
-    <div class="when">${esc(fmtDate(data?.date))}</div>
-    <div class="materials-columns">
-      ${blocks || '<p class="empty">No sales</p>'}
-    </div>
-  </div>`;
+      const pageInfo = totalPages > 1 ? ` (Page ${pageIdx + 1} of ${totalPages})` : '';
+
+      return `<div class="sheet ${pageIdx < totalPages - 1 ? 'page-break' : ''}">
+        <div class="header-row">
+          <div class="when">${esc(fmtDate(data?.date))}${pageInfo}</div>
+          <div class="total-bar">${grandTotalText}</div>
+        </div>
+        <div class="materials-columns">
+          ${blocks}
+        </div>
+      </div>`;
+    })
+    .join('\n');
 }
 
 export const SALE_REPORT_2_CSS = `
 .sheet {
   width: 100%;
-  max-width: 1060px;
-  margin: 0 auto;
-  padding: 12px 16px;
+  max-width: 1100px;
+  margin: 0 auto 24px auto;
+  padding: 14px 18px;
   background: #ffffff;
   color: #000000;
   font-family: '${RAMABHADRA}', 'Noto Sans Telugu', system-ui, -apple-system, sans-serif;
   font-weight: 400;
   box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.sheet.page-break {
+  margin-bottom: 32px;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 4px;
+  border-bottom: 1.5px solid #111111;
 }
 
 .when {
   font-size: 15px;
   font-weight: 700;
-  margin-bottom: 12px;
-  padding-bottom: 4px;
-  border-bottom: 1.5px solid #111111;
+}
+
+.total-bar {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
 }
 
 .materials-columns {
   columns: 5;
-  column-gap: 20px;
+  column-gap: 18px;
   column-rule: 1px solid #111111;
   column-fill: auto;
-  height: 175mm;
+  height: 172mm;
   width: 100%;
 }
 
 .mat {
-  break-inside: avoid;
-  page-break-inside: avoid;
-  padding: 0 4px 10px;
-  margin-bottom: 14px;
   display: block;
   width: 100%;
+  padding: 0 2px 8px;
+  margin-bottom: 12px;
   box-sizing: border-box;
+  break-inside: auto;
+  page-break-inside: auto;
 }
 
 .mat .head {
@@ -101,8 +176,10 @@ export const SALE_REPORT_2_CSS = `
   font-size: 14px;
   font-weight: 700;
   border-bottom: 1px solid #111111;
-  margin-bottom: 8px;
-  padding-bottom: 3px;
+  margin-bottom: 6px;
+  padding-bottom: 2px;
+  break-after: avoid;
+  page-break-after: avoid;
 }
 
 .mat .head .te {
@@ -111,13 +188,13 @@ export const SALE_REPORT_2_CSS = `
 }
 
 .group {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .line {
   font-size: 12px;
   line-height: 1.45;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   overflow-wrap: break-word;
 }
 
@@ -125,9 +202,27 @@ export const SALE_REPORT_2_CSS = `
   font-weight: 700;
 }
 
+.line .vendor-tag {
+  font-weight: 500;
+  color: #374151;
+  font-size: 11px;
+}
+
 .line .price-red {
   color: #dc2626;
   font-weight: 700;
+}
+
+.col-summary {
+  font-size: 11px;
+  border-top: 1px dashed #4b5563;
+  margin-top: 4px;
+  padding-top: 2px;
+  color: #111827;
+  text-align: center;
+  font-weight: 500;
+  break-before: avoid;
+  page-break-before: avoid;
 }
 
 .rate {
@@ -137,6 +232,8 @@ export const SALE_REPORT_2_CSS = `
 .empty {
   font-size: 13px;
   color: #666666;
+  text-align: center;
+  padding: 24px 0;
 }
 
 @media print {
@@ -152,27 +249,48 @@ export const SALE_REPORT_2_CSS = `
   }
   .stage {
     padding: 0 !important;
+    display: block !important;
   }
   .sheet {
     max-width: 100% !important;
     padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .sheet.page-break {
+    page-break-after: always !important;
+    break-after: page !important;
   }
   .materials-columns {
-    height: 175mm;
-    columns: 5;
-    column-gap: 16px;
-    column-rule: 1px solid #111111;
-    column-fill: auto;
+    height: 172mm !important;
+    columns: 5 !important;
+    column-gap: 16px !important;
+    column-rule: 1px solid #111111 !important;
+    column-fill: auto !important;
   }
   .mat {
-    break-inside: avoid;
-    page-break-inside: avoid;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  .mat .head {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+  .col-summary {
+    break-before: avoid !important;
+    page-break-before: avoid !important;
+    color: #000000 !important;
+    border-top-color: #000000 !important;
   }
   .line .price-red {
     color: #dc2626 !important;
     font-weight: 700 !important;
     -webkit-print-color-adjust: exact;
     color-adjust: exact;
+  }
+  .line .vendor-tag {
+    color: #111827 !important;
   }
 }
 `;

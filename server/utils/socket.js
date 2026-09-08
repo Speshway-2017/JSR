@@ -8,6 +8,10 @@ export function initSocket(httpServer) {
       origin: '*',
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     },
+    transports: ['polling', 'websocket'],
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000,
   });
 
   io.on('connection', (socket) => {

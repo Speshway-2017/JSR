@@ -213,6 +213,7 @@ router.get('/report-2', async (req, res) => {
 
     const sales = await Sale.find({ createdAt: { $gte: start, $lte: end } })
       .populate('customer', 'name nameTelugu')
+      .populate('vendor', 'name nameTelugu')
       .populate('lines.material', 'name nameTelugu')
       .sort({ createdAt: 1 })
       .lean();
@@ -222,6 +223,9 @@ router.get('/report-2', async (req, res) => {
     for (const sale of sales) {
       const customerName = sale.customer?.name || '—';
       const customerId = String(sale.customer?._id || sale.customer || '');
+      const vendorName = sale.vendor?.name || '';
+      const vendorNameTelugu = sale.vendor?.nameTelugu || '';
+
       for (const line of sale.lines || []) {
         const matDoc = line.material && typeof line.material === 'object' ? line.material : null;
         const materialId = String(matDoc?._id || line.material || line.materialName || '');
@@ -257,7 +261,11 @@ router.get('/report-2', async (req, res) => {
           saleId: sale._id,
           customerId,
           name: customerName,
+          vendorName,
+          vendorNameTelugu,
           bags: bagStrList,
+          count,
+          weight: Number(lineTotalKg.toFixed(1)),
           rate,
           amount: Math.round(lineAmount),
         });
@@ -282,7 +290,10 @@ router.get('/report-2', async (req, res) => {
       ],
     }));
 
-    res.json({ date: start, columns });
+    const totalBags = columns.reduce((acc, c) => acc + (c.bagCount || 0), 0);
+    const totalWeight = Number(columns.reduce((acc, c) => acc + (c.totalKg || 0), 0).toFixed(1));
+
+    res.json({ date: start, columns, totalBags, totalWeight });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -305,7 +316,7 @@ router.get('/report', async (req, res) => {
 
     const sales = await Sale.find(filter)
       .populate('customer', 'name nameTelugu city state')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
 
     const rows = [];
 

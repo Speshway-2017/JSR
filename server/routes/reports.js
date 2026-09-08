@@ -469,7 +469,11 @@ router.get('/bills', async (req, res) => {
 
     const [sales, txs] = await Promise.all([
       Sale.find({ createdAt: { $gte: start, $lte: end } })
-        .populate('customer', 'name nameTelugu')
+        .populate({
+          path: 'customer',
+          select: 'name nameTelugu schedule',
+          populate: { path: 'schedule', select: 'name' },
+        })
         .populate('vendor', 'name city mobile')
         .sort({ createdAt: 1 })
         .lean(),
@@ -477,7 +481,11 @@ router.get('/bills', async (req, res) => {
         customer: { $ne: null },
         type: { $in: ['customer_credit', 'customer_payment'] },
       })
-        .populate('customer', 'name nameTelugu')
+        .populate({
+          path: 'customer',
+          select: 'name nameTelugu schedule',
+          populate: { path: 'schedule', select: 'name' },
+        })
         .lean(),
     ]);
 
@@ -485,15 +493,28 @@ router.get('/bills', async (req, res) => {
 
     const ensure = (id, customer) => {
       const key = String(id);
+      const custObj = customer && typeof customer === 'object' ? customer : null;
+      const schedObj = custObj?.schedule && typeof custObj.schedule === 'object' ? custObj.schedule : null;
+      const schedId = schedObj?._id ? String(schedObj._id) : (custObj?.schedule ? String(custObj.schedule) : '');
+      const schedName = schedObj?.name || '';
+
       if (!byCustomer.has(key)) {
         byCustomer.set(key, {
           customerId: key,
-          name: customer?.name || '—',
-          nameTelugu: customer?.nameTelugu || '',
+          name: custObj?.name || '—',
+          nameTelugu: custObj?.nameTelugu || '',
+          scheduleId: schedId,
+          scheduleName: schedName,
           opening: 0,
           sales: [],
           payments: [],
         });
+      } else {
+        const bucket = byCustomer.get(key);
+        if (!bucket.scheduleId && schedId) {
+          bucket.scheduleId = schedId;
+          bucket.scheduleName = schedName;
+        }
       }
       return byCustomer.get(key);
     };
@@ -505,9 +526,14 @@ router.get('/bills', async (req, res) => {
       const vId = sale.vendor?._id ? String(sale.vendor._id) : String(sale.vendor || '');
       const vName = sale.vendor?.name || '';
       const lines = sale.lines || [];
+      const coolyTotal = Number(sale.handlingCharges) || 0;
       if (lines.length) {
-        for (const line of lines) {
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const lineCooly = i === 0 ? coolyTotal : 0;
           bucket.sales.push({
+            saleId: String(sale._id),
+            lineId: String(line._id || ''),
             date: sale.createdAt,
             material: line.materialName || 'Item',
             materialId: line.material ? String(line.material) : '',
@@ -515,11 +541,18 @@ router.get('/bills', async (req, res) => {
             vendorName: vName,
             bags: Number(line.bagCount) || (line.bags?.length) || 0,
             weight: Number(line.totalKg) || 0,
+            ratePerKg: line.ratePerKg || 0,
+            saleType: line.saleType || 'by_weight',
             amount: Number(line.totalAmount) || 0,
+            cooly: lineCooly,
+            handlingCharges: coolyTotal,
+            coolyRate: sale.coolyRate || 0,
+            coolyPerBag: sale.coolyPerBag || false,
           });
         }
-      } else if (Number(sale.totalAmount) > 0) {
+      } else if (Number(sale.totalAmount) > 0 || coolyTotal > 0) {
         bucket.sales.push({
+          saleId: String(sale._id),
           date: sale.createdAt,
           material: 'Sale',
           vendorId: vId,
@@ -527,16 +560,10 @@ router.get('/bills', async (req, res) => {
           bags: Number(sale.totalBags) || 0,
           weight: Number(sale.totalWeight) || 0,
           amount: Number(sale.totalAmount) || 0,
-        });
-      }
-      const cooly = Number(sale.handlingCharges) || 0;
-      if (cooly > 0) {
-        bucket.sales.push({
-          date: sale.createdAt,
-          material: 'Cooly',
-          bags: 0,
-          weight: 0,
-          amount: cooly,
+          cooly: coolyTotal,
+          handlingCharges: coolyTotal,
+          coolyRate: sale.coolyRate || 0,
+          coolyPerBag: sale.coolyPerBag || false,
         });
       }
     }
@@ -572,18 +599,21 @@ router.get('/bills', async (req, res) => {
 
     const statements = [...byCustomer.values()]
       .map((b) => {
-        const totalSale = b.sales.reduce((s, r) => s + r.amount, 0);
+        const totalSale = b.sales.reduce((s, r) => s + r.amount + (r.cooly || 0), 0);
         const totalPaid = b.payments.reduce((s, r) => s + r.amount, 0);
         const opening = Number(b.opening.toFixed(2));
         return {
           customerId: b.customerId,
           name: b.name,
           nameTelugu: b.nameTelugu,
+          scheduleId: b.scheduleId || '',
+          scheduleName: b.scheduleName || '',
           opening,
           sales: b.sales.map((r) => ({
             ...r,
             weight: Number(Number(r.weight).toFixed(1)),
             amount: Number(Number(r.amount).toFixed(2)),
+            cooly: Number(Number(r.cooly || 0).toFixed(2)),
           })),
           payments: b.payments.map((r) => ({
             ...r,

@@ -20,7 +20,7 @@ function normalizeEntries(entries = []) {
 router.get('/', async (req, res) => {
   try {
     const reports = await SalesBagReport.find()
-      .sort({ updatedAt: -1 })
+      .sort({ createdAt: 1, updatedAt: 1 })
       .populate('createdBy', 'name email role')
       .lean();
     res.json(reports);
