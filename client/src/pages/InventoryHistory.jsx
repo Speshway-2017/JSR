@@ -3,6 +3,7 @@ import { ClipboardList, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../api';
 import { formatCurrency, formatDate } from '../utils/format';
+import { useDataRestored } from '../utils/useDataRestored';
 
 function formatWeight(kg) {
   return `${Number(kg || 0).toFixed(1)} kg`;
@@ -49,6 +50,8 @@ export default function InventoryHistory() {
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
+
+  useDataRestored(fetchHistory);
 
   const exportExcel = () => {
     if (!data?.rows?.length) return;

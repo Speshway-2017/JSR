@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Phone, MapPin, ChevronRight, X } from 'lucide-react';
+import { Plus, Phone, MapPin, ChevronRight, X, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import MDIModalWindow from '../components/mdi/MDIModalWindow';
 import { formatCurrency } from '../utils/format';
+import { searchAndSortItems } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
 import { useMDI } from '../context/MDIContext';
 
@@ -19,6 +20,7 @@ const emptyForm = {
 export default function Vendors() {
   const { openWindow } = useMDI();
   const [vendors, setVendors] = useState([]);
+  const [query, setQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,6 +35,10 @@ export default function Vendors() {
   }, [fetchVendors]);
 
   useDataRestored(fetchVendors);
+
+  const filteredVendors = useMemo(() => {
+    return searchAndSortItems(vendors, ['name', 'nameTelugu', 'mobile', 'city'], query);
+  }, [vendors, query]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -122,6 +128,18 @@ export default function Vendors() {
         </form>
       </MDIModalWindow>
 
+      {vendors.length > 0 && (
+        <div className="relative max-w-md">
+          <Search className="w-4 h-4 text-primary-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            className="input-field !pl-9 !py-2 text-sm"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search vendor name, phone or city..."
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-20 text-primary-400">Loading vendors...</div>
       ) : vendors.length === 0 ? (
@@ -129,9 +147,13 @@ export default function Vendors() {
           <p className="text-primary-500 text-lg">No vendors yet</p>
           <p className="text-primary-400 mt-2">Click "Add Vendor" to get started</p>
         </div>
+      ) : filteredVendors.length === 0 ? (
+        <div className="card text-center py-12 text-primary-400 text-sm">
+          No vendors match "{query}"
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {vendors.map((vendor) => (
+          {filteredVendors.map((vendor) => (
             <button
               key={vendor._id}
               type="button"

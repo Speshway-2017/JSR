@@ -7,6 +7,7 @@ import { formatCurrency, formatDateOnly } from '../utils/format';
 import { openRangeBillsNUp } from '../utils/rangeBillPrint';
 import { generateSingleCustomerBillHtml } from '../utils/customerSaleBillPdf';
 import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
+import { matchesPrefix } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
 
 function todayInputValue() {
@@ -202,15 +203,15 @@ export default function BillPrint({ path: windowPath }) {
     });
 
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+      const q = searchQuery.trim();
       list = list.filter((st) => {
         const custMatch =
-          (st.name || '').toLowerCase().includes(q) ||
-          (st.nameTelugu || '').toLowerCase().includes(q);
+          matchesPrefix(st.name, q) ||
+          matchesPrefix(st.nameTelugu, q);
         const salesMatch = (st.sales || []).some(
           (s) =>
-            (s.material || '').toLowerCase().includes(q) ||
-            (s.vendorName || '').toLowerCase().includes(q)
+            matchesPrefix(s.material, q) ||
+            matchesPrefix(s.vendorName, q)
         );
         return custMatch || salesMatch;
       });
@@ -493,54 +494,39 @@ export default function BillPrint({ path: windowPath }) {
       {/* Main Workspace (Split View) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
         {/* Left Column: Records Table */}
-        <div className="lg:col-span-5 flex flex-col card !p-0 overflow-hidden min-h-[300px]">
-          <div className="px-4 py-3 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        <div className="lg:col-span-3 flex flex-col card !p-0 overflow-hidden min-h-[300px]">
+          <div className="px-3 py-2.5 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
               <button type="button" onClick={toggleSelectAll} className="text-primary-600">
                 {selectedCids.size === filteredStatements.length && filteredStatements.length > 0 ? (
-                  <CheckSquare className="w-5 h-5" />
+                  <CheckSquare className="w-4 h-4" />
                 ) : (
-                  <Square className="w-5 h-5 text-primary-400" />
+                  <Square className="w-4 h-4 text-primary-400" />
                 )}
               </button>
-              <span className="font-bold text-primary-800 text-sm">
+              <span className="font-bold text-primary-800 text-xs">
                 Selected {selectedStatements.length} / {filteredStatements.length}
               </span>
-            </div>
-            <div className="flex items-center gap-1 text-xs text-primary-500">
-              <span>Layout:</span>
-              {[2, 4, 6].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPerPage(n)}
-                  className={`px-2 py-0.5 rounded font-semibold transition ${
-                    perPage === n ? 'bg-primary-700 text-white' : 'bg-primary-100 text-primary-700 hover:bg-primary-200'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
             </div>
           </div>
 
           <div className="flex-1 overflow-auto">
             {loading ? (
-              <div className="text-center py-16 text-primary-400">Loading bills...</div>
+              <div className="text-center py-16 text-primary-400 text-xs">Loading bills...</div>
             ) : filteredStatements.length === 0 ? (
-              <div className="text-center py-16 text-primary-400 text-sm">No bills match the selected filters</div>
+              <div className="text-center py-16 text-primary-400 text-xs">No bills match filter</div>
             ) : (
-              <table className="w-full text-sm">
+              <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-primary-50 border-b border-primary-100 z-10">
                   <tr className="text-left text-primary-600">
-                    <th className="w-10 px-3 py-2.5"></th>
-                    <th className="px-3 py-2.5 font-semibold">
+                    <th className="w-7 px-2 py-2"></th>
+                    <th className="px-2 py-2 font-semibold">
                       <SortHeader column="name" label="Customer" />
                     </th>
-                    <th className="px-3 py-2.5 font-semibold text-right">
+                    <th className="px-2 py-2 font-semibold text-right">
                       <SortHeader column="totalSale" label="Sale" />
                     </th>
-                    <th className="px-3 py-2.5 font-semibold text-right">
+                    <th className="px-2 py-2 font-semibold text-right">
                       <SortHeader column="closing" label="Closing" />
                     </th>
                   </tr>
@@ -557,25 +543,25 @@ export default function BillPrint({ path: windowPath }) {
                           selected ? 'bg-primary-50/70 font-medium' : 'hover:bg-primary-50/30'
                         }`}
                       >
-                        <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-1.5 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                           <button type="button" onClick={() => toggleSelectOne(cid)}>
                             {selected ? (
-                              <CheckSquare className="w-4 h-4 text-primary-600" />
+                              <CheckSquare className="w-3.5 h-3.5 text-primary-600" />
                             ) : (
-                              <Square className="w-4 h-4 text-primary-300" />
+                              <Square className="w-3.5 h-3.5 text-primary-300" />
                             )}
                           </button>
                         </td>
-                        <td className="px-3 py-2 text-primary-800">
-                          <div>{st.name}</div>
+                        <td className="px-2 py-1.5 text-primary-800">
+                          <div className="font-semibold text-xs leading-snug truncate max-w-[110px]">{st.name}</div>
                           {st.nameTelugu ? (
-                            <span className="text-xs text-primary-400">{st.nameTelugu}</span>
+                            <span className="text-[11px] text-primary-400 truncate block">{st.nameTelugu}</span>
                           ) : null}
                         </td>
-                        <td className="px-3 py-2 text-right text-primary-700 font-semibold tabular-nums">
+                        <td className="px-2 py-1.5 text-right text-primary-700 font-semibold tabular-nums text-xs">
                           {formatCurrency(st.totalSale)}
                         </td>
-                        <td className="px-3 py-2 text-right text-primary-800 font-bold tabular-nums">
+                        <td className="px-2 py-1.5 text-right text-primary-800 font-bold tabular-nums text-xs">
                           {formatCurrency(st.closing)}
                         </td>
                       </tr>
@@ -588,14 +574,30 @@ export default function BillPrint({ path: windowPath }) {
         </div>
 
         {/* Right Column: Live Bill Preview */}
-        <div className="lg:col-span-7 flex flex-col card !p-0 overflow-hidden min-h-[300px]">
-          <div className="px-4 py-3 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between">
+        <div className="lg:col-span-9 flex flex-col card !p-0 overflow-hidden min-h-[300px]">
+          <div className="px-4 py-2.5 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between flex-wrap gap-2">
             <span className="font-bold text-primary-800 text-sm">
               Live Preview ({selectedStatements.length} Bills · {perPage} per page layout)
             </span>
-            <span className="text-xs text-primary-500 font-medium">
-              Page 1 of {Math.max(1, Math.ceil(selectedStatements.length / perPage))}
-            </span>
+
+            {/* Prominent Layout Toggle Buttons */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-primary-600 font-semibold">Layout:</span>
+              {[2, 4, 6].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPerPage(n)}
+                  className={`px-3 py-1 text-xs rounded-md font-bold transition shadow-sm ${
+                    perPage === n
+                      ? 'bg-primary-800 text-white ring-2 ring-primary-400'
+                      : 'bg-white text-primary-700 hover:bg-primary-100 border border-primary-200'
+                  }`}
+                >
+                  {n} Per Page
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex-1 overflow-auto p-4 bg-primary-100/50">
@@ -606,18 +608,14 @@ export default function BillPrint({ path: windowPath }) {
                 <p className="text-xs mt-1 text-primary-400">Select customers on the left to see live preview</p>
               </div>
             ) : (
-              <div
-                className={`grid gap-3 ${
-                  perPage === 2 ? 'grid-cols-1 md:grid-cols-2' : perPage === 4 ? 'grid-cols-2' : 'grid-cols-2'
-                }`}
-              >
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                 {selectedStatements.slice(0, 12).map((st) => (
                   <div
                     key={st.customerId}
-                    className="card !p-3 border border-primary-200 shadow-sm bg-white text-xs space-y-2"
+                    className="card !p-3.5 border border-primary-200 shadow-sm bg-white text-xs space-y-2.5"
                   >
-                    <div className="text-center border-b border-primary-100 pb-1.5">
-                      <p className="font-bold text-primary-900 text-sm">{st.name}</p>
+                    <div className="text-center border-b border-primary-100 pb-2">
+                      <p className="font-bold text-primary-900 text-base">{st.name}</p>
                       {st.nameTelugu ? (
                         <p className="text-xs text-primary-500 font-medium">{st.nameTelugu}</p>
                       ) : null}
@@ -625,47 +623,70 @@ export default function BillPrint({ path: windowPath }) {
 
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="border-b border-primary-100 text-primary-500 font-semibold text-left">
-                          <th className="pb-1">తేదీ</th>
-                          <th className="pb-1">వస్తువు</th>
-                          <th className="pb-1 text-right">బ్యాగ్</th>
-                          <th className="pb-1 text-right">మొత్తం</th>
+                        <tr className="border-b border-primary-200 text-primary-600 font-semibold text-left bg-primary-50/70">
+                          <th className="py-1.5 px-1 font-bold">తేదీ</th>
+                          <th className="py-1.5 px-1 font-bold">వస్తువు</th>
+                          <th className="py-1.5 px-1 text-right font-bold">బ్యాగ్</th>
+                          <th className="py-1.5 px-1 text-right font-bold">బరువు (kg)</th>
+                          <th className="py-1.5 px-1 text-right font-bold">ధర</th>
+                          <th className="py-1.5 px-1 text-right font-bold">మొత్తం</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-primary-50">
+                      <tbody className="divide-y divide-primary-100">
                         <tr>
-                          <td className="py-1"></td>
-                          <td className="py-1 font-medium text-primary-700">Opening</td>
-                          <td className="py-1"></td>
-                          <td className="py-1 text-right font-semibold">{formatCurrency(st.opening)}</td>
+                          <td className="py-1 px-1"></td>
+                          <td className="py-1 px-1 font-medium text-primary-700">Opening</td>
+                          <td className="py-1 px-1"></td>
+                          <td className="py-1 px-1"></td>
+                          <td className="py-1 px-1"></td>
+                          <td className="py-1 px-1 text-right font-semibold">{formatCurrency(st.opening)}</td>
                         </tr>
-                        {(st.sales || []).map((s, idx) => (
-                          <tr key={idx}>
-                            <td className="py-1 text-primary-400">{formatDateOnly(s.date)}</td>
-                            <td className="py-1 font-medium text-primary-800">
-                              <div>{s.material || 'Sale'}</div>
-                              {teluguMap[String(s.material || '').trim().toLowerCase()] &&
-                              teluguMap[String(s.material || '').trim().toLowerCase()] !== String(s.material || '').trim() ? (
-                                <span className="text-[11px] text-primary-400 font-normal block">
-                                  {teluguMap[String(s.material || '').trim().toLowerCase()]}
-                                </span>
-                              ) : null}
-                            </td>
-                            <td className="py-1 text-right">{s.bags || '—'}</td>
-                            <td className="py-1 text-right font-semibold">{formatCurrency(s.amount)}</td>
-                          </tr>
-                        ))}
-                        <tr className="font-bold border-t border-primary-200">
-                          <td className="pt-1 font-bold" colSpan={3}>
+                        {(st.sales || []).map((s, idx) => {
+                          const baseAmount = Number(s.amount) || 0;
+                          const coolyAmt = Number(s.cooly) || Number(s.handlingCharges) || 0;
+                          const lineTotal = baseAmount + coolyAmt;
+
+                          return (
+                            <tr key={idx} className="hover:bg-primary-50/40 transition">
+                              <td className="py-1.5 px-1 text-primary-500">{formatDateOnly(s.date)}</td>
+                              <td className="py-1.5 px-1 font-medium text-primary-800">
+                                <div>{s.material || 'Sale'}</div>
+                                {teluguMap[String(s.material || '').trim().toLowerCase()] &&
+                                teluguMap[String(s.material || '').trim().toLowerCase()] !== String(s.material || '').trim() ? (
+                                  <span className="text-[10px] text-primary-400 font-normal block">
+                                    {teluguMap[String(s.material || '').trim().toLowerCase()]}
+                                  </span>
+                                ) : null}
+                              </td>
+                              <td className="py-1.5 px-1 text-right">{s.bags || '—'}</td>
+                              <td className="py-1.5 px-1 text-right text-primary-600">
+                                {s.weight ? `${s.weight}` : '—'}
+                              </td>
+                              <td className="py-1.5 px-1 text-right text-primary-600">
+                                {s.ratePerKg ? `₹${s.ratePerKg}` : '—'}
+                              </td>
+                              <td className="py-1.5 px-1 text-right font-bold text-primary-800">
+                                {formatCurrency(lineTotal)}
+                                {coolyAmt > 0 ? (
+                                  <span className="text-[10px] text-emerald-700 block font-normal">
+                                    (incl. ₹{coolyAmt} cooly)
+                                  </span>
+                                ) : null}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="font-bold border-t border-primary-200 bg-primary-50/30">
+                          <td className="py-1.5 px-1 font-bold" colSpan={5}>
                             Total
                           </td>
-                          <td className="pt-1 text-right font-bold">{formatCurrency(st.totalSale)}</td>
+                          <td className="py-1.5 px-1 text-right font-bold text-primary-900">{formatCurrency(st.totalSale)}</td>
                         </tr>
-                        <tr className="font-bold text-primary-900 border-t border-primary-200">
-                          <td className="pt-1 font-bold" colSpan={3}>
+                        <tr className="font-bold text-primary-900 border-t border-primary-200 bg-primary-50/60">
+                          <td className="py-1.5 px-1 font-bold text-xs" colSpan={5}>
                             Closing
                           </td>
-                          <td className="pt-1 text-right font-bold text-primary-800">
+                          <td className="py-1.5 px-1 text-right font-bold text-sm text-primary-900">
                             {formatCurrency(st.closing)}
                           </td>
                         </tr>

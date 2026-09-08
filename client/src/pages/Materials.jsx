@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus, Package, X, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import MDIModalWindow from '../components/mdi/MDIModalWindow';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
+import { useDataRestored } from '../utils/useDataRestored';
 
 export default function Materials() {
   const [materials, setMaterials] = useState([]);
@@ -32,17 +33,19 @@ export default function Materials() {
     }
   }, [liveTelugu, teluguLoading, showForm, name, isTeluguCustomized]);
 
-  const fetchMaterials = () => {
+  const fetchMaterials = useCallback(() => {
     api
       .get('/materials')
       .then((res) => setMaterials(res.data))
       .catch(() => toast.error('Failed to load product list'))
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     fetchMaterials();
-  }, []);
+  }, [fetchMaterials]);
+
+  useDataRestored(fetchMaterials);
 
   const openAdd = () => {
     setEditing(null);

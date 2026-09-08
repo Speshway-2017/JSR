@@ -6,7 +6,7 @@ import api from '../api';
 import Toggle from '../components/Toggle';
 import MDIModalWindow from '../components/mdi/MDIModalWindow';
 import { formatCurrency } from '../utils/format';
-import { matchesSearchFields } from '../utils/search';
+import { matchesSearchFields, searchAndSortItems } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
 import { useMDI } from '../context/MDIContext';
 
@@ -127,16 +127,19 @@ export default function Customers() {
   const scheduleName = (c) => c.schedule?.name || '—';
 
   const filtered = useMemo(() => {
-    return customers.filter((c) => {
+    let list = customers.filter((c) => {
       if (scheduleFilter) {
         const sid = String(c.schedule?._id || c.schedule || '');
         if (sid !== scheduleFilter) return false;
       }
       if (coolyFilter === 'on' && !c.handlingCharges) return false;
       if (coolyFilter === 'off' && c.handlingCharges) return false;
-      if (!query.trim()) return true;
-      return matchesSearchFields(c, ['name', 'nameTelugu', 'mobile'], query);
+      return true;
     });
+    if (query.trim()) {
+      list = searchAndSortItems(list, ['name', 'nameTelugu', 'mobile'], query);
+    }
+    return list;
   }, [customers, query, scheduleFilter, coolyFilter]);
 
   useEffect(() => {

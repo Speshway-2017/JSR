@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus, Package, X, Trash2, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
+import { useDataRestored } from '../utils/useDataRestored';
 
 export default function SalesMaterials() {
   const [materials, setMaterials] = useState([]);
@@ -11,17 +12,19 @@ export default function SalesMaterials() {
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const fetchMaterials = () => {
+  const fetchMaterials = useCallback(() => {
     api
       .get('/sales-materials')
       .then((res) => setMaterials(res.data))
       .catch(() => toast.error('Failed to load sales materials'))
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     fetchMaterials();
-  }, []);
+  }, [fetchMaterials]);
+
+  useDataRestored(fetchMaterials);
 
   const openAdd = () => {
     setEditing(null);

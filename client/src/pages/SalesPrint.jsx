@@ -61,6 +61,7 @@ export default function SalesPrint({ path: windowPath }) {
 
   // Inline Editing State
   const [editingCid, setEditingCid] = useState('');
+  const [editingRowKey, setEditingRowKey] = useState('');
   const [editingSale, setEditingSale] = useState(null);
   const [editForm, setEditForm] = useState({
     saleId: '',
@@ -354,7 +355,7 @@ export default function SalesPrint({ path: windowPath }) {
     }
   };
 
-  const openInlineEdit = (st, saleLine) => {
+  const openInlineEdit = (st, saleLine, rowKey) => {
     const targetLine = saleLine || (st.sales || []).find((s) => !s.isCoolyLine) || st.sales?.[0];
     if (!targetLine || !targetLine.saleId) {
       toast.error('Cannot edit this sale record');
@@ -378,6 +379,7 @@ export default function SalesPrint({ path: windowPath }) {
     const resolvedMatId = matchedMat ? String(matchedMat._id) : (materials[0]?._id ? String(materials[0]._id) : '');
 
     setEditingCid(cid);
+    setEditingRowKey(rowKey || `${cid}_${targetLine.saleId}`);
     setEditingSale(targetLine);
     setEditForm({
       saleId: targetLine.saleId,
@@ -388,7 +390,7 @@ export default function SalesPrint({ path: windowPath }) {
       weight: targetLine.weight || 0,
       ratePerKg: targetLine.ratePerKg || (targetLine.weight ? (targetLine.amount / targetLine.weight) : (targetLine.amount / (targetLine.bags || 1))),
       saleType: targetLine.saleType || 'by_weight',
-      handlingCharges: targetLine.handlingCharges || 0,
+      handlingCharges: targetLine.cooly || targetLine.handlingCharges || 0,
       coolyRate: targetLine.coolyRate || 0,
       coolyPerBag: targetLine.coolyPerBag || false,
     });
@@ -432,6 +434,7 @@ export default function SalesPrint({ path: windowPath }) {
       await api.put(`/sales/${editForm.saleId}`, payload);
       toast.success('Sale updated successfully');
       setEditingCid('');
+      setEditingRowKey('');
       setEditingSale(null);
       await fetchSalesBills();
       window.dispatchEvent(new CustomEvent('jsr_data_updated'));
@@ -564,52 +567,37 @@ export default function SalesPrint({ path: windowPath }) {
       {/* Main Workspace (Split View) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
         {/* Left Column: Records Table */}
-        <div className="lg:col-span-5 flex flex-col card !p-0 overflow-hidden min-h-[300px]">
-          <div className="px-4 py-3 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        <div className="lg:col-span-3 flex flex-col card !p-0 overflow-hidden min-h-[300px]">
+          <div className="px-3 py-2.5 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
               <button type="button" onClick={toggleSelectAll} className="text-primary-600">
                 {selectedCids.size === filteredStatements.length && filteredStatements.length > 0 ? (
-                  <CheckSquare className="w-5 h-5" />
+                  <CheckSquare className="w-4 h-4" />
                 ) : (
-                  <Square className="w-5 h-5 text-primary-400" />
+                  <Square className="w-4 h-4 text-primary-400" />
                 )}
               </button>
-              <span className="font-bold text-primary-800 text-sm">
+              <span className="font-bold text-primary-800 text-xs">
                 Selected {selectedStatements.length} / {filteredStatements.length}
               </span>
-            </div>
-            <div className="flex items-center gap-1 text-xs text-primary-500">
-              <span>Layout:</span>
-              {[2, 4, 6].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPerPage(n)}
-                  className={`px-2 py-0.5 rounded font-semibold transition ${
-                    perPage === n ? 'bg-primary-700 text-white' : 'bg-primary-100 text-primary-700 hover:bg-primary-200'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
             </div>
           </div>
 
           <div className="flex-1 overflow-auto">
             {loading ? (
-              <div className="text-center py-16 text-primary-400">Loading sales...</div>
+              <div className="text-center py-16 text-primary-400 text-xs">Loading sales...</div>
             ) : filteredStatements.length === 0 ? (
-              <div className="text-center py-16 text-primary-400 text-sm">No sales match the selected filters</div>
+              <div className="text-center py-16 text-primary-400 text-xs">No sales match filter</div>
             ) : (
-              <table className="w-full text-sm">
+              <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-primary-50 border-b border-primary-100 z-10">
                   <tr className="text-left text-primary-600">
-                    <th className="w-10 px-3 py-2.5"></th>
-                    <th className="px-3 py-2.5 font-semibold">
+                    <th className="w-7 px-2 py-2"></th>
+                    <th className="px-2 py-2 font-semibold">
                       <SortHeader column="name" label="Customer" />
                     </th>
-                    <th className="px-3 py-2.5 font-semibold text-right">
-                      <SortHeader column="totalSale" label="Total Sale" />
+                    <th className="px-2 py-2 font-semibold text-right">
+                      <SortHeader column="totalSale" label="Total" />
                     </th>
                   </tr>
                 </thead>
@@ -625,22 +613,22 @@ export default function SalesPrint({ path: windowPath }) {
                           selected ? 'bg-primary-50/70 font-medium' : 'hover:bg-primary-50/30'
                         }`}
                       >
-                        <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-1.5 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                           <button type="button" onClick={() => toggleSelectOne(cid)}>
                             {selected ? (
-                              <CheckSquare className="w-4 h-4 text-primary-600" />
+                              <CheckSquare className="w-3.5 h-3.5 text-primary-600" />
                             ) : (
-                              <Square className="w-4 h-4 text-primary-300" />
+                              <Square className="w-3.5 h-3.5 text-primary-300" />
                             )}
                           </button>
                         </td>
-                        <td className="px-3 py-2 text-primary-800">
-                          <div>{st.name}</div>
+                        <td className="px-2 py-1.5 text-primary-800">
+                          <div className="font-semibold text-xs leading-snug truncate max-w-[120px]">{st.name}</div>
                           {st.nameTelugu ? (
-                            <span className="text-xs text-primary-400">{st.nameTelugu}</span>
+                            <span className="text-[11px] text-primary-400 truncate block">{st.nameTelugu}</span>
                           ) : null}
                         </td>
-                        <td className="px-3 py-2 text-right text-primary-800 font-bold tabular-nums">
+                        <td className="px-2 py-1.5 text-right text-primary-800 font-bold tabular-nums text-xs">
                           {formatCurrency(st.totalSale)}
                         </td>
                       </tr>
@@ -653,14 +641,30 @@ export default function SalesPrint({ path: windowPath }) {
         </div>
 
         {/* Right Column: Live Bill Preview */}
-        <div className="lg:col-span-7 flex flex-col card !p-0 overflow-hidden min-h-[300px]">
-          <div className="px-4 py-3 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between">
+        <div className="lg:col-span-9 flex flex-col card !p-0 overflow-hidden min-h-[300px]">
+          <div className="px-4 py-2.5 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between flex-wrap gap-2">
             <span className="font-bold text-primary-800 text-sm">
               Live Preview ({selectedStatements.length} Bills · {perPage} per page layout)
             </span>
-            <span className="text-xs text-primary-500 font-medium">
-              Page 1 of {Math.max(1, Math.ceil(selectedStatements.length / perPage))}
-            </span>
+
+            {/* Prominent Layout Toggle Buttons */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-primary-600 font-semibold">Layout:</span>
+              {[2, 4, 6].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPerPage(n)}
+                  className={`px-3 py-1 text-xs rounded-md font-bold transition shadow-sm ${
+                    perPage === n
+                      ? 'bg-primary-800 text-white ring-2 ring-primary-400'
+                      : 'bg-white text-primary-700 hover:bg-primary-100 border border-primary-200'
+                  }`}
+                >
+                  {n} Per Page
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex-1 overflow-auto p-4 bg-primary-100/50">
@@ -671,210 +675,185 @@ export default function SalesPrint({ path: windowPath }) {
                 <p className="text-xs mt-1 text-primary-400">Select customers on the left to see live preview</p>
               </div>
             ) : (
-              <div
-                className={`grid gap-3 ${
-                  perPage === 2 ? 'grid-cols-1 md:grid-cols-2' : perPage === 4 ? 'grid-cols-2' : 'grid-cols-2'
-                }`}
-              >
-                {selectedStatements.slice(0, 12).map((st) => {
-                  const isEditingThisCard = editingCid === String(st.customerId);
-                  if (isEditingThisCard) {
-                    return (
-                      <div
-                        key={st.customerId}
-                        className="card !p-3 border-2 border-primary-500 shadow-md bg-white text-xs space-y-2.5"
-                      >
-                        <div className="flex items-center justify-between border-b border-primary-200 pb-1.5 font-bold text-primary-900">
-                          <span className="flex items-center gap-1.5 text-primary-800 font-bold">
-                            <Edit2 className="w-3.5 h-3.5 text-primary-600" /> Editing: {st.name}
-                          </span>
-                          <button
-                            type="button"
-                            className="text-primary-400 hover:text-primary-700 font-bold text-xs"
-                            onClick={() => { setEditingCid(''); setEditingSale(null); }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[10px] font-bold text-primary-600 block mb-0.5">Customer</label>
-                              <select
-                                className="input-field !h-7 !py-0 text-xs w-full"
-                                value={editForm.customerId}
-                                onChange={(e) => setEditForm({ ...editForm, customerId: e.target.value })}
-                              >
-                                {customers.map((c) => (
-                                  <option key={c._id} value={c._id}>{c.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-bold text-primary-600 block mb-0.5">Vendor</label>
-                              <select
-                                className="input-field !h-7 !py-0 text-xs w-full"
-                                value={editForm.vendorId}
-                                onChange={(e) => setEditForm({ ...editForm, vendorId: e.target.value })}
-                              >
-                                {vendors.map((v) => (
-                                  <option key={v._id} value={v._id}>{v.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[10px] font-bold text-primary-600 block mb-0.5">Product</label>
-                              <select
-                                className="input-field !h-7 !py-0 text-xs w-full"
-                                value={editForm.materialId}
-                                onChange={(e) => {
-                                  const mat = materials.find((m) => m._id === e.target.value);
-                                  const newRate = mat?.sellingPricePerKg || editForm.ratePerKg;
-                                  setEditForm({ ...editForm, materialId: e.target.value, ratePerKg: newRate });
-                                }}
-                              >
-                                {materials.map((m) => (
-                                  <option key={m._id} value={m._id}>{m.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-bold text-primary-600 block mb-0.5">Bags</label>
-                              <input
-                                type="number"
-                                className="input-field !h-7 !py-0 text-xs w-full"
-                                value={editForm.bags}
-                                onChange={(e) => setEditForm({ ...editForm, bags: e.target.value })}
-                                min="1"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-2">
-                            <div>
-                              <label className="text-[10px] font-bold text-primary-600 block mb-0.5">Qty (kg)</label>
-                              <input
-                                type="number"
-                                step="0.1"
-                                className="input-field !h-7 !py-0 text-xs w-full"
-                                value={editForm.weight}
-                                onChange={(e) => setEditForm({ ...editForm, weight: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-bold text-primary-600 block mb-0.5">Rate / kg</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                className="input-field !h-7 !py-0 text-xs w-full"
-                                value={editForm.ratePerKg}
-                                onChange={(e) => setEditForm({ ...editForm, ratePerKg: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-bold text-primary-600 block mb-0.5">Cooly</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                className="input-field !h-7 !py-0 text-xs w-full"
-                                value={editForm.handlingCharges}
-                                onChange={(e) => setEditForm({ ...editForm, handlingCharges: e.target.value })}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-end gap-2 pt-1 border-t border-primary-100">
-                            <button
-                              type="button"
-                              className="px-2 py-1 text-xs rounded font-medium bg-primary-100 text-primary-700 hover:bg-primary-200"
-                              onClick={() => { setEditingCid(''); setEditingSale(null); }}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-primary !py-1 !px-3 text-xs"
-                              onClick={handleSaveEdit}
-                              disabled={savingEdit}
-                            >
-                              {savingEdit ? 'Saving...' : 'Save'}
-                            </button>
-                          </div>
-                        </div>
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                {selectedStatements.slice(0, 12).map((st) => (
+                  <div
+                    key={st.customerId}
+                    className="card !p-3.5 border border-primary-200 shadow-sm bg-white text-xs space-y-2.5 relative"
+                  >
+                    <div className="flex items-center justify-between border-b border-primary-100 pb-2">
+                      <div className="text-center flex-1">
+                        <p className="font-bold text-primary-900 text-base">{st.name}</p>
+                        {st.nameTelugu ? (
+                          <p className="text-xs text-primary-500 font-medium">{st.nameTelugu}</p>
+                        ) : null}
                       </div>
-                    );
-                  }
+                    </div>
 
-                  return (
-                    <div
-                      key={st.customerId}
-                      className="card !p-3 border border-primary-200 shadow-sm bg-white text-xs space-y-2 relative group"
-                    >
-                      <div className="flex items-center justify-between border-b border-primary-100 pb-1.5">
-                        <div className="text-center flex-1">
-                          <p className="font-bold text-primary-900 text-sm">{st.name}</p>
-                          {st.nameTelugu ? (
-                            <p className="text-xs text-primary-500 font-medium">{st.nameTelugu}</p>
-                          ) : null}
-                        </div>
-                        <button
-                          type="button"
-                          title="Edit sale entry inline"
-                          className="text-primary-400 hover:text-primary-700 p-1 rounded hover:bg-primary-50 transition"
-                          onClick={() => openInlineEdit(st)}
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-primary-200 text-primary-600 font-semibold text-left bg-primary-50/70">
+                          <th className="py-1.5 px-1 font-bold">తేదీ</th>
+                          <th className="py-1.5 px-1 font-bold">వస్తువు</th>
+                          <th className="py-1.5 px-1 text-right font-bold">బ్యాగ్</th>
+                          <th className="py-1.5 px-1 text-right font-bold">బరువు (kg)</th>
+                          <th className="py-1.5 px-1 text-right font-bold">ధర</th>
+                          <th className="py-1.5 px-1 text-right font-bold">మొత్తం</th>
+                          <th className="py-1.5 px-1 text-center font-bold w-6"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-primary-100">
+                        {(st.sales || []).map((s, idx) => {
+                          const rowKey = `${st.customerId}_${s.saleId || idx}_${idx}`;
+                          const isEditingRow = editingRowKey === rowKey;
 
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-primary-100 text-primary-500 font-semibold text-left">
-                            <th className="pb-1">తేదీ</th>
-                            <th className="pb-1">వస్తువు</th>
-                            <th className="pb-1 text-right">బ్యాగ్</th>
-                            <th className="pb-1 text-right">మొత్తం</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-primary-50">
-                          {(st.sales || []).map((s, idx) => (
+                          if (isEditingRow) {
+                            return (
+                              <tr key={idx} className="bg-amber-50/90 border-2 border-amber-400">
+                                <td className="py-1.5 px-1 text-[11px] font-medium text-primary-600">
+                                  {formatDateOnly(s.date)}
+                                </td>
+                                <td className="py-1.5 px-1">
+                                  <select
+                                    className="input-field !h-7 !py-0 !px-1 text-xs w-full font-medium"
+                                    value={editForm.materialId}
+                                    onChange={(e) => {
+                                      const mat = materials.find((m) => m._id === e.target.value);
+                                      const newRate = mat?.sellingPricePerKg || editForm.ratePerKg;
+                                      setEditForm({ ...editForm, materialId: e.target.value, ratePerKg: newRate });
+                                    }}
+                                  >
+                                    {materials.map((m) => (
+                                      <option key={m._id} value={m._id}>{m.name}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td className="py-1.5 px-1">
+                                  <input
+                                    type="number"
+                                    className="input-field !h-7 !py-0 !px-1 text-xs w-12 text-right font-medium"
+                                    value={editForm.bags}
+                                    onChange={(e) => setEditForm({ ...editForm, bags: e.target.value })}
+                                    onFocus={(e) => e.target.select()}
+                                    min="1"
+                                  />
+                                </td>
+                                <td className="py-1.5 px-1">
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    className="input-field !h-7 !py-0 !px-1 text-xs w-14 text-right font-medium"
+                                    value={editForm.weight}
+                                    onChange={(e) => setEditForm({ ...editForm, weight: e.target.value })}
+                                    onFocus={(e) => e.target.select()}
+                                  />
+                                </td>
+                                <td className="py-1.5 px-1">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="input-field !h-7 !py-0 !px-1 text-xs w-14 text-right font-medium"
+                                    value={editForm.ratePerKg}
+                                    onChange={(e) => setEditForm({ ...editForm, ratePerKg: e.target.value })}
+                                    onFocus={(e) => e.target.select()}
+                                  />
+                                </td>
+                                <td className="py-1.5 px-1">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="input-field !h-7 !py-0 !px-1 text-xs w-16 text-right font-medium"
+                                    value={editForm.handlingCharges}
+                                    onChange={(e) => setEditForm({ ...editForm, handlingCharges: e.target.value })}
+                                    onFocus={(e) => e.target.select()}
+                                    placeholder="Cooly"
+                                  />
+                                </td>
+                                <td className="py-1.5 px-1 text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      title="Save inline edit"
+                                      onClick={handleSaveEdit}
+                                      disabled={savingEdit}
+                                      className="p-1 rounded bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold"
+                                    >
+                                      ✓
+                                    </button>
+                                    <button
+                                      type="button"
+                                      title="Cancel edit"
+                                      onClick={() => { setEditingCid(''); setEditingRowKey(''); }}
+                                      className="p-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-xs font-bold"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          const baseAmount = Number(s.amount) || 0;
+                          const coolyAmt = Number(s.cooly) || Number(s.handlingCharges) || 0;
+                          const lineTotal = baseAmount + coolyAmt;
+
+                          return (
                             <tr
                               key={idx}
-                              onClick={() => openInlineEdit(st, s)}
-                              className="cursor-pointer hover:bg-primary-50/60 transition"
-                              title="Click to edit sale item inline"
+                              onClick={() => openInlineEdit(st, s, rowKey)}
+                              className="cursor-pointer hover:bg-amber-50/50 transition group"
+                              title="Click anywhere on row to edit inline"
                             >
-                              <td className="py-1 text-primary-400">{formatDateOnly(s.date)}</td>
-                              <td className="py-1 font-medium text-primary-800">
+                              <td className="py-1.5 px-1 text-primary-500">{formatDateOnly(s.date)}</td>
+                              <td className="py-1.5 px-1 font-medium text-primary-800">
                                 <div>{s.material || 'Sale'}</div>
                                 {teluguMap[String(s.material || '').trim().toLowerCase()] &&
                                 teluguMap[String(s.material || '').trim().toLowerCase()] !== String(s.material || '').trim() ? (
-                                  <span className="text-[11px] text-primary-400 font-normal block">
+                                  <span className="text-[10px] text-primary-400 font-normal block">
                                     {teluguMap[String(s.material || '').trim().toLowerCase()]}
                                   </span>
                                 ) : null}
                               </td>
-                              <td className="py-1 text-right">{s.bags || '—'}</td>
-                              <td className="py-1 text-right font-semibold">{formatCurrency(s.amount)}</td>
+                              <td className="py-1.5 px-1 text-right">{s.bags || '—'}</td>
+                              <td className="py-1.5 px-1 text-right text-primary-600">
+                                {s.weight ? `${s.weight}` : '—'}
+                              </td>
+                              <td className="py-1.5 px-1 text-right text-primary-600">
+                                {s.ratePerKg ? `₹${s.ratePerKg}` : '—'}
+                              </td>
+                              <td className="py-1.5 px-1 text-right font-bold text-primary-800">
+                                {formatCurrency(lineTotal)}
+                                {coolyAmt > 0 ? (
+                                  <span className="text-[10px] text-emerald-700 block font-normal">
+                                    (incl. ₹{coolyAmt} cooly)
+                                  </span>
+                                ) : null}
+                              </td>
+                              <td className="py-1.5 px-1 text-center">
+                                <button
+                                  type="button"
+                                  className="opacity-0 group-hover:opacity-100 text-primary-400 hover:text-primary-800 transition"
+                                  title="Edit inline"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
                             </tr>
-                          ))}
-                          <tr className="font-bold text-primary-900 border-t border-primary-200">
-                            <td className="pt-1 font-bold" colSpan={3}>
-                              Total
-                            </td>
-                            <td className="pt-1 text-right font-bold text-primary-800">
-                              {formatCurrency(st.totalSale)}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                })}
+                          );
+                        })}
+                        <tr className="font-bold text-primary-900 border-t border-primary-200 bg-primary-50/50">
+                          <td className="py-2 px-1 font-bold text-xs" colSpan={5}>
+                            Total
+                          </td>
+                          <td className="py-2 px-1 text-right font-bold text-sm text-primary-900" colSpan={2}>
+                            {formatCurrency(st.totalSale)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
               </div>
             )}
           </div>

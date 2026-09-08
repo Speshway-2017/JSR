@@ -141,6 +141,17 @@ const router = express.Router();
 router.use(auth);
 router.use(requireRole('admin'));
 
+async function getNextSerialNo(start, end) {
+  const maxSale = await Sale.findOne({ createdAt: { $gte: start, $lte: end }, serialNo: { $ne: null } })
+    .sort({ serialNo: -1 })
+    .lean();
+  if (maxSale && typeof maxSale.serialNo === 'number' && maxSale.serialNo > 0) {
+    return maxSale.serialNo + 1;
+  }
+  const count = await Sale.countDocuments({ createdAt: { $gte: start, $lte: end } });
+  return count + 1;
+}
+
 router.get('/', async (req, res) => {
   try {
     const { customerId, vendorId, loadId, date } = req.query;
@@ -158,7 +169,19 @@ router.get('/', async (req, res) => {
       .populate('customer', 'name nameTelugu city state creditBalance')
       .populate('vendor', 'name nameTelugu city')
       .populate('load', 'createdAt loadDate totalWeight')
-      .sort({ createdAt: 1 });
+      .sort({ serialNo: 1, createdAt: 1 });
+
+    let maxSeq = 0;
+    for (const s of sales) {
+      if (typeof s.serialNo === 'number' && s.serialNo > 0) {
+        maxSeq = Math.max(maxSeq, s.serialNo);
+      } else {
+        maxSeq += 1;
+        s.serialNo = maxSeq;
+        Sale.updateOne({ _id: s._id }, { $set: { serialNo: maxSeq } }).catch(() => {});
+      }
+    }
+
     res.json(sales);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -400,6 +423,9 @@ router.post('/', async (req, res) => {
       when.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
     }
 
+    const { start: dayStart, end: dayEnd } = dayRange(saleDate);
+    const nextSerialNo = await getNextSerialNo(dayStart, dayEnd);
+
     const sale = await Sale.create({
       customer: customerId,
       vendor: vendor._id,
@@ -411,6 +437,7 @@ router.post('/', async (req, res) => {
       totalAmount: saleTotal,
       totalBags,
       totalWeight,
+      serialNo: nextSerialNo,
       createdAt: Number.isNaN(when.getTime()) ? undefined : when,
     });
 

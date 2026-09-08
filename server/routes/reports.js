@@ -379,7 +379,10 @@ router.get('/sales-bills', async (req, res) => {
       const lines = sale.lines || [];
 
       if (lines.length) {
-        for (const line of lines) {
+        const coolyTotal = Number(sale.handlingCharges) || 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const lineCooly = i === 0 ? coolyTotal : 0;
           bucket.sales.push({
             saleId: String(sale._id),
             lineId: String(line._id || ''),
@@ -393,12 +396,14 @@ router.get('/sales-bills', async (req, res) => {
             ratePerKg: line.ratePerKg || 0,
             saleType: line.saleType || 'by_weight',
             amount: Number(line.totalAmount) || 0,
-            handlingCharges: sale.handlingCharges || 0,
+            cooly: lineCooly,
+            handlingCharges: coolyTotal,
             coolyRate: sale.coolyRate || 0,
             coolyPerBag: sale.coolyPerBag || false,
           });
         }
-      } else if (Number(sale.totalAmount) > 0) {
+      } else if (Number(sale.totalAmount) > 0 || Number(sale.handlingCharges) > 0) {
+        const coolyTotal = Number(sale.handlingCharges) || 0;
         bucket.sales.push({
           saleId: String(sale._id),
           date: sale.createdAt,
@@ -408,25 +413,8 @@ router.get('/sales-bills', async (req, res) => {
           bags: Number(sale.totalBags) || 0,
           weight: Number(sale.totalWeight) || 0,
           amount: Number(sale.totalAmount) || 0,
-          handlingCharges: sale.handlingCharges || 0,
-          coolyRate: sale.coolyRate || 0,
-          coolyPerBag: sale.coolyPerBag || false,
-        });
-      }
-
-      const cooly = Number(sale.handlingCharges) || 0;
-      if (cooly > 0) {
-        bucket.sales.push({
-          saleId: String(sale._id),
-          date: sale.createdAt,
-          material: 'Cooly',
-          vendorId: vId,
-          vendorName: vName,
-          bags: 0,
-          weight: 0,
-          amount: cooly,
-          isCoolyLine: true,
-          handlingCharges: cooly,
+          cooly: coolyTotal,
+          handlingCharges: coolyTotal,
           coolyRate: sale.coolyRate || 0,
           coolyPerBag: sale.coolyPerBag || false,
         });
@@ -435,7 +423,7 @@ router.get('/sales-bills', async (req, res) => {
 
     const statements = [...byCustomer.values()]
       .map((b) => {
-        const totalSale = b.sales.reduce((s, r) => s + r.amount, 0);
+        const totalSale = b.sales.reduce((s, r) => s + r.amount + (r.cooly || 0), 0);
         return {
           customerId: b.customerId,
           name: b.name,

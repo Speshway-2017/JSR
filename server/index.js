@@ -4,6 +4,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import dns from 'dns';
+import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 
 try {
@@ -13,6 +14,7 @@ try {
 }
 import connectDB, { isDbReady } from './config/db.js';
 import { ensureDefaultUsers } from './utils/ensureAdmin.js';
+import { initSocket, notifyDataChange } from './utils/socket.js';
 import authRoutes from './routes/auth.js';
 import vendorRoutes from './routes/vendors.js';
 import materialRoutes from './routes/materials.js';
@@ -48,6 +50,20 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Automatic real-time socket notification on successful data mutations
+app.use((req, res, next) => {
+  const originalJson = res.json;
+  res.json = function (body) {
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method) && res.statusCode >= 200 && res.statusCode < 300) {
+      const parts = (req.baseUrl || req.path).split('/').filter(Boolean);
+      const entity = parts[1] || parts[0] || 'general';
+      notifyDataChange(entity, req.method.toLowerCase(), body);
+    }
+    return originalJson.call(this, body);
+  };
+  next();
+});
 
 app.get('/api/health', (_, res) => {
   const dbOk = isDbReady();
@@ -125,8 +141,10 @@ const start = async () => {
   await connectDB();
   await ensureDefaultUsers();
   refreshLicense().catch((err) => console.error('License check:', err.message));
-  const server = app.listen(PORT, '127.0.0.1', () => console.log(`Server running on port ${PORT}`));
-  server.on('error', (err) => {
+  const httpServer = createServer(app);
+  initSocket(httpServer);
+  httpServer.listen(PORT, '0.0.0.0', () => console.log(`Server running with Socket.io on port ${PORT}`));
+  httpServer.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`Port ${PORT} is already in use. Stop the other process or reuse it with: npm run electron:open`);
       process.exit(1);
@@ -139,3 +157,4 @@ start().catch((err) => {
   console.error('Failed to start server:', err);
   process.exit(1);
 });
+

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus, CalendarDays, X, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import MDIModalWindow from '../components/mdi/MDIModalWindow';
+import { useDataRestored } from '../utils/useDataRestored';
 
 export default function Schedules() {
   const [schedules, setSchedules] = useState([]);
@@ -12,17 +13,19 @@ export default function Schedules() {
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const fetchSchedules = () => {
+  const fetchSchedules = useCallback(() => {
     api
       .get('/schedules')
       .then((res) => setSchedules(res.data))
       .catch(() => toast.error('Failed to load schedule list'))
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     fetchSchedules();
-  }, []);
+  }, [fetchSchedules]);
+
+  useDataRestored(fetchSchedules);
 
   const openAdd = () => {
     setEditing(null);

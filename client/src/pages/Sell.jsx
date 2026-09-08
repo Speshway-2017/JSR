@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDate, formatDateTimeSplit } from '../utils/format';
 import { openBillPreviewTab, openRangeBillsNUp } from '../utils/rangeBillPrint';
-import { matchesSearchFields } from '../utils/search';
+import { matchesSearchFields, searchAndSortItems } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
 import { useMDI } from '../context/MDIContext';
 
@@ -109,9 +109,7 @@ export default function Sell({ path: windowPath }) {
 
   const suggestions = useMemo(() => {
     if (!nameQuery.trim()) return [];
-    return customers
-      .filter((c) => matchesSearchFields(c, ['name', 'nameTelugu', 'mobile'], nameQuery))
-      .slice(0, 8);
+    return searchAndSortItems(customers, ['name', 'nameTelugu', 'mobile'], nameQuery).slice(0, 8);
   }, [customers, nameQuery]);
 
   const flatRows = useMemo(() => {
@@ -124,7 +122,7 @@ export default function Sell({ path: windowPath }) {
         rows.push({
           saleId: sale._id,
           lineIndex: sale.lines.indexOf(line),
-          serial: rows.length + 1,
+          serial: sale.serialNo != null ? sale.serialNo : rows.length + 1,
           item: line.materialName,
           materialId: line.material?._id || line.material || '',
           name: sale.customer?.name || '—',
@@ -215,6 +213,10 @@ export default function Sell({ path: windowPath }) {
     if (sortKey) {
       const dir = sortDir === 'desc' ? -1 : 1;
       rows.sort((a, b) => {
+        if (sortKey === 'serial') {
+          const diff = (Number(a.serial) || 0) - (Number(b.serial) || 0);
+          return diff * dir;
+        }
         if (sortKey === 'vendor') {
           const vComp = String(a.vendor || '').localeCompare(String(b.vendor || ''), 'en', { numeric: true });
           if (vComp !== 0) return vComp * dir;
@@ -859,12 +861,12 @@ export default function Sell({ path: windowPath }) {
       <div className="flex flex-col lg:flex-row gap-3 flex-1 min-h-0 overflow-hidden">
       <form
         onSubmit={handleSave}
-        className="card border-2 border-primary-200 w-full lg:w-[26rem] xl:w-[28rem] shrink-0 min-h-0 max-h-[48vh] lg:max-h-full h-full flex flex-col overflow-hidden"
+        className="card border-2 border-primary-200 w-full lg:w-[26rem] xl:w-[28rem] shrink-0 min-h-0 max-h-[48vh] lg:max-h-full h-full flex flex-col overflow-hidden !p-4"
       >
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-0.5">
-        <div className="flex items-center gap-4 bg-primary-50/70 px-3 py-2 rounded-xl border border-primary-100 mb-1">
-          <span className="text-xs font-semibold text-primary-600">Sale Type:</span>
-          <label className="inline-flex items-center gap-1.5 text-xs text-primary-700 font-medium cursor-pointer">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-0.5">
+        <div className="flex items-center gap-3 bg-primary-50/70 px-2.5 py-1.5 rounded-xl border border-primary-100 mb-0.5">
+          <span className="text-[11px] font-semibold text-primary-600 shrink-0">Sale Type:</span>
+          <label className="inline-flex items-center gap-1 text-[11px] text-primary-700 font-medium cursor-pointer">
             <input
               type="radio"
               name="saleType"
@@ -874,7 +876,7 @@ export default function Sell({ path: windowPath }) {
             />
             By Weight (kg)
           </label>
-          <label className="inline-flex items-center gap-1.5 text-xs text-primary-700 font-medium cursor-pointer">
+          <label className="inline-flex items-center gap-1 text-[11px] text-primary-700 font-medium cursor-pointer">
             <input
               type="radio"
               name="saleType"
@@ -886,25 +888,25 @@ export default function Sell({ path: windowPath }) {
           </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2.5">
           <div>
-            <label className="label">Serial</label>
-            <input className="input-field bg-primary-50 font-semibold" value={nextSerial} readOnly />
+            <label className="block text-xs font-semibold text-primary-600 mb-1">Serial</label>
+            <input className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm text-primary-700 font-semibold focus:outline-none" value={nextSerial} readOnly />
           </div>
           <div>
-            <label className="label">Date *</label>
+            <label className="block text-xs font-semibold text-primary-600 mb-1">Date *</label>
             <input
               type="date"
-              className="input-field"
+              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
             />
           </div>
           <div>
-            <label className="label">Product *</label>
+            <label className="block text-xs font-semibold text-primary-600 mb-1">Product *</label>
             <select
-              className="input-field"
+              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
               value={materialId}
               onChange={(e) => setMaterialId(e.target.value)}
               required
@@ -919,9 +921,9 @@ export default function Sell({ path: windowPath }) {
             </select>
           </div>
           <div>
-            <label className="label">Vendor *</label>
+            <label className="block text-xs font-semibold text-primary-600 mb-1">Vendor *</label>
             <select
-              className="input-field"
+              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
               value={vendorId}
               onChange={(e) => setVendorId(e.target.value)}
               required
@@ -939,12 +941,12 @@ export default function Sell({ path: windowPath }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 border-t border-primary-100 pt-4">
+        <div className="grid grid-cols-1 gap-2.5 border-t border-primary-100 pt-2.5">
           <div className="relative">
-            <label className="label">Name *</label>
+            <label className="block text-xs font-semibold text-primary-600 mb-1">Name *</label>
             <input
               ref={nameRef}
-              className="input-field"
+              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
               value={nameQuery}
               onChange={(e) => {
                 const val = e.target.value;
@@ -973,14 +975,14 @@ export default function Sell({ path: windowPath }) {
             {suggestOpen && suggestions.length > 0 && (
               <ul
                 ref={custSuggestListRef}
-                className="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+                className="absolute z-20 mt-1 w-full max-h-40 overflow-auto rounded-xl border border-primary-200 bg-surface shadow-card"
               >
                 {suggestions.map((c, i) => (
                   <li key={c._id}>
                     <button
                       type="button"
                       data-idx={i}
-                      className={`w-full text-left px-3 py-2 text-sm ${
+                      className={`w-full text-left px-3 py-1.5 text-xs ${
                         i === highlight ? 'bg-primary-100 text-primary-800' : 'hover:bg-primary-50'
                       }`}
                       onMouseDown={(ev) => {
@@ -990,7 +992,7 @@ export default function Sell({ path: windowPath }) {
                     >
                       {c.name}
                       {c.nameTelugu ? (
-                        <span className="block text-xs text-primary-400">{c.nameTelugu}</span>
+                        <span className="block text-[11px] text-primary-400">{c.nameTelugu}</span>
                       ) : null}
                     </button>
                   </li>
@@ -999,14 +1001,14 @@ export default function Sell({ path: windowPath }) {
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2.5">
             <div>
-              <label className="label">{isByBag ? 'Bags *' : 'Bags'}</label>
+              <label className="block text-xs font-semibold text-primary-600 mb-1">{isByBag ? 'Bags *' : 'Bags'}</label>
               {isByBag ? (
                 <input
                   type="text"
                   inputMode="numeric"
-                  className="input-field"
+                  className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
                   placeholder="Bags"
                   value={directBagCount}
                   onChange={(e) => setDirectBagCount(e.target.value.replace(/[^\d]/g, ''))}
@@ -1018,25 +1020,25 @@ export default function Sell({ path: windowPath }) {
                   }}
                 />
               ) : (
-                <input className="input-field bg-primary-50" value={bagCount || ''} readOnly />
+                <input className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm text-primary-700 focus:outline-none" value={bagCount || ''} readOnly />
               )}
             </div>
             <div>
-              <label className="label">Qty (kg)</label>
+              <label className="block text-xs font-semibold text-primary-600 mb-1">Qty (kg)</label>
               <input
-                className="input-field bg-primary-50"
+                className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm text-primary-700 focus:outline-none"
                 value={isByBag ? '—' : qty ? qty.toFixed(1) : ''}
                 readOnly
               />
             </div>
             <div>
-              <label className="label">{isByBag ? 'Rate/bag *' : 'Rate/kg *'}</label>
+              <label className="block text-xs font-semibold text-primary-600 mb-1">{isByBag ? 'Rate/bag *' : 'Rate/kg *'}</label>
               <input
                 ref={rateRef}
                 type="text"
                 inputMode="decimal"
                 autoComplete="off"
-                className="input-field"
+                className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
                 value={rate}
                 onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ''))}
                 onKeyDown={(e) => {
@@ -1052,11 +1054,11 @@ export default function Sell({ path: windowPath }) {
 
         {!isByBag && (
           <div>
-            <label className="label">Bag weights (kg) *</label>
-            <p className="text-xs text-primary-400 mb-2">
+            <label className="block text-xs font-semibold text-primary-600 mb-1">Bag weights (kg) *</label>
+            <p className="text-[11px] text-primary-400 mb-1.5">
               Type weight and press Enter for the next bag — empty Enter moves to Rate
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {bagWeights.map((bag, idx) => (
                 <input
                   key={idx}
@@ -1066,7 +1068,7 @@ export default function Sell({ path: windowPath }) {
                   type="text"
                   inputMode="decimal"
                   autoComplete="off"
-                  className="input-field !w-24 !py-2"
+                  className="w-20 rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                   placeholder={`Bag ${idx + 1}`}
                   value={bag}
                   onChange={(e) => updateBag(idx, e.target.value.replace(/[^\d.]/g, ''))}
@@ -1077,10 +1079,10 @@ export default function Sell({ path: windowPath }) {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2.5">
           <div>
-            <label className="label flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="inline-flex items-center gap-1.5">
+            <label className="block text-xs font-semibold text-primary-600 mb-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+              <span className="inline-flex items-center gap-1">
                 Cooly
                 <input
                   type="checkbox"
@@ -1096,7 +1098,7 @@ export default function Sell({ path: windowPath }) {
                   }}
                 />
               </span>
-              <span className="inline-flex items-center gap-1.5 font-normal text-primary-500">
+              <span className="inline-flex items-center gap-1 font-normal text-primary-500">
                 Per bag
                 <input
                   type="checkbox"
@@ -1111,7 +1113,7 @@ export default function Sell({ path: windowPath }) {
               type="text"
               inputMode="decimal"
               autoComplete="off"
-              className="input-field"
+              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
               value={cooly}
               disabled={!coolyOn}
               onChange={(e) => setCooly(e.target.value.replace(/[^\d.]/g, ''))}
@@ -1122,28 +1124,28 @@ export default function Sell({ path: windowPath }) {
                 }
               }}
             />
-            <p className="text-[11px] text-primary-400 mt-1">
+            <p className="text-[10px] text-primary-400 mt-0.5">
               {!coolyOn
                 ? customerCoolyDefault
-                  ? 'Customer default is cooly on — uncheck to skip this sale'
-                  : 'Customer default is no cooly — tick to add on this sale'
+                  ? 'Customer default is cooly on — uncheck to skip'
+                  : 'Customer default is no cooly — tick to add'
                 : coolyPerBag
                   ? `Per bag · ${formatCurrency(Number(cooly) || 0)} × ${bagCount} = ${formatCurrency(coolyApplied)}`
                   : `Overall · ${formatCurrency(coolyApplied)}`}
             </p>
           </div>
           <div>
-            <label className="label">Amount</label>
+            <label className="block text-xs font-semibold text-primary-600 mb-1">Amount</label>
             <input
-              className="input-field bg-accent-100 font-semibold text-accent-700"
+              className="w-full rounded-xl border border-primary-200 bg-accent-100 px-3 py-1.5 text-sm font-semibold text-accent-700 focus:outline-none"
               value={amount ? formatCurrency(amount) : ''}
               readOnly
             />
           </div>
           <div className="col-span-2">
-            <label className="label">Detail</label>
+            <label className="block text-xs font-semibold text-primary-600 mb-1">Detail</label>
             <input
-              className="input-field"
+              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
               value={detail}
               onChange={(e) => setDetail(e.target.value)}
               placeholder="Optional note"
@@ -1152,11 +1154,11 @@ export default function Sell({ path: windowPath }) {
         </div>
 
         </div>
-        <div className="flex flex-wrap gap-2 justify-center pt-3 mt-3 border-t border-primary-100 shrink-0">
-          <button type="submit" className="btn-primary min-w-[120px]" disabled={saving}>
+        <div className="flex flex-wrap gap-2 justify-center pt-2.5 mt-2 border-t border-primary-100 shrink-0">
+          <button type="submit" className="btn-primary !py-1.5 !px-4 !text-sm min-w-[100px]" disabled={saving}>
             {saving ? 'Saving...' : editingSaleId ? 'Update' : 'Save'}
           </button>
-          <button type="button" className="btn-secondary min-w-[120px]" onClick={clearEntry}>
+          <button type="button" className="btn-secondary !py-1.5 !px-4 !text-sm min-w-[100px]" onClick={clearEntry}>
             {editingSaleId ? 'Cancel edit' : 'Clear'}
           </button>
         </div>
@@ -1241,7 +1243,9 @@ export default function Sell({ path: windowPath }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-accent-200 text-accent-800 text-left">
-              <th className="px-3 py-2.5 font-semibold">S No</th>
+              <th className="px-3 py-2.5 font-semibold">
+                <SortLabel column="serial">S No</SortLabel>
+              </th>
               <th className="px-3 py-2.5 font-semibold">
                 <SortLabel column="vendor">Vendor</SortLabel>
               </th>
@@ -1255,8 +1259,9 @@ export default function Sell({ path: windowPath }) {
               <th className="px-3 py-2.5 font-semibold text-right">Cooly</th>
               <th className="px-3 py-2.5 font-semibold text-right">Amount</th>
               <th className="px-3 py-2 font-semibold text-right leading-tight whitespace-nowrap">
-                <div>Entry Date</div>
-                <div>Time</div>
+                <SortLabel column="createdAt" align="right">
+                  <span>Entry Date Time</span>
+                </SortLabel>
               </th>
             </tr>
           </thead>

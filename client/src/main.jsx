@@ -5,7 +5,34 @@ import { Toaster } from 'react-hot-toast';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import LicenseGate from './components/LicenseGate';
+import './utils/socket';
 import './index.css';
+
+// Auto-select text on focus for all input & textarea fields throughout the application
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'focusin',
+    (e) => {
+      const el = e.target;
+      if (
+        el &&
+        (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') &&
+        !['button', 'submit', 'checkbox', 'radio', 'file', 'image', 'range', 'color'].includes(el.type)
+      ) {
+        setTimeout(() => {
+          if (document.activeElement === el && typeof el.select === 'function') {
+            try {
+              el.select();
+            } catch (err) {
+              // Ignore non-selectable inputs
+            }
+          }
+        }, 0);
+      }
+    },
+    true
+  );
+}
 
 function Root() {
   return (

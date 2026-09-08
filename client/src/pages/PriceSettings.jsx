@@ -1,22 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Save, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency } from '../utils/format';
 import { DEDUCTION_FIELDS, emptyRatesState, ratesPayload } from '../utils/deductionFields';
+import { useDataRestored } from '../utils/useDataRestored';
 
 export default function PriceSettings() {
   const [form, setForm] = useState(() => emptyRatesState());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const fetchSettings = useCallback(() => {
     api
       .get('/settings')
       .then((res) => setForm(emptyRatesState(res.data)))
       .catch(() => toast.error('Failed to load settings'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  useDataRestored(fetchSettings);
 
   const perBagTotal = DEDUCTION_FIELDS.filter(
     (f) => form[`${f.key}PerBag`] && !(f.isCommission && !form[`${f.key}PerBag`])

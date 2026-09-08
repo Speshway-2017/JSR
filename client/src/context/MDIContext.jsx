@@ -138,14 +138,22 @@ export function MDIProvider({ children }) {
 
   const userIdKey = user?.id || user?._id || user?.email || role;
   const storageKey = user ? `jsr_mdi_windows_v1_${userIdKey}` : null;
+  const isRestoredRef = React.useRef(false);
 
-  // Restore open window state from user-scoped localStorage
+  // Reset restoration flag when user logs out
   useEffect(() => {
-    if (!storageKey) {
+    if (!user) {
+      isRestoredRef.current = false;
       setWindows([]);
       setActiveWindowId(null);
-      return;
     }
+  }, [user]);
+
+  // Restore open window state from user-scoped localStorage and current URL
+  useEffect(() => {
+    if (!storageKey || isRestoredRef.current) return;
+
+    let restored = [];
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
@@ -153,7 +161,7 @@ export function MDIProvider({ children }) {
         if (Array.isArray(parsed) && parsed.length > 0) {
           const validWindows = parsed.filter((w) => isPathAllowedForRole(w.path, role));
           let maxZ = 10;
-          const restored = validWindows.map((w) => {
+          restored = validWindows.map((w) => {
             if (w.zIndex > maxZ) maxZ = w.zIndex;
             return {
               ...w,
@@ -163,23 +171,90 @@ export function MDIProvider({ children }) {
               },
             };
           });
-          setWindows(restored);
           setNextZIndex(maxZ + 1);
-          const active = restored.find((w) => w.isActive && !w.isMinimized);
-          if (active) setActiveWindowId(active.id);
-          return;
         }
       }
     } catch (err) {
       console.warn('[MDI] Failed to restore saved windows:', err);
     }
-    setWindows([]);
-    setActiveWindowId(null);
+
+    // Include window from URL if navigating directly or refreshing on module route
+    const currentPath = window.location.pathname + window.location.search;
+    const basePath = window.location.pathname;
+    if (
+      basePath &&
+      basePath !== '/' &&
+      basePath !== '/dashboard' &&
+      basePath !== '/login' &&
+      isPathAllowedForRole(currentPath, role)
+    ) {
+      let urlId = basePath;
+      if (basePath.startsWith('/vendors/')) urlId = 'vendor-detail';
+      else if (basePath.startsWith('/customers/')) urlId = 'customer-detail';
+      else if (basePath.startsWith('/sales-orders/') && basePath !== '/sales-orders/previous')
+        urlId = 'sales-order-detail';
+
+      const existingIndex = restored.findIndex((w) => w.id === urlId);
+      const meta = MODULE_REGISTRY[basePath] || MODULE_REGISTRY[urlId] || {};
+      const winTitle = meta.title || 'Module';
+      const icon = meta.icon || 'Package';
+
+      const isWide =
+        basePath === '/sell' ||
+        basePath === '/ledger' ||
+        basePath === '/sales-report' ||
+        basePath === '/sales-orders' ||
+        urlId === 'sales-order-detail';
+      const defaultWidth = isWide ? 960 : 840;
+      const defaultHeight = isWide ? 620 : 540;
+
+      if (existingIndex >= 0) {
+        restored = restored.map((w, idx) => ({
+          ...w,
+          path: idx === existingIndex ? currentPath : w.path,
+          isActive: idx === existingIndex,
+          isMinimized: idx === existingIndex ? false : w.isMinimized,
+        }));
+      } else {
+        const offsetCount = restored.length % 6;
+        const startX = 35 + offsetCount * 30;
+        const startY = 25 + offsetCount * 25;
+        const newZ = 10 + restored.length * 5;
+
+        const updatedOthers = restored.map((w) => ({ ...w, isActive: false }));
+        updatedOthers.push({
+          id: urlId,
+          path: currentPath,
+          title: winTitle,
+          iconName: icon,
+          isOpen: true,
+          isMinimized: false,
+          isMaximized: false,
+          isActive: true,
+          zIndex: newZ,
+          position: { x: startX, y: startY },
+          size: { width: defaultWidth, height: defaultHeight },
+          prevPosition: { x: startX, y: startY },
+          prevSize: { width: defaultWidth, height: defaultHeight },
+        });
+        restored = updatedOthers;
+      }
+    }
+
+    setWindows(restored);
+    const active = restored.find((w) => w.isActive && !w.isMinimized);
+    if (active) {
+      setActiveWindowId(active.id);
+    } else if (restored.length > 0) {
+      const top = [...restored].sort((a, b) => b.zIndex - a.zIndex)[0];
+      if (top) setActiveWindowId(top.id);
+    }
+    isRestoredRef.current = true;
   }, [storageKey, role]);
 
-  // Save state to user-scoped localStorage on changes
+  // Save state to user-scoped localStorage ONLY AFTER restoration has completed
   useEffect(() => {
-    if (!storageKey) return;
+    if (!storageKey || !isRestoredRef.current) return;
     try {
       const validWindows = windows.filter((w) => isPathAllowedForRole(w.path, role));
       const serializable = validWindows.map((w) => ({
@@ -201,6 +276,18 @@ export function MDIProvider({ children }) {
       /* ignore */
     }
   }, [windows, storageKey, role]);
+
+  // Keep active window synced with browser URL bar
+  useEffect(() => {
+    if (!isRestoredRef.current) return;
+    const activeWin = windows.find((w) => w.id === activeWindowId && !w.isMinimized);
+    if (activeWin && activeWin.path) {
+      const curPath = window.location.pathname + window.location.search;
+      if (curPath !== activeWin.path) {
+        window.history.replaceState(null, '', activeWin.path);
+      }
+    }
+  }, [activeWindowId, windows]);
 
   const focusWindow = useCallback((id) => {
     setWindows((prev) => {

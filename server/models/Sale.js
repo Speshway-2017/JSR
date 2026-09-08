@@ -34,6 +34,7 @@ const saleSchema = new mongoose.Schema(
     totalAmount: { type: Number, required: true },
     totalBags: { type: Number, default: 0 },
     totalWeight: { type: Number, default: 0 },
+    serialNo: { type: Number, default: null },
   },
   { timestamps: true }
 );

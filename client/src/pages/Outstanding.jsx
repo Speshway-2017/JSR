@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Scale } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
+import { useDataRestored } from '../utils/useDataRestored';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -23,7 +24,7 @@ export default function Outstanding() {
       .catch(() => toast.error('Failed to load schedules'));
   }, []);
 
-  const loadReport = async (e) => {
+  const loadReport = useCallback(async (e) => {
     e?.preventDefault?.();
     setLoading(true);
     try {
@@ -37,7 +38,9 @@ export default function Outstanding() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [date, scheduleId]);
+
+  useDataRestored(loadReport);
 
   return (
     <div className="space-y-4">

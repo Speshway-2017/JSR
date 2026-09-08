@@ -51,7 +51,7 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
   );
 
   const sales = summaryRow.sales || [];
-  const calculatedSalesSum = sales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  const calculatedSalesSum = sales.reduce((sum, s) => sum + (Number(s.amount) || 0) + (Number(s.cooly) || 0), 0);
   const total = Number(
     summaryRow.totalSale != null
       ? summaryRow.totalSale
@@ -77,53 +77,57 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
     <td class="date"></td>
     <td class="item">Opening</td>
     <td class="num"></td>
+    <td class="num"></td>
+    <td class="num"></td>
     <td class="num">${esc(fmtMoney(opening))}</td>
   </tr>`;
 
   // 2. Sales item rows
   sales.forEach((s) => {
     const rawName = s.material || s.materialName || '—';
+    if (String(rawName).toLowerCase() === 'cooly' || s.isCoolyLine) return;
+
     const teName = s.materialNameTelugu || (teluguMap?.get ? teluguMap.get(String(rawName).trim().toLowerCase()) : teluguMap?.[String(rawName).trim().toLowerCase()]);
     const matName = teName && teName.trim() && teName.trim().toLowerCase() !== String(rawName).trim().toLowerCase()
       ? `${rawName} (${teName.trim()})`
       : displayMaterialName(rawName, teluguMap);
     const bagVal = s.bags != null ? s.bags : s.bagCount != null ? s.bagCount : 0;
     const bagsStr = Number(bagVal) > 0 ? String(bagVal) : '';
-    const amtStr = s.amount != null ? fmtMoney(s.amount) : '0';
+
+    const weightVal = s.weight != null ? s.weight : s.totalKg != null ? s.totalKg : '';
+    const weightStr = Number(weightVal) > 0 ? fmtNum(weightVal) : '';
+
+    const rateVal = s.ratePerKg != null ? s.ratePerKg : s.rate != null ? s.rate : '';
+    const rateStr = Number(rateVal) > 0 ? fmtNum(rateVal) : '';
+
+    const lineTotal = (Number(s.amount) || 0) + (Number(s.cooly) || 0);
+    const amtStr = fmtMoney(lineTotal);
     const itemDateStr = formatDateShort(s.date || summaryRow.date || summaryRow.startDate);
 
     rowsHtml += `<tr>
       <td class="date">${esc(itemDateStr)}</td>
       <td class="item">${esc(matName)}</td>
       <td class="num">${esc(bagsStr)}</td>
+      <td class="num">${esc(weightStr)}</td>
+      <td class="num">${esc(rateStr)}</td>
       <td class="num">${esc(amtStr)}</td>
     </tr>`;
   });
-
-  // 3. Cooly row if distinct
-  const cooly = Number(summaryRow.coolyTotal || summaryRow.cooly || 0);
-  if (cooly > 0 && !sales.some((s) => String(s.material || s.materialName).toLowerCase() === 'cooly')) {
-    const itemDateStr = formatDateShort(summaryRow.date || summaryRow.startDate);
-    rowsHtml += `<tr>
-      <td class="date">${esc(itemDateStr)}</td>
-      <td class="item">Cooly</td>
-      <td class="num"></td>
-      <td class="num">${esc(fmtMoney(cooly))}</td>
-    </tr>`;
-  }
 
   // 4. Total row
   rowsHtml += `<tr class="rule">
     <td class="date"></td>
     <td class="item">Total</td>
-    <td class="num" colspan="2">${esc(fmtMoney(total))}</td>
+    <td class="num" colspan="3"></td>
+    <td class="num">${esc(fmtMoney(total))}</td>
   </tr>`;
 
   // 5. Closing row
   rowsHtml += `<tr class="rule">
     <td class="date"></td>
     <td class="item">Closing</td>
-    <td class="num" colspan="2">${esc(fmtMoney(closing))}</td>
+    <td class="num" colspan="3"></td>
+    <td class="num">${esc(fmtMoney(closing))}</td>
   </tr>`;
 
   return `
@@ -137,6 +141,8 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
         <th class="date">${esc(TE.tedi)}</th>
         <th class="item">${esc(TE.itemCol)}</th>
         <th class="num">${esc(TE.bag)}</th>
+        <th class="num">బరువు (kg)</th>
+        <th class="num">ధర</th>
         <th class="num">${esc(TE.mottham)}</th>
       </tr>
     </thead>
