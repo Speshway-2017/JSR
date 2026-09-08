@@ -41,7 +41,20 @@ export default function Outstanding({ path: windowPath }) {
       const res = await api.get('/reports/outstanding', {
         params: { date, scheduleId: scheduleId || undefined },
       });
-      setData(res.data);
+      if (res.data?.rows) {
+        const sortedRows = [...res.data.rows].sort((a, b) => {
+          const schedA = (a.schedule || '').trim();
+          const schedB = (b.schedule || '').trim();
+          if (!schedA && schedB) return 1;
+          if (schedA && !schedB) return -1;
+          const schedCmp = schedA.localeCompare(schedB, undefined, { sensitivity: 'base', numeric: true });
+          if (schedCmp !== 0) return schedCmp;
+          return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true });
+        });
+        setData({ ...res.data, rows: sortedRows });
+      } else {
+        setData(res.data);
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to load outstanding');
       setData(null);

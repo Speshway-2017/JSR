@@ -1,11 +1,11 @@
 import React, { useRef } from 'react';
 import * as Icons from 'lucide-react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { useMDI, isPathAllowedForRole } from '../../context/MDIContext';
 import { useAuth } from '../../context/AuthContext';
 
 export default function MDIWindowTaskbar() {
-  const { windows, activeWindowId, restoreWindow, minimizeWindow, focusWindow } = useMDI();
+  const { windows, activeWindowId, restoreWindow, minimizeWindow, focusWindow, arrangeWindows } = useMDI();
   const { role } = useAuth();
   const scrollRef = useRef(null);
 
@@ -28,9 +28,22 @@ export default function MDIWindowTaskbar() {
 
   return (
     <div className="h-10 shrink-0 bg-surface border-t border-primary-200 px-2 flex items-center gap-1 select-none z-30 shadow-card">
-      <span className="text-[11px] font-bold uppercase tracking-wider text-primary-500 px-2 shrink-0 border-r border-primary-100 hidden sm:inline">
-        Open Modules ({visibleWindows.length}):
-      </span>
+      <div className="flex items-center gap-1.5 shrink-0 border-r border-primary-100 pr-2 mr-1">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-primary-500 hidden sm:inline">
+          Open ({visibleWindows.length})
+        </span>
+        {visibleWindows.length > 1 && (
+          <button
+            type="button"
+            onClick={arrangeWindows}
+            className="h-6 px-2 rounded-md flex items-center gap-1 text-[11px] font-semibold bg-primary-100 text-primary-800 hover:bg-primary-200 transition border border-primary-300"
+            title="Arrange open windows side-by-side"
+          >
+            <LayoutGrid className="w-3 h-3 text-primary-700" />
+            <span className="hidden md:inline">Arrange Tabs</span>
+          </button>
+        )}
+      </div>
 
       <button
         type="button"

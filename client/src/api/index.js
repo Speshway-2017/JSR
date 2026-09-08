@@ -15,7 +15,7 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     const raw = err.response?.data?.message || err.message || '';
-    if (/ECONNREFUSED|MongoServerSelection|buffering timed out|topology was destroyed/i.test(raw)) {
+    if (/ECONNREFUSED|MongoServerSelection|buffering timed out|topology was destroyed|reconnecting/i.test(raw)) {
       if (!err.response) err.response = { data: {} };
       if (!err.response.data) err.response.data = {};
       err.response.data.message =

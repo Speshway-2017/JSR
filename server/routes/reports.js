@@ -320,6 +320,17 @@ router.get('/outstanding', async (req, res) => {
       });
     }
 
+    // Arrange records schedule-wise so all customers in the same schedule are grouped together
+    rows.sort((a, b) => {
+      const schedA = (a.schedule || '').trim();
+      const schedB = (b.schedule || '').trim();
+      if (!schedA && schedB) return 1;
+      if (schedA && !schedB) return -1;
+      const schedCmp = schedA.localeCompare(schedB, undefined, { sensitivity: 'base', numeric: true });
+      if (schedCmp !== 0) return schedCmp;
+      return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true });
+    });
+
     res.json({
       date: start,
       rows,

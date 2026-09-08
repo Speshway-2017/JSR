@@ -356,9 +356,11 @@ export function MDIProvider({ children }) {
           );
         }
 
-        const offsetCount = prev.length % 6;
-        const startX = 35 + offsetCount * 30;
-        const startY = 25 + offsetCount * 25;
+        const containerWidth = typeof window !== 'undefined' ? Math.max(800, window.innerWidth - 60) : 1200;
+        const containerHeight = typeof window !== 'undefined' ? Math.max(500, window.innerHeight - 140) : 700;
+
+        const openNonMin = prev.filter((w) => !w.isMinimized);
+        const count = openNonMin.length;
 
         const isWide =
           path === '/sell' ||
@@ -366,8 +368,27 @@ export function MDIProvider({ children }) {
           path === '/sales-report' ||
           path === '/sales-orders' ||
           id === 'sales-order-detail';
-        const defaultWidth = isWide ? 960 : 840;
-        const defaultHeight = isWide ? 620 : 540;
+
+        const defaultWidth = Math.min(isWide ? 900 : 760, Math.max(560, containerWidth - 40));
+        const defaultHeight = Math.min(isWide ? 600 : 510, Math.max(400, containerHeight - 40));
+
+        // Horizontal step spacing of ~ 260px - 300px ensures previous window title & body remain clearly visible side-by-side
+        const stepX = Math.min(280, Math.max(160, Math.floor((containerWidth - 650) / Math.max(1, count))));
+        const maxCols = Math.max(1, Math.floor((containerWidth - defaultWidth) / Math.max(1, stepX)) + 1);
+
+        const col = count % maxCols;
+        const row = Math.floor(count / maxCols);
+
+        let startX = 20 + col * stepX;
+        let startY = 20 + (row % 4) * 35;
+
+        // Ensure window stays safely within container bounds
+        if (startX + defaultWidth > containerWidth) {
+          startX = Math.max(10, containerWidth - defaultWidth - 15);
+        }
+        if (startY + defaultHeight > containerHeight) {
+          startY = Math.max(10, containerHeight - defaultHeight - 15);
+        }
 
         const updatedOthers = prev.map((w) => ({ ...w, isActive: false }));
         const newZ = 10 + updatedOthers.length * 5;
@@ -654,6 +675,52 @@ export function MDIProvider({ children }) {
     focusWindow,
   ]);
 
+  const arrangeWindows = useCallback(() => {
+    setWindows((prev) => {
+      const visible = prev.filter((w) => !w.isMinimized);
+      if (visible.length === 0) return prev;
+
+      const containerWidth = typeof window !== 'undefined' ? Math.max(800, window.innerWidth - 60) : 1200;
+      const containerHeight = typeof window !== 'undefined' ? Math.max(500, window.innerHeight - 140) : 700;
+
+      const count = visible.length;
+      const stepX = Math.min(280, Math.max(160, Math.floor((containerWidth - 650) / Math.max(1, count - 1 || 1))));
+
+      let visibleIdx = 0;
+      return prev.map((w) => {
+        if (w.isMinimized) return w;
+
+        const idx = visibleIdx++;
+        const isWide =
+          w.path === '/sell' ||
+          w.path === '/ledger' ||
+          w.path === '/sales-report' ||
+          w.path === '/sales-orders' ||
+          w.id === 'sales-order-detail';
+
+        const winWidth = Math.min(isWide ? 900 : 760, Math.max(560, containerWidth - 40));
+        const winHeight = Math.min(isWide ? 580 : 510, Math.max(400, containerHeight - 40));
+
+        let newX = 20 + idx * stepX;
+        let newY = 20 + (idx % 4) * 35;
+
+        if (newX + winWidth > containerWidth) {
+          newX = Math.max(10, containerWidth - winWidth - 15);
+        }
+        if (newY + winHeight > containerHeight) {
+          newY = Math.max(10, containerHeight - winHeight - 15);
+        }
+
+        return {
+          ...w,
+          position: { x: newX, y: newY },
+          size: { width: winWidth, height: winHeight },
+          isMaximized: false,
+        };
+      });
+    });
+  }, []);
+
   return (
     <MDIContext.Provider
       value={{
@@ -674,6 +741,7 @@ export function MDIProvider({ children }) {
         restoreWindow,
         toggleMaximize,
         focusWindow,
+        arrangeWindows,
         updatePosition,
         updateSize,
         setUnsavedChanges,

@@ -398,6 +398,7 @@ export default function SalesPrint({ path: windowPath }) {
 
   const handleSaveEdit = async (e) => {
     e?.preventDefault?.();
+    e?.stopPropagation?.();
     if (!editForm.saleId) return;
     setSavingEdit(true);
     try {
@@ -431,13 +432,14 @@ export default function SalesPrint({ path: windowPath }) {
         ],
       };
 
-      await api.put(`/sales/${editForm.saleId}`, payload);
-      toast.success('Sale updated successfully');
+      const currentSaleId = editForm.saleId;
       setEditingCid('');
       setEditingRowKey('');
       setEditingSale(null);
+
+      await api.put(`/sales/${currentSaleId}`, payload);
+      toast.success('Sale updated successfully');
       await fetchSalesBills();
-      window.dispatchEvent(new CustomEvent('jsr_data_updated'));
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Failed to update sale');
     } finally {
@@ -709,7 +711,7 @@ export default function SalesPrint({ path: windowPath }) {
 
                           if (isEditingRow) {
                             return (
-                              <tr key={idx} className="bg-amber-50/90 border-2 border-amber-400">
+                              <tr key={rowKey} onClick={(e) => e.stopPropagation()} className="bg-amber-50/90 border-2 border-amber-400">
                                 <td className="py-1.5 px-1 text-[11px] font-medium text-primary-600">
                                   {formatDateOnly(s.date)}
                                 </td>
@@ -783,7 +785,7 @@ export default function SalesPrint({ path: windowPath }) {
                                     <button
                                       type="button"
                                       title="Cancel edit"
-                                      onClick={() => { setEditingCid(''); setEditingRowKey(''); }}
+                                      onClick={(e) => { e.stopPropagation(); setEditingCid(''); setEditingRowKey(''); }}
                                       className="p-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-xs font-bold"
                                     >
                                       ✕
@@ -800,7 +802,7 @@ export default function SalesPrint({ path: windowPath }) {
 
                           return (
                             <tr
-                              key={idx}
+                              key={rowKey}
                               onClick={() => openInlineEdit(st, s, rowKey)}
                               className="cursor-pointer hover:bg-amber-50/50 transition group"
                               title="Click anywhere on row to edit inline"
