@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Pencil, X, Save, FileText } from 'lucide-react';
+import { ArrowLeft, CreditCard, Pencil, X, Save, FileText, Send, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import MDIModalWindow from '../components/mdi/MDIModalWindow';
 import Toggle from '../components/Toggle';
 import { formatCurrency, formatDate, formatKg } from '../utils/format';
-import { openCustomerSaleBillPdf } from '../utils/customerSaleBillPdf';
+import { openCustomerSaleBillPdf, generateSingleCustomerBillHtml } from '../utils/customerSaleBillPdf';
 import { openBillPreviewTab } from '../utils/raituBillShared';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
 import { useDataRestored } from '../utils/useDataRestored';
 import { useMDI } from '../context/MDIContext';
+import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
+import { generateAccountStatementHtml } from '../utils/statementPdf';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export default function CustomerDetail({ path: windowPath }) {
+  const isOnline = useOnlineStatus();
   const { openWindow } = useMDI();
   const { id: routeId } = useParams();
   const id = routeId || (windowPath ? windowPath.split('/customers/')[1]?.split('?')[0] : null);
@@ -144,6 +148,62 @@ export default function CustomerDetail({ path: windowPath }) {
     }
   };
 
+  const handleSendWhatsAppSale = async (sale) => {
+    try {
+      let billSale = sale;
+      if (!sale.customer?.name || !sale.lines?.length) {
+        const res = await api.get(`/sales/${sale._id}`);
+        billSale = res.data;
+      } else {
+        billSale = { ...sale, customer: data.customer };
+      }
+      const htmlString = await generateSingleCustomerBillHtml(billSale);
+      await sendWhatsAppBillPdf({
+        recipientPhone: data.customer.mobile,
+        recipientName: data.customer.name,
+        htmlString,
+        filename: `Sale_Bill_${sale._id?.slice(-6) || 'JSR'}.pdf`,
+        caption: `Dear ${data.customer.name}, your sales bill from JSR Traders is attached. Thank you!`,
+      });
+    } catch (err) {
+      toast.error(err.message || 'Failed to send WhatsApp bill');
+    }
+  };
+
+  const handleSendWhatsAppStatement = async () => {
+    try {
+      const htmlString = generateAccountStatementHtml({
+        partyName: data.customer.name,
+        partyPhone: data.customer.mobile,
+        partyType: 'Customer',
+        balanceLabel: 'Credit Balance',
+        balanceAmount: data.customer.creditBalance,
+        sales: data.sales || [],
+        transactions: data.transactions || [],
+      });
+      await sendWhatsAppBillPdf({
+        recipientPhone: data.customer.mobile,
+        recipientName: data.customer.name,
+        htmlString,
+        filename: `Customer_Statement_${data.customer.name}.pdf`,
+        caption: `Dear ${data.customer.name}, your Account Statement from JSR Traders is attached. Balance: ${formatCurrency(data.customer.creditBalance)}. Thank you!`,
+      });
+    } catch (err) {
+      toast.error(err.message || 'Failed to send WhatsApp statement');
+    }
+  };
+
+  const handleTogglePaid = async (saleId, targetIsPaid) => {
+    try {
+      await api.patch(`/sales/${saleId}/toggle-paid`, { isPaid: targetIsPaid });
+      toast.success(targetIsPaid ? 'Marked as Paid Direct' : 'Marked as Unpaid');
+      fetchData();
+      window.dispatchEvent(new CustomEvent('jsr_data_updated'));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update payment status');
+    }
+  };
+
   if (loading) return <div className="text-center py-20 text-primary-400">Loading...</div>;
   if (!data) return <div className="text-center py-20 text-primary-400">Customer not found</div>;
 
@@ -225,12 +285,21 @@ export default function CustomerDetail({ path: windowPath }) {
           </div>
 
           {!editing && (
-            <div className="bg-accent-50 rounded-2xl p-5 text-center min-w-[180px]">
+            <div className="bg-accent-50 rounded-2xl p-5 text-center min-w-[200px] flex flex-col gap-2">
               <p className="text-sm text-accent-600 font-medium">Credit Balance</p>
               <p className="text-3xl font-bold text-accent-700 mt-1">{formatCurrency(customer.creditBalance)}</p>
-              <button type="button" onClick={() => setShowPayment(true)} className="btn-primary w-full mt-4 !py-2.5 !text-sm">
+              <button type="button" onClick={() => setShowPayment(true)} className="btn-primary w-full mt-2 !py-2.5 !text-sm">
                 <CreditCard className="w-4 h-4" /> Add Payment
               </button>
+              {isOnline && (
+                <button
+                  type="button"
+                  onClick={handleSendWhatsAppStatement}
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5 w-full"
+                >
+                  <Send className="w-3.5 h-3.5" /> WhatsApp Statement
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -288,13 +357,44 @@ export default function CustomerDetail({ path: windowPath }) {
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <p className="font-semibold text-primary-700">{formatCurrency(sale.totalAmount)}</p>
-                    <button
-                      type="button"
-                      onClick={() => handleViewSaleBill(sale)}
-                      className="btn-secondary !py-1.5 !px-2.5 !text-xs"
-                    >
-                      <FileText className="w-3.5 h-3.5" /> Bill
-                    </button>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {sale.isPaid ? (
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePaid(sale._id, false)}
+                          className="px-2 py-1 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 hover:bg-amber-100 hover:text-amber-800 transition cursor-pointer"
+                          title="Paid Direct — Click to mark unpaid"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Paid Direct
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePaid(sale._id, true)}
+                          className="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-gray-100 text-gray-700 hover:bg-emerald-600 hover:text-white border border-gray-300 transition cursor-pointer"
+                          title="Click to mark as paid direct"
+                        >
+                          Mark as Paid
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleViewSaleBill(sale)}
+                        className="btn-secondary !py-1.5 !px-2.5 !text-xs"
+                      >
+                        <FileText className="w-3.5 h-3.5" /> Bill
+                      </button>
+                      {isOnline && (
+                        <button
+                          type="button"
+                          onClick={() => handleSendWhatsAppSale(sale)}
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200"
+                          title="Send Bill via WhatsApp"
+                        >
+                          <Send className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

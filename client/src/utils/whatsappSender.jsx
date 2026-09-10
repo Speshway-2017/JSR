@@ -3,6 +3,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
 import api from '../api';
+import { hasInternet } from './atlasNetwork';
 
 /**
  * Format phone number into clean digits for Meta API (e.g. 919010253076)
@@ -114,6 +115,11 @@ export async function sendWhatsAppBillPdf({
   templateName = 'customer_sales_bill',
   templateParams = [],
 }) {
+  if (!hasInternet()) {
+    toast.error('No internet connection. Connect to the internet to send WhatsApp bill.');
+    return false;
+  }
+
   const formattedPhone = cleanPhone(recipientPhone);
   const displayPhone = formatDisplayPhone(recipientPhone);
 

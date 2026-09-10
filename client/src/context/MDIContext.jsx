@@ -510,6 +510,28 @@ export function MDIProvider({ children }) {
     );
   }, []);
 
+  const updateWindowPath = useCallback((id, newPath) => {
+    if (!id || !newPath) return;
+    const basePath = id.split('?')[0];
+    let winId = basePath;
+    if (basePath.startsWith('/vendors/')) winId = 'vendor-detail';
+    else if (basePath.startsWith('/customers/')) winId = 'customer-detail';
+    else if (basePath.startsWith('/sales-orders/') && basePath !== '/sales-orders/previous') winId = 'sales-order-detail';
+
+    setWindows((prev) =>
+      prev.map((w) => (w.id === winId ? { ...w, path: newPath } : w))
+    );
+
+    try {
+      const curPath = window.location.pathname;
+      if (curPath === basePath || curPath === '/' || curPath === newPath.split('?')[0]) {
+        window.history.replaceState(null, '', newPath);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const setUnsavedChanges = useCallback((id, hasChanges) => {
     setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, hasUnsavedChanges: !!hasChanges } : w)));
   }, []);
@@ -744,6 +766,7 @@ export function MDIProvider({ children }) {
         arrangeWindows,
         updatePosition,
         updateSize,
+        updateWindowPath,
         setUnsavedChanges,
         confirmCloseId,
         cancelCloseModal: () => setConfirmCloseId(null),

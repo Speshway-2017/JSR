@@ -7,7 +7,9 @@ import {
   vendorMaterialsHtml,
   resolvePartyTeluguName,
   openRaituSheetPdf,
+  BILL_CSS,
 } from './raituBillShared';
+import { RAMABHADRA, ramabhadraFontFaceCss } from './pdfFont';
 
 function collectRateLines(bill) {
   if (bill.rateLines?.length) return bill.rateLines;
@@ -95,3 +97,29 @@ export async function openVendorBillPdf(bill, previewTab) {
   ]);
   await openRaituSheetPdf(buildVendorInner(bill, teluguMap, partyName), previewTab);
 }
+
+export async function generateSingleVendorBillHtml(bill) {
+  const [teluguMap, partyName] = await Promise.all([
+    materialTeluguMap(),
+    resolvePartyTeluguName(bill.vendor || {}),
+  ]);
+  const innerFn = buildVendorInner(bill, teluguMap, partyName);
+  const inner = innerFn('');
+  const fontCss = await ramabhadraFontFaceCss();
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    ${fontCss}
+    ${BILL_CSS}
+  </style>
+</head>
+<body style="font-family:'${RAMABHADRA}','Noto Sans Telugu',sans-serif;font-weight:400;background:#fff;margin:0;padding:10px;">
+  <div class="sheet" style="margin:0 auto;box-shadow:none;">
+    ${inner}
+  </div>
+</body>
+</html>`;
+}
+

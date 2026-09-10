@@ -331,11 +331,21 @@ ${SALE_REPORT_2_CSS}
 <body>
   <div class="preview-toolbar">
     <button type="button" onclick="window.close()">Close</button>
-    <button type="button" style="background:#25D366;color:#fff;border-color:#25D366;font-weight:600;" onclick="sendWhatsAppBill()">Send WhatsApp</button>
+    <button type="button" id="whatsapp-btn" style="background:#25D366;color:#fff;border-color:#25D366;font-weight:600;" onclick="sendWhatsAppBill()">Send WhatsApp</button>
     <button type="button" class="primary" onclick="window.print()">Print / Save PDF</button>
   </div>
   <div class="stage">${inner}</div>
   <script>
+    function checkConnectivity() {
+      var waBtn = document.getElementById('whatsapp-btn');
+      if (waBtn) {
+        waBtn.style.display = (navigator.onLine === false) ? 'none' : '';
+      }
+    }
+    window.addEventListener('online', checkConnectivity);
+    window.addEventListener('offline', checkConnectivity);
+    checkConnectivity();
+
     function sendWhatsAppBill() {
       var stage = document.querySelector('.stage');
       var bodyText = stage ? stage.innerText : document.body.innerText;

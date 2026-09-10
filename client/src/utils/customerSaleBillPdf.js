@@ -188,13 +188,23 @@ ${BILL_CSS}
 <body class="bill-preview" style="font-family:'${RAMABHADRA}','Noto Sans Telugu',sans-serif;font-weight:400;">
   <div class="preview-toolbar no-print">
     <button type="button" class="secondary" onclick="window.close()">Close</button>
-    <button type="button" style="background:#25D366;color:#fff;border-color:#25D366;font-weight:600;" onclick="sendWhatsAppBill()">Send WhatsApp</button>
+    <button type="button" id="whatsapp-btn" style="background:#25D366;color:#fff;border-color:#25D366;font-weight:600;" onclick="sendWhatsAppBill()">Send WhatsApp</button>
     <button type="button" onclick="window.print()">Print / Save PDF</button>
   </div>
   <div class="preview-stage">
     ${pageHtml}
   </div>
   <script>
+    function checkConnectivity() {
+      var waBtn = document.getElementById('whatsapp-btn');
+      if (waBtn) {
+        waBtn.style.display = (navigator.onLine === false) ? 'none' : '';
+      }
+    }
+    window.addEventListener('online', checkConnectivity);
+    window.addEventListener('offline', checkConnectivity);
+    checkConnectivity();
+
     function sendWhatsAppBill() {
       var stage = document.querySelector('.preview-stage');
       var bodyText = stage ? stage.innerText : document.body.innerText;

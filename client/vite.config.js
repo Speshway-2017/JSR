@@ -13,7 +13,7 @@ export default defineConfig({
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('error', (_err, _req, res) => {
-            if (res && !res.headersSent) {
+            if (res && typeof res.writeHead === 'function' && !res.headersSent) {
               res.writeHead(503, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ message: 'Backend server is reconnecting' }));
             }
@@ -26,7 +26,7 @@ export default defineConfig({
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('error', (_err, _req, res) => {
-            if (res && !res.headersSent) {
+            if (res && typeof res.writeHead === 'function' && !res.headersSent) {
               res.writeHead(503, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ message: 'Socket reconnecting' }));
             }

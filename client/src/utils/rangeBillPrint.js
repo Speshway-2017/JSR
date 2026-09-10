@@ -313,13 +313,23 @@ table.lines tr.rule td { border-top: 1px solid #000000; font-weight: 700; paddin
 <body class="bill-preview">
   <div class="preview-toolbar no-print">
     <button type="button" class="secondary" onclick="window.close()">Close</button>
-    <button type="button" class="whatsapp" onclick="sendWhatsAppBill()">Send WhatsApp</button>
+    <button type="button" id="whatsapp-btn" class="whatsapp" onclick="sendWhatsAppBill()">Send WhatsApp</button>
     <button type="button" onclick="window.print()">Print / Save PDF</button>
   </div>
   <div class="stage">
     ${pageHtml}
   </div>
   <script>
+    function checkConnectivity() {
+      var waBtn = document.getElementById('whatsapp-btn');
+      if (waBtn) {
+        waBtn.style.display = (navigator.onLine === false) ? 'none' : '';
+      }
+    }
+    window.addEventListener('online', checkConnectivity);
+    window.addEventListener('offline', checkConnectivity);
+    checkConnectivity();
+
     function sendWhatsAppBill() {
       var stage = document.querySelector('.stage');
       var bodyText = stage ? stage.innerText : document.body.innerText;

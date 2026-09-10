@@ -1,19 +1,41 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatKg } from '../utils/format';
 import { matchesSearchFields } from '../utils/search';
-import { openVendorBillPdf } from '../utils/vendorBillPdf';
+import { openVendorBillPdf, generateSingleVendorBillHtml } from '../utils/vendorBillPdf';
 import { DEDUCTION_FIELDS, emptyRatesState, ratesPayload } from '../utils/deductionFields';
 import { useDataRestored } from '../utils/useDataRestored';
+import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+
+import { useMDI } from '../context/MDIContext';
+import { useSearchParams } from 'react-router-dom';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function SalePatty() {
-  const [date, setDate] = useState(todayInputValue());
+export default function SalePatty({ path: windowPath }) {
+  const { updateWindowPath } = useMDI();
+  const isOnline = useOnlineStatus();
+
+  const [searchParams] = useSearchParams();
+  const effectiveSearchParams = useMemo(() => {
+    if (windowPath && windowPath.includes('?')) {
+      return new URLSearchParams(windowPath.split('?')[1]);
+    }
+    return searchParams;
+  }, [windowPath, searchParams]);
+
+  const [date, setDate] = useState(() => effectiveSearchParams.get('date') || todayInputValue());
+
+  useEffect(() => {
+    if (date && typeof updateWindowPath === 'function') {
+      updateWindowPath('/sale-patty', `/sale-patty?date=${date}`);
+    }
+  }, [date, updateWindowPath]);
   const [vendors, setVendors] = useState([]);
   const [vendorQuery, setVendorQuery] = useState('');
   const [vendorId, setVendorId] = useState('');
@@ -383,6 +405,30 @@ export default function SalePatty() {
               <FileText className="w-4 h-4" />
               {saving ? 'Saving…' : 'Generate / Print'}
             </button>
+            {isOnline && (
+              <button
+                type="button"
+                className="btn-secondary flex items-center gap-1.5 !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200"
+                onClick={async () => {
+                  const vendorObj = preview.vendor || selected || {};
+                  try {
+                    const htmlString = await generateSingleVendorBillHtml(preview);
+                    await sendWhatsAppBillPdf({
+                      recipientPhone: vendorObj.mobile,
+                      recipientName: vendorObj.name || 'Vendor',
+                      htmlString,
+                      filename: `Patti_Bill_${vendorObj.name || 'Vendor'}.pdf`,
+                      caption: `Dear ${vendorObj.name || 'Vendor'}, your Sale Patti statement from JSR Traders is attached. Net Total: ${formatCurrency(preview.summary?.receivable)}. Thank you!`,
+                    });
+                  } catch (err) {
+                    toast.error(err.message || 'Failed to send WhatsApp Patti');
+                  }
+                }}
+              >
+                <Send className="w-4 h-4 text-emerald-600" />
+                Send WhatsApp Patti
+              </button>
+            )}
             {preview.load?.billGenerated && (
               <button
                 type="button"

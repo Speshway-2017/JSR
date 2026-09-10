@@ -54,7 +54,10 @@ export async function uploadPdfToMetaMedia(pdfBuffer, filename = 'document.pdf',
 
   const data = await response.json();
   if (!response.ok || !data.id) {
-    const errorMsg = data.error?.message || data.error?.error_user_msg || JSON.stringify(data);
+    let errorMsg = data.error?.message || data.error?.error_user_msg || JSON.stringify(data);
+    if (data.error?.code === 190 || errorMsg.includes('Authentication Error') || errorMsg.includes('OAuth')) {
+      errorMsg = 'Meta Access Token in server/.env is expired or invalid (Authentication Error). Please generate a new System User Access Token from Meta Developer Console.';
+    }
     throw new Error(`Meta Media Upload Failed: ${errorMsg}`);
   }
 
@@ -171,7 +174,10 @@ export async function sendWhatsAppDocumentMessage({
   const data = await response.json();
 
   if (!response.ok || data.error) {
-    const errDetails = data.error?.message || data.error?.error_user_msg || JSON.stringify(data);
+    let errDetails = data.error?.message || data.error?.error_user_msg || JSON.stringify(data);
+    if (data.error?.code === 190 || errDetails.includes('Authentication Error') || errDetails.includes('OAuth')) {
+      errDetails = 'Meta Access Token in server/.env is expired or invalid. Please generate a new System User Access Token from Meta Developer Console.';
+    }
     throw new Error(`Meta WhatsApp Message Failed: ${errDetails}`);
   }
 

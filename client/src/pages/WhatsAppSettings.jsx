@@ -3,8 +3,11 @@ import { MessageSquare, CheckCircle, AlertCircle, Send, Key, Phone, Building } f
 import toast from 'react-hot-toast';
 import api from '../api';
 import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export default function WhatsAppSettings() {
+  const isOnline = useOnlineStatus();
+
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [testPhone, setTestPhone] = useState('9010253076');
@@ -126,15 +129,21 @@ export default function WhatsAppSettings() {
             value={testPhone}
             onChange={(e) => setTestPhone(e.target.value)}
           />
-          <button
-            type="button"
-            className="btn-primary !py-2.5 !px-4 text-xs flex items-center gap-2"
-            onClick={handleTestSend}
-            disabled={sendingTest}
-          >
-            <Send className="w-4 h-4 text-white" />
-            {sendingTest ? 'Sending Test PDF...' : 'Send Test WhatsApp PDF'}
-          </button>
+          {isOnline ? (
+            <button
+              type="button"
+              className="btn-primary !py-2.5 !px-4 text-xs flex items-center gap-2"
+              onClick={handleTestSend}
+              disabled={sendingTest}
+            >
+              <Send className="w-4 h-4 text-white" />
+              {sendingTest ? 'Sending Test PDF...' : 'Send Test WhatsApp PDF'}
+            </button>
+          ) : (
+            <span className="text-xs text-amber-600 font-medium bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+              Offline (Internet connection required to send test WhatsApp messages)
+            </span>
+          )}
         </div>
       </div>
     </div>

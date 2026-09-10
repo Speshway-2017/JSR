@@ -7,6 +7,9 @@ import { formatCurrency, formatDate, formatKg } from '../utils/format';
 import { matchesSearchFields } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
 
+import { useMDI } from '../context/MDIContext';
+import { useSearchParams } from 'react-router-dom';
+
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -20,12 +23,27 @@ const emptyLine = (type = 'by_weight') => ({
   ratePerKg: '10',
 });
 
-export default function Purchase() {
+export default function Purchase({ path: windowPath }) {
+  const { updateWindowPath } = useMDI();
+  const [searchParams] = useSearchParams();
+  const effectiveSearchParams = useMemo(() => {
+    if (windowPath && windowPath.includes('?')) {
+      return new URLSearchParams(windowPath.split('?')[1]);
+    }
+    return searchParams;
+  }, [windowPath, searchParams]);
+
   const [vendors, setVendors] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [vendorQuery, setVendorQuery] = useState('');
   const [vendorId, setVendorId] = useState('');
-  const [purchaseDate, setPurchaseDate] = useState(todayInputValue());
+  const [purchaseDate, setPurchaseDate] = useState(() => effectiveSearchParams.get('date') || todayInputValue());
+
+  useEffect(() => {
+    if (purchaseDate && typeof updateWindowPath === 'function') {
+      updateWindowPath('/purchase', `/purchase?date=${purchaseDate}`);
+    }
+  }, [purchaseDate, updateWindowPath]);
   const [globalPurchaseType, setGlobalPurchaseType] = useState('by_weight');
   const [lines, setLines] = useState([emptyLine('by_weight')]);
   const [notes, setNotes] = useState('');

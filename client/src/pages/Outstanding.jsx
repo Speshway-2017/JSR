@@ -1,21 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Scale } from 'lucide-react';
+import { Scale, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
 import { useDataRestored } from '../utils/useDataRestored';
+import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
+import { generateAccountStatementHtml } from '../utils/statementPdf';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+
+import { useMDI } from '../context/MDIContext';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function Outstanding({ path: windowPath }) {
+  const { updateWindowPath } = useMDI();
+  const isOnline = useOnlineStatus();
+
   const today = todayInputValue();
   const [date, setDate] = useState(today);
   const [scheduleId, setScheduleId] = useState('');
   const [schedules, setSchedules] = useState([]);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (date && typeof updateWindowPath === 'function') {
+      updateWindowPath('/outstanding', `/outstanding?date=${date}`);
+    }
+  }, [date, updateWindowPath]);
 
   useEffect(() => {
     if (windowPath && windowPath.includes('?')) {
@@ -69,6 +83,32 @@ export default function Outstanding({ path: windowPath }) {
 
   useDataRestored(loadReport);
 
+  const handleSendWhatsAppRow = async (row) => {
+    if (!row.mobile) {
+      toast.error(`No mobile number registered for ${row.name}`);
+      return;
+    }
+    try {
+      const htmlString = generateAccountStatementHtml({
+        partyName: row.name,
+        partyPhone: row.mobile || '',
+        partyType: 'Customer',
+        balanceLabel: 'Outstanding Balance',
+        balanceAmount: row.closing,
+        asOfDate: date,
+      });
+      await sendWhatsAppBillPdf({
+        recipientPhone: row.mobile,
+        recipientName: row.name,
+        htmlString,
+        filename: `Outstanding_Statement_${row.name}.pdf`,
+        caption: `Dear ${row.name}, your outstanding balance as of ${formatDateOnly(date)} is ${formatCurrency(row.closing)} from JSR Traders. Thank you!`,
+      });
+    } catch (err) {
+      toast.error(err.message || 'Failed to send WhatsApp statement');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -116,9 +156,11 @@ export default function Outstanding({ path: windowPath }) {
 
       {data && (
         <div className="card !p-0 overflow-hidden">
-          <div className="px-4 py-3 border-b border-primary-100">
-            <p className="font-bold text-primary-800">As of {formatDateOnly(data.date)}</p>
-            <p className="text-xs text-primary-400">{data.rows.length} customers</p>
+          <div className="px-4 py-3 border-b border-primary-100 flex items-center justify-between">
+            <div>
+              <p className="font-bold text-primary-800">As of {formatDateOnly(data.date)}</p>
+              <p className="text-xs text-primary-400">{data.rows.length} customers</p>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -131,18 +173,19 @@ export default function Outstanding({ path: windowPath }) {
                   <th className="px-3 py-2 font-semibold text-right">Paid</th>
                   <th className="px-3 py-2 font-semibold text-right">Less</th>
                   <th className="px-3 py-2 font-semibold text-right">Closing</th>
+                  <th className="px-3 py-2 font-semibold text-center">WhatsApp</th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-10 text-center text-primary-400">
+                    <td colSpan={8} className="px-3 py-10 text-center text-primary-400">
                       No outstanding for this date / schedule
                     </td>
                   </tr>
                 ) : (
                   data.rows.map((row) => (
-                    <tr key={row.customerId} className="border-t border-primary-50">
+                    <tr key={row.customerId} className="border-t border-primary-50 hover:bg-primary-50/50">
                       <td className="px-3 py-2 font-medium text-primary-800">{row.name}</td>
                       <td className="px-3 py-2 text-primary-500">{row.schedule || '—'}</td>
                       <td className="px-3 py-2 text-right tabular-nums">
@@ -159,6 +202,18 @@ export default function Outstanding({ path: windowPath }) {
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold">
                         {formatCurrency(row.closing)}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {isOnline && (
+                          <button
+                            type="button"
+                            onClick={() => handleSendWhatsAppRow(row)}
+                            className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-xs font-medium inline-flex items-center gap-1"
+                            title="Send Outstanding Statement via WhatsApp"
+                          >
+                            <Send className="w-3 h-3 text-emerald-600" /> Send
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -185,6 +240,7 @@ export default function Outstanding({ path: windowPath }) {
                     <td className="px-3 py-3 text-right tabular-nums">
                       {formatCurrency(data.totals.closing)}
                     </td>
+                    <td></td>
                   </tr>
                 </tfoot>
               )}

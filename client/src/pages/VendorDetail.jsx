@@ -1,21 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Phone, MapPin, CreditCard, Pencil, X, Save, FileText, Truck,
+  ArrowLeft, Phone, MapPin, CreditCard, Pencil, X, Save, FileText, Truck, Send,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import MDIModalWindow from '../components/mdi/MDIModalWindow';
 import { formatCurrency, formatDate, formatKg } from '../utils/format';
-import { openVendorBillPdf } from '../utils/vendorBillPdf';
+import { openVendorBillPdf, generateSingleVendorBillHtml } from '../utils/vendorBillPdf';
 import { openCustomerSaleBillPdf } from '../utils/customerSaleBillPdf';
 import { openBillPreviewTab } from '../utils/raituBillShared';
 import { DEDUCTION_FIELDS, emptyRatesState, ratesPayload } from '../utils/deductionFields';
 import { useTeluguPreview } from '../hooks/useTeluguPreview';
 import { useDataRestored } from '../utils/useDataRestored';
 import { useMDI } from '../context/MDIContext';
+import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
+import { generateAccountStatementHtml } from '../utils/statementPdf';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export default function VendorDetail({ path: windowPath }) {
+  const isOnline = useOnlineStatus();
+
   const { openWindow } = useMDI();
   const { id: routeId } = useParams();
   const id = routeId || (windowPath ? windowPath.split('/vendors/')[1]?.split('?')[0] : null);
@@ -190,6 +195,45 @@ export default function VendorDetail({ path: windowPath }) {
     }
   };
 
+  const handleSendWhatsAppVendorLoad = async (load) => {
+    try {
+      const res = await api.get(`/loads/${load._id}/bill`);
+      const htmlString = await generateSingleVendorBillHtml(res.data);
+      await sendWhatsAppBillPdf({
+        recipientPhone: data.vendor.mobile,
+        recipientName: data.vendor.name,
+        htmlString,
+        filename: `Vendor_Load_Bill_${load._id?.slice(-6) || 'JSR'}.pdf`,
+        caption: `Dear ${data.vendor.name}, your Paddy Load Bill from JSR Traders is attached. Thank you!`,
+      });
+    } catch (err) {
+      toast.error(err.message || 'Failed to send WhatsApp bill');
+    }
+  };
+
+  const handleSendWhatsAppVendorStatement = async () => {
+    try {
+      const htmlString = generateAccountStatementHtml({
+        partyName: data.vendor.name,
+        partyPhone: data.vendor.mobile,
+        partyType: 'Vendor',
+        balanceLabel: 'Payable Balance',
+        balanceAmount: data.vendor.creditBalance,
+        loads: data.loads || [],
+        transactions: data.transactions || [],
+      });
+      await sendWhatsAppBillPdf({
+        recipientPhone: data.vendor.mobile,
+        recipientName: data.vendor.name,
+        htmlString,
+        filename: `Vendor_Statement_${data.vendor.name}.pdf`,
+        caption: `Dear ${data.vendor.name}, your Account Statement from JSR Traders is attached. Balance: ${formatCurrency(data.vendor.creditBalance)}. Thank you!`,
+      });
+    } catch (err) {
+      toast.error(err.message || 'Failed to send WhatsApp statement');
+    }
+  };
+
   if (loading) return <div className="text-center py-20 text-primary-400">Loading...</div>;
   if (!data) return <div className="text-center py-20 text-primary-400">Vendor not found</div>;
 
@@ -266,12 +310,21 @@ export default function VendorDetail({ path: windowPath }) {
           </div>
 
           {!editing && (
-            <div className="bg-accent-50 rounded-2xl p-5 text-center min-w-[180px]">
+            <div className="bg-accent-50 rounded-2xl p-5 text-center min-w-[200px] flex flex-col gap-2">
               <p className="text-sm text-accent-600 font-medium">Payable Balance</p>
               <p className="text-3xl font-bold text-accent-700 mt-1">{formatCurrency(vendor.creditBalance)}</p>
-              <button type="button" onClick={() => setShowPayment(true)} className="btn-primary w-full mt-4 !py-2.5 !text-sm">
+              <button type="button" onClick={() => setShowPayment(true)} className="btn-primary w-full mt-2 !py-2.5 !text-sm">
                 <CreditCard className="w-4 h-4" /> Pay Vendor
               </button>
+              {isOnline && (
+                <button
+                  type="button"
+                  onClick={handleSendWhatsAppVendorStatement}
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5 w-full"
+                >
+                  <Send className="w-3.5 h-3.5" /> WhatsApp Statement
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -430,6 +483,17 @@ export default function VendorDetail({ path: windowPath }) {
                           <Pencil className="w-3.5 h-3.5" />
                           Modify
                         </button>
+                        {isOnline && (
+                          <button
+                            type="button"
+                            onClick={() => handleSendWhatsAppVendorLoad(load)}
+                            disabled={billLoadingId === load._id}
+                            className="btn-secondary !py-1.5 !px-2.5 !text-xs !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200"
+                            title="Send Load Bill via WhatsApp"
+                          >
+                            <Send className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <button

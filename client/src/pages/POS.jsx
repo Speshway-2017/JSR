@@ -86,6 +86,7 @@ export default function POS() {
     try {
       const res = await api.post('/sales', {
         customerName: customerName || 'Walk-in Customer',
+        isPaid: true,
         items: validItems.map((i) => ({
           materialId: i.materialId,
           quantityKg: Number(i.quantityKg),

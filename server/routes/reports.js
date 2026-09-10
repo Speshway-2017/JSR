@@ -411,6 +411,9 @@ router.get('/sales-bills', async (req, res) => {
             handlingCharges: coolyTotal,
             coolyRate: sale.coolyRate || 0,
             coolyPerBag: sale.coolyPerBag || false,
+            isPaid: !!sale.isPaid,
+            paymentType: sale.paymentType || 'Cash',
+            paidAmount: sale.paidAmount || 0,
           });
         }
       } else if (Number(sale.totalAmount) > 0 || Number(sale.handlingCharges) > 0) {
@@ -428,6 +431,9 @@ router.get('/sales-bills', async (req, res) => {
           handlingCharges: coolyTotal,
           coolyRate: sale.coolyRate || 0,
           coolyPerBag: sale.coolyPerBag || false,
+          isPaid: !!sale.isPaid,
+          paymentType: sale.paymentType || 'Cash',
+          paidAmount: sale.paidAmount || 0,
         });
       }
     }

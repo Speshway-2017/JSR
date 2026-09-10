@@ -384,7 +384,7 @@ router.get('/report', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { customerId, loadId, vendorId, date, lines, handlingCharges, coolyRate, coolyPerBag } =
+    const { customerId, loadId, vendorId, date, lines, handlingCharges, coolyRate, coolyPerBag, isPaid, paymentType } =
       req.body;
 
     if (!customerId || !lines?.length) {
@@ -437,6 +437,10 @@ router.post('/', async (req, res) => {
     const { start: dayStart, end: dayEnd } = dayRange(saleDate);
     const nextSerialNo = await getNextSerialNo(dayStart, dayEnd);
 
+    const isPaidBool = !!isPaid;
+    const paymentTypeVal = paymentType || 'Cash';
+    const paidAmountVal = isPaidBool ? saleTotal : 0;
+
     const sale = await Sale.create({
       customer: customerId,
       vendor: vendor._id,
@@ -449,11 +453,16 @@ router.post('/', async (req, res) => {
       totalBags,
       totalWeight,
       serialNo: nextSerialNo,
+      isPaid: isPaidBool,
+      paymentType: paymentTypeVal,
+      paidAmount: paidAmountVal,
       createdAt: Number.isNaN(when.getTime()) ? undefined : when,
     });
 
-    customer.creditBalance += saleTotal;
-    await customer.save();
+    if (!isPaidBool) {
+      customer.creditBalance += saleTotal;
+      await customer.save();
+    }
 
     vendor.creditBalance += materialsTotal;
     await vendor.save();
@@ -462,10 +471,23 @@ router.post('/', async (req, res) => {
       customer: customerId,
       type: 'customer_credit',
       amount: saleTotal,
-      description: `Sale - ${processedLines.map((l) => l.materialName).join(', ')}`,
+      description: `Sale${isPaidBool ? ' (Paid Direct)' : ''} - ${processedLines.map((l) => l.materialName).join(', ')}`,
       sale: sale._id,
       balanceAfter: customer.creditBalance,
     });
+
+    if (isPaidBool) {
+      await Transaction.create({
+        customer: customerId,
+        type: 'customer_payment',
+        amount: saleTotal,
+        paymentType: paymentTypeVal,
+        description: `Direct Payment for Sale - ${processedLines.map((l) => l.materialName).join(', ')}`,
+        sale: sale._id,
+        source: 'Direct Sale Payment',
+        balanceAfter: customer.creditBalance,
+      });
+    }
 
     await Transaction.create({
       vendor: vendor._id,
@@ -505,7 +527,7 @@ router.put('/:id', async (req, res) => {
     const existing = await Sale.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: 'Sale not found' });
 
-    const { customerId, loadId, vendorId, date, lines, handlingCharges, coolyRate, coolyPerBag } =
+    const { customerId, loadId, vendorId, date, lines, handlingCharges, coolyRate, coolyPerBag, isPaid, paymentType } =
       req.body;
     if (!lines?.length) {
       return res.status(400).json({ message: 'Sale lines are required' });
@@ -565,6 +587,10 @@ router.put('/:id', async (req, res) => {
     );
     const oldSaleTotal = Number(existing.totalAmount || 0);
 
+    const wasPaid = !!existing.isPaid;
+    const nowPaid = isPaid !== undefined ? !!isPaid : wasPaid;
+    const paymentTypeVal = paymentType || existing.paymentType || 'Cash';
+
     existing.customer = customer._id;
     existing.vendor = vendor._id;
     existing.load = load._id;
@@ -575,39 +601,52 @@ router.put('/:id', async (req, res) => {
     existing.totalAmount = saleTotal;
     existing.totalBags = totalBags;
     existing.totalWeight = totalWeight;
+    existing.isPaid = nowPaid;
+    existing.paymentType = paymentTypeVal;
+    existing.paidAmount = nowPaid ? saleTotal : 0;
     await existing.save();
 
     if (oldCustomer) {
       if (oldCustomer._id.toString() === customer._id.toString()) {
-        oldCustomer.creditBalance = Math.max(0, oldCustomer.creditBalance - oldSaleTotal + saleTotal);
+        if (!wasPaid && !nowPaid) {
+          oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal + saleTotal).toFixed(2)));
+        } else if (!wasPaid && nowPaid) {
+          oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal).toFixed(2)));
+        } else if (wasPaid && !nowPaid) {
+          oldCustomer.creditBalance = Number((oldCustomer.creditBalance + saleTotal).toFixed(2));
+        }
         await oldCustomer.save();
       } else {
-        oldCustomer.creditBalance = Math.max(0, oldCustomer.creditBalance - oldSaleTotal);
-        await oldCustomer.save();
-        customer.creditBalance += saleTotal;
-        await customer.save();
+        if (!wasPaid) {
+          oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal).toFixed(2)));
+          await oldCustomer.save();
+        }
+        if (!nowPaid) {
+          customer.creditBalance = Number((customer.creditBalance + saleTotal).toFixed(2));
+          await customer.save();
+        }
       }
-    } else {
-      customer.creditBalance += saleTotal;
+    } else if (!nowPaid) {
+      customer.creditBalance = Number((customer.creditBalance + saleTotal).toFixed(2));
       await customer.save();
     }
 
     const refreshedCustomer = await Customer.findById(customer._id);
 
     if (oldVendor && oldVendor._id.toString() !== vendor._id.toString()) {
-      oldVendor.creditBalance = Math.max(0, oldVendor.creditBalance - oldMaterialsTotal);
+      oldVendor.creditBalance = Math.max(0, Number((oldVendor.creditBalance - oldMaterialsTotal).toFixed(2)));
       await oldVendor.save();
-      vendor.creditBalance += materialsTotal;
+      vendor.creditBalance = Number((vendor.creditBalance + materialsTotal).toFixed(2));
       await vendor.save();
     } else if (oldVendor) {
-      oldVendor.creditBalance = Math.max(0, oldVendor.creditBalance - oldMaterialsTotal + materialsTotal);
+      oldVendor.creditBalance = Math.max(0, Number((oldVendor.creditBalance - oldMaterialsTotal + materialsTotal).toFixed(2)));
       await oldVendor.save();
     } else {
-      vendor.creditBalance += materialsTotal;
+      vendor.creditBalance = Number((vendor.creditBalance + materialsTotal).toFixed(2));
       await vendor.save();
     }
 
-    const desc = `Sale - ${processedLines.map((l) => l.materialName).join(', ')}`;
+    const desc = `Sale${nowPaid ? ' (Paid Direct)' : ''} - ${processedLines.map((l) => l.materialName).join(', ')}`;
     await Transaction.updateMany(
       { sale: existing._id, type: 'customer_credit' },
       {
@@ -615,10 +654,35 @@ router.put('/:id', async (req, res) => {
           customer: customer._id,
           amount: saleTotal,
           description: desc,
-          balanceAfter: refreshedCustomer.creditBalance,
+          balanceAfter: refreshedCustomer?.creditBalance || 0,
         },
       }
     );
+
+    if (nowPaid) {
+      const existingPayTx = await Transaction.findOne({ sale: existing._id, type: 'customer_payment' });
+      if (existingPayTx) {
+        existingPayTx.customer = customer._id;
+        existingPayTx.amount = saleTotal;
+        existingPayTx.paymentType = paymentTypeVal;
+        existingPayTx.balanceAfter = refreshedCustomer?.creditBalance || 0;
+        await existingPayTx.save();
+      } else {
+        await Transaction.create({
+          customer: customer._id,
+          type: 'customer_payment',
+          amount: saleTotal,
+          paymentType: paymentTypeVal,
+          description: `Direct Payment for Sale - ${processedLines.map((l) => l.materialName).join(', ')}`,
+          sale: existing._id,
+          source: 'Direct Sale Payment',
+          balanceAfter: refreshedCustomer?.creditBalance || 0,
+        });
+      }
+    } else {
+      await Transaction.deleteMany({ sale: existing._id, type: 'customer_payment' });
+    }
+
     const vendorNow = await Vendor.findById(vendor._id);
     await Transaction.updateMany(
       { sale: existing._id, type: 'vendor_credit' },
@@ -643,4 +707,105 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+router.patch('/:id/toggle-paid', async (req, res) => {
+  try {
+    const sale = await Sale.findById(req.params.id);
+    if (!sale) return res.status(404).json({ message: 'Sale not found' });
+
+    const targetIsPaid = req.body.isPaid !== undefined ? !!req.body.isPaid : !sale.isPaid;
+    const paymentTypeVal = req.body.paymentType || sale.paymentType || 'Cash';
+
+    if (sale.isPaid === targetIsPaid) {
+      return res.json(sale);
+    }
+
+    const customer = await Customer.findById(sale.customer);
+    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+
+    sale.isPaid = targetIsPaid;
+    sale.paymentType = paymentTypeVal;
+    sale.paidAmount = targetIsPaid ? sale.totalAmount : 0;
+    await sale.save();
+
+    if (targetIsPaid) {
+      // Unpaid -> Paid: Subtract from customer credit balance since it's paid direct
+      customer.creditBalance = Math.max(0, Number((customer.creditBalance - sale.totalAmount).toFixed(2)));
+      await customer.save();
+
+      // Create a customer_payment transaction
+      await Transaction.create({
+        customer: customer._id,
+        type: 'customer_payment',
+        amount: sale.totalAmount,
+        paymentType: paymentTypeVal,
+        description: `Direct Payment for Sale #${sale.serialNo || ''}`,
+        sale: sale._id,
+        source: 'Direct Sale Payment',
+        balanceAfter: customer.creditBalance,
+      });
+
+      // Update customer credit transaction description
+      await Transaction.updateMany(
+        { sale: sale._id, type: 'customer_credit' },
+        { $set: { description: `Sale (Paid Direct) - ${(sale.lines || []).map((l) => l.materialName).join(', ')}` } }
+      );
+    } else {
+      // Paid -> Unpaid: Re-add to customer credit balance
+      customer.creditBalance = Number((customer.creditBalance + sale.totalAmount).toFixed(2));
+      await customer.save();
+
+      // Delete the customer_payment transaction
+      await Transaction.deleteMany({ sale: sale._id, type: 'customer_payment' });
+
+      // Reset customer credit transaction description
+      await Transaction.updateMany(
+        { sale: sale._id, type: 'customer_credit' },
+        { $set: { description: `Sale - ${(sale.lines || []).map((l) => l.materialName).join(', ')}` } }
+      );
+    }
+
+    const populated = await Sale.findById(sale._id)
+      .populate('customer', 'name nameTelugu city state mobile address creditBalance')
+      .populate('vendor', 'name nameTelugu city creditBalance')
+      .populate('load', 'createdAt totalWeight');
+
+    res.json(populated);
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Failed to toggle paid status' });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  try {
+    const sale = await Sale.findById(req.params.id);
+    if (!sale) return res.status(404).json({ message: 'Sale not found' });
+
+    if (sale.customer && !sale.isPaid) {
+      const customer = await Customer.findById(sale.customer);
+      if (customer) {
+        customer.creditBalance = Math.max(0, Number((customer.creditBalance - (Number(sale.totalAmount) || 0)).toFixed(2)));
+        await customer.save();
+      }
+    }
+
+    if (sale.vendor) {
+      const vendor = await Vendor.findById(sale.vendor);
+      if (vendor) {
+        const materialsTotal = (sale.lines || []).reduce((s, l) => s + (Number(l.totalAmount) || 0), 0);
+        vendor.creditBalance = Math.max(0, Number((vendor.creditBalance - materialsTotal).toFixed(2)));
+        await vendor.save();
+      }
+    }
+
+    await Transaction.deleteMany({ sale: sale._id });
+    await Sale.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Sale entry deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Failed to delete sale entry' });
+  }
+});
+
 export default router;
+
+

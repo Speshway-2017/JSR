@@ -35,6 +35,9 @@ const saleSchema = new mongoose.Schema(
     totalBags: { type: Number, default: 0 },
     totalWeight: { type: Number, default: 0 },
     serialNo: { type: Number, default: null },
+    isPaid: { type: Boolean, default: false },
+    paymentType: { type: String, default: 'Cash', trim: true },
+    paidAmount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

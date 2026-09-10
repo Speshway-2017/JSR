@@ -653,13 +653,23 @@ ${BILL_CSS}
 <body class="bill-preview" style="font-family:'${RAMABHADRA}','Noto Sans Telugu',sans-serif;font-weight:400;">
   <div class="preview-toolbar no-print">
     <button type="button" class="secondary" onclick="window.close()">Close</button>
-    <button type="button" class="whatsapp" onclick="sendWhatsAppBill()">Send WhatsApp</button>
+    <button type="button" id="whatsapp-btn" class="whatsapp" onclick="sendWhatsAppBill()">Send WhatsApp</button>
     <button type="button" onclick="window.print()">Print / Save PDF</button>
   </div>
   <div class="preview-stage">
     <div class="sheet">${sheetInner}</div>
   </div>
   <script>
+    function checkConnectivity() {
+      var waBtn = document.getElementById('whatsapp-btn');
+      if (waBtn) {
+        waBtn.style.display = (navigator.onLine === false) ? 'none' : '';
+      }
+    }
+    window.addEventListener('online', checkConnectivity);
+    window.addEventListener('offline', checkConnectivity);
+    checkConnectivity();
+
     function sendWhatsAppBill() {
       var sheet = document.querySelector('.sheet');
       var bodyText = sheet ? sheet.innerText : document.body.innerText;

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Printer, Send, FileText, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Edit2, Calendar } from 'lucide-react';
+import { Printer, Send, FileText, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Edit2, Calendar, CheckCircle2, DollarSign } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
@@ -8,12 +8,18 @@ import { openRangeBillsNUp } from '../utils/rangeBillPrint';
 import { generateSingleCustomerBillHtml } from '../utils/customerSaleBillPdf';
 import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
 import { useDataRestored } from '../utils/useDataRestored';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+
+import { useMDI } from '../context/MDIContext';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function SalesPrint({ path: windowPath }) {
+  const { updateWindowPath } = useMDI();
+  const isOnline = useOnlineStatus();
+
   const [searchParams] = useSearchParams();
   const effectiveSearchParams = useMemo(() => {
     if (windowPath && windowPath.includes('?')) {
@@ -26,6 +32,12 @@ export default function SalesPrint({ path: windowPath }) {
 
   const [startDate, setStartDate] = useState(dateParam);
   const [endDate, setEndDate] = useState(dateParam);
+
+  useEffect(() => {
+    if (startDate && typeof updateWindowPath === 'function') {
+      updateWindowPath('/sales-print', `/sales-print?date=${startDate}`);
+    }
+  }, [startDate, updateWindowPath]);
 
   const [filterCustomer, setFilterCustomer] = useState(effectiveSearchParams.get('customer') || '');
   const [filterVendor, setFilterVendor] = useState(effectiveSearchParams.get('vendor') || '');
@@ -447,6 +459,24 @@ export default function SalesPrint({ path: windowPath }) {
     }
   };
 
+  const toggleBillPaid = async (st, targetIsPaid) => {
+    try {
+      const saleIds = Array.from(new Set((st.sales || []).map((s) => s.saleId).filter(Boolean)));
+      if (!saleIds.length) {
+        toast.error('No sale ID found to update status');
+        return;
+      }
+      for (const saleId of saleIds) {
+        await api.patch(`/sales/${saleId}/toggle-paid`, { isPaid: targetIsPaid });
+      }
+      toast.success(targetIsPaid ? `Marked as Paid for ${st.name}` : `Marked as Unpaid for ${st.name}`);
+      fetchSalesBills();
+      window.dispatchEvent(new CustomEvent('jsr_data_updated'));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update payment status');
+    }
+  };
+
   const SortHeader = ({ column, label }) => {
     const active = sortKey === column;
     const Icon = active ? (sortDir === 'desc' ? ArrowDown : ArrowUp) : ArrowUpDown;
@@ -474,15 +504,17 @@ export default function SalesPrint({ path: windowPath }) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="btn-secondary !py-2 !px-3 text-xs"
-            onClick={handleSendWhatsApp}
-            disabled={!selectedStatements.length}
-          >
-            <Send className="w-4 h-4 text-emerald-600" /> Send WhatsApp
-          </button>
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+          {isOnline && (
+            <button
+              type="button"
+              className="btn-secondary !py-2 !px-3 text-xs"
+              onClick={handleSendWhatsApp}
+              disabled={!selectedStatements.length}
+            >
+              <Send className="w-4 h-4 text-emerald-600" /> Send WhatsApp
+            </button>
+          )}
           <button
             type="button"
             className="btn-primary !py-2 !px-4 text-xs"
@@ -503,7 +535,7 @@ export default function SalesPrint({ path: windowPath }) {
           </div>
 
           <select
-            className="input-field !h-10 !py-0 w-full sm:w-48 text-sm"
+            className="input-field !h-10 !py-0 w-full sm:w-auto min-w-[140px] text-sm flex-1 sm:flex-initial"
             value={filterCustomer}
             onChange={(e) => setFilterCustomer(e.target.value)}
           >
@@ -516,7 +548,7 @@ export default function SalesPrint({ path: windowPath }) {
           </select>
 
           <select
-            className="input-field !h-10 !py-0 w-full sm:w-44 text-sm"
+            className="input-field !h-10 !py-0 w-full sm:w-auto min-w-[130px] text-sm flex-1 sm:flex-initial"
             value={filterVendor}
             onChange={(e) => setFilterVendor(e.target.value)}
           >
@@ -529,7 +561,7 @@ export default function SalesPrint({ path: windowPath }) {
           </select>
 
           <select
-            className="input-field !h-10 !py-0 w-full sm:w-44 text-sm"
+            className="input-field !h-10 !py-0 w-full sm:w-auto min-w-[130px] text-sm flex-1 sm:flex-initial"
             value={filterItem}
             onChange={(e) => setFilterItem(e.target.value)}
           >
@@ -567,9 +599,9 @@ export default function SalesPrint({ path: windowPath }) {
       </div>
 
       {/* Main Workspace (Split View) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-col xl:grid xl:grid-cols-12 gap-4 flex-1 min-h-0 overflow-y-auto xl:overflow-hidden">
         {/* Left Column: Records Table */}
-        <div className="lg:col-span-3 flex flex-col card !p-0 overflow-hidden min-h-[300px]">
+        <div className="xl:col-span-3 flex flex-col card !p-0 overflow-hidden min-h-[220px] max-h-[300px] xl:max-h-none shrink-0 xl:shrink">
           <div className="px-3 py-2.5 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <button type="button" onClick={toggleSelectAll} className="text-primary-600">
@@ -643,7 +675,7 @@ export default function SalesPrint({ path: windowPath }) {
         </div>
 
         {/* Right Column: Live Bill Preview */}
-        <div className="lg:col-span-9 flex flex-col card !p-0 overflow-hidden min-h-[300px]">
+        <div className="xl:col-span-9 flex flex-col card !p-0 overflow-hidden min-h-[300px] flex-1">
           <div className="px-4 py-2.5 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between flex-wrap gap-2">
             <span className="font-bold text-primary-800 text-sm">
               Live Preview ({selectedStatements.length} Bills · {perPage} per page layout)
@@ -677,33 +709,55 @@ export default function SalesPrint({ path: windowPath }) {
                 <p className="text-xs mt-1 text-primary-400">Select customers on the left to see live preview</p>
               </div>
             ) : (
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-                {selectedStatements.slice(0, 12).map((st) => (
-                  <div
-                    key={st.customerId}
-                    className="card !p-3.5 border border-primary-200 shadow-sm bg-white text-xs space-y-2.5 relative"
-                  >
-                    <div className="flex items-center justify-between border-b border-primary-100 pb-2">
-                      <div className="text-center flex-1">
-                        <p className="font-bold text-primary-900 text-base">{st.name}</p>
-                        {st.nameTelugu ? (
-                          <p className="text-xs text-primary-500 font-medium">{st.nameTelugu}</p>
-                        ) : null}
-                      </div>
-                    </div>
+              <div className="grid gap-4 grid-cols-1 xl:grid-cols-2">
+                {selectedStatements.slice(0, 12).map((st) => {
+                  const allPaid = (st.sales || []).length > 0 && (st.sales || []).every((s) => s.isPaid);
+                  return (
+                      <div
+                        key={st.customerId}
+                        className="card !p-3.5 border border-primary-200 shadow-sm bg-white text-xs space-y-2.5 relative overflow-hidden"
+                      >
+                        <div className="flex items-center justify-between border-b border-primary-100 pb-2">
+                          <div className="text-left flex-1">
+                            <p className="font-bold text-primary-900 text-base">{st.name}</p>
+                            {st.nameTelugu ? (
+                              <p className="text-xs text-primary-500 font-medium">{st.nameTelugu}</p>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {allPaid ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Paid Direct
+                              </span>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => toggleBillPaid(st, !allPaid)}
+                              className={`px-3 py-1 rounded-md text-xs font-bold border transition shadow-2xs cursor-pointer ${
+                                allPaid
+                                  ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                                  : 'bg-emerald-600 text-white hover:bg-emerald-700 border-emerald-700'
+                              }`}
+                              title={allPaid ? 'Click to mark as unpaid' : 'Click to mark as paid direct'}
+                            >
+                              {allPaid ? 'Mark Unpaid' : 'Mark as Paid'}
+                            </button>
+                          </div>
+                        </div>
 
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-primary-200 text-primary-600 font-semibold text-left bg-primary-50/70">
-                          <th className="py-1.5 px-1 font-bold">తేదీ</th>
-                          <th className="py-1.5 px-1 font-bold">వస్తువు</th>
-                          <th className="py-1.5 px-1 text-right font-bold">బ్యాగ్</th>
-                          <th className="py-1.5 px-1 text-right font-bold">బరువు (kg)</th>
-                          <th className="py-1.5 px-1 text-right font-bold">ధర</th>
-                          <th className="py-1.5 px-1 text-right font-bold">మొత్తం</th>
-                          <th className="py-1.5 px-1 text-center font-bold w-6"></th>
-                        </tr>
-                      </thead>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs min-w-[340px]">
+                        <thead>
+                          <tr className="border-b border-primary-200 text-primary-600 font-semibold text-left bg-primary-50/70 whitespace-nowrap">
+                            <th className="py-1.5 px-1 font-bold">తేదీ</th>
+                            <th className="py-1.5 px-1 font-bold">వస్తువు</th>
+                            <th className="py-1.5 px-1 text-right font-bold">బ్యాగ్</th>
+                            <th className="py-1.5 px-1 text-right font-bold">బరువు (kg)</th>
+                            <th className="py-1.5 px-1 text-right font-bold">ధర</th>
+                            <th className="py-1.5 px-1 text-right font-bold">మొత్తం</th>
+                            <th className="py-1.5 px-1 text-center font-bold w-6"></th>
+                          </tr>
+                        </thead>
                       <tbody className="divide-y divide-primary-100">
                         {(st.sales || []).map((s, idx) => {
                           const rowKey = `${st.customerId}_${s.saleId || idx}_${idx}`;
@@ -844,7 +898,7 @@ export default function SalesPrint({ path: windowPath }) {
                             </tr>
                           );
                         })}
-                        <tr className="font-bold text-primary-900 border-t border-primary-200 bg-primary-50/50">
+                        <tr className="font-bold text-primary-900 border-t border-primary-200 bg-primary-50/50 whitespace-nowrap">
                           <td className="py-2 px-1 font-bold text-xs" colSpan={5}>
                             Total
                           </td>
@@ -854,9 +908,11 @@ export default function SalesPrint({ path: windowPath }) {
                         </tr>
                       </tbody>
                     </table>
+                    </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
+            </div>
             )}
           </div>
         </div>
