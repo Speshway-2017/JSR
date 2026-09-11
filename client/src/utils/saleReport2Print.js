@@ -54,17 +54,16 @@ export function saleReport2InnerHtml(data) {
   let currentLines = 0;
 
   for (const col of columns) {
-    const entries = col.entries || (col.rateGroups || []).flatMap((g) => g.entries || []);
-    const matLineCount = 4 + entries.length;
+    const vendLineCount = 4 + (col.materials || []).reduce((acc, m) => acc + 2 + (m.entries?.length || 0), 0);
 
-    if (currentChunk.length > 0 && currentLines + matLineCount > LINES_PER_PAGE) {
+    if (currentChunk.length > 0 && currentLines + vendLineCount > LINES_PER_PAGE) {
       pageChunks.push(currentChunk);
       currentChunk = [];
       currentLines = 0;
     }
 
     currentChunk.push(col);
-    currentLines += matLineCount;
+    currentLines += vendLineCount;
   }
 
   if (currentChunk.length > 0) {
@@ -76,24 +75,35 @@ export function saleReport2InnerHtml(data) {
   return pageChunks
     .map((chunk, pageIdx) => {
       const blocks = chunk
-        .map((col) => {
-          const title = esc(col.materialName);
-          const te = col.materialNameTelugu ? `<div class="te">${esc(col.materialNameTelugu)}</div>` : '';
-          const entries = col.entries || (col.rateGroups || []).flatMap((g) => g.entries || []);
-          const lines = entries
-            .map((e) => {
-              const bagsText = esc(fmtBags(e.bags));
-              const rateVal = e.rate != null ? e.rate : (e.amount != null ? e.amount : 0);
-              const whoText = e.vendorName
-                ? `${esc(e.name)} <span class="vendor-tag">(${esc(e.vendorName)})</span>`
-                : esc(e.name);
-              return `<div class="line"><span class="who">${whoText}</span> - ${bagsText} = rs <span class="price-red">${esc(rateVal)}</span></div>`;
+        .map((vend) => {
+          const vendTitle = esc(vend.vendorName);
+          const vendTe = vend.vendorNameTelugu ? `<div class="te">${esc(vend.vendorNameTelugu)}</div>` : '';
+
+          const matBlocks = (vend.materials || [])
+            .map((mat) => {
+              const matTitle = esc(mat.materialName);
+              const matTe = mat.materialNameTelugu ? `<span class="mat-te"> (${esc(mat.materialNameTelugu)})</span>` : '';
+
+              const lines = (mat.entries || [])
+                .map((e) => {
+                  const bagsText = esc(fmtBags(e.bags));
+                  const rateVal = e.rate != null ? e.rate : (e.amount != null ? e.amount : 0);
+                  return `<div class="line"><span class="who">${esc(e.name)}</span> - ${bagsText} = rs <span class="price-red">${esc(rateVal)}</span></div>`;
+                })
+                .join('');
+
+              return `<div class="mat-subgroup">
+                <div class="mat-subhead">${matTitle}${matTe}</div>
+                <div class="group">${lines}</div>
+              </div>`;
             })
             .join('');
-          const colBags = col.bagCount || entries.reduce((s, e) => s + (e.count || (Array.isArray(e.bags) ? e.bags.length : 1)), 0);
-          const colKg = col.totalKg || Number(entries.reduce((s, e) => s + (e.weight || 0), 0).toFixed(1));
+
+          const colBags = vend.bagCount || 0;
+          const colKg = vend.totalKg || 0;
           const colSummary = `<div class="col-summary">Tot: <strong>${colBags} Bags</strong>${colKg > 0 ? `, <strong>${colKg} kg</strong>` : ''}</div>`;
-          return `<section class="mat"><div class="head">${title}${te}</div><div class="group">${lines}</div>${colSummary}</section>`;
+
+          return `<section class="mat"><div class="head">${vendTitle}${vendTe}</div>${matBlocks}${colSummary}</section>`;
         })
         .join('');
 
@@ -173,11 +183,13 @@ export const SALE_REPORT_2_CSS = `
 
 .mat .head {
   text-align: center;
-  font-size: 14px;
-  font-weight: 700;
-  border-bottom: 1px solid #111111;
-  margin-bottom: 6px;
-  padding-bottom: 2px;
+  font-size: 15px;
+  font-weight: 800;
+  border-bottom: 2px solid #111111;
+  margin-bottom: 8px;
+  padding-bottom: 3px;
+  background: #f8fafc;
+  text-transform: uppercase;
   break-after: avoid;
   page-break-after: avoid;
 }
@@ -185,6 +197,30 @@ export const SALE_REPORT_2_CSS = `
 .mat .head .te {
   font-size: 12px;
   font-weight: 400;
+  text-transform: none;
+}
+
+.mat-subgroup {
+  margin-bottom: 6px;
+}
+
+.mat-subhead {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  border-bottom: 1px solid #cbd5e1;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  padding-bottom: 1px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.mat-subhead .mat-te {
+  font-size: 11px;
+  font-weight: 400;
+  color: #475569;
 }
 
 .group {

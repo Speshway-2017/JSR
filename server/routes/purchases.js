@@ -75,8 +75,8 @@ router.post('/', async (req, res) => {
       const material = await resolveMaterial(line);
       const purchaseType = line.purchaseType === 'by_bag' ? 'by_bag' : 'by_weight';
       const isByBag = purchaseType === 'by_bag';
-      const bags = Math.floor(Number(line.bags)) || 0;
-      const totalKg = Number(line.totalKg) || 0;
+      const bags = isByBag ? Math.floor(Number(line.bags)) || 0 : 0;
+      const totalKg = isByBag ? 0 : Number(line.totalKg) || 0;
       const ratePerKg = Number(line.ratePerKg);
 
       if (!material) {

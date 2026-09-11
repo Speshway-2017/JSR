@@ -71,24 +71,8 @@ export default function SalesPrint({ path: windowPath }) {
   const [sortKey, setSortKey] = useState('');
   const [sortDir, setSortDir] = useState('asc');
 
-  // Inline Editing State
-  const [editingCid, setEditingCid] = useState('');
-  const [editingRowKey, setEditingRowKey] = useState('');
-  const [editingSale, setEditingSale] = useState(null);
-  const [editForm, setEditForm] = useState({
-    saleId: '',
-    customerId: '',
-    vendorId: '',
-    materialId: '',
-    bags: 1,
-    weight: 0,
-    ratePerKg: 0,
-    saleType: 'by_weight',
-    handlingCharges: 0,
-    coolyRate: 0,
-    coolyPerBag: false,
-  });
-  const [savingEdit, setSavingEdit] = useState(false);
+  const cellStyle =
+    'w-full bg-transparent rounded border border-transparent hover:border-primary-200 focus:border-primary-400 focus:bg-white outline-none px-1 py-0.5 text-xs transition-all';
 
   useEffect(() => {
     Promise.all([
@@ -367,57 +351,37 @@ export default function SalesPrint({ path: windowPath }) {
     }
   };
 
-  const openInlineEdit = (st, saleLine, rowKey) => {
-    const targetLine = saleLine || (st.sales || []).find((s) => !s.isCoolyLine) || st.sales?.[0];
-    if (!targetLine || !targetLine.saleId) {
-      toast.error('Cannot edit this sale record');
+  const persistSaleLine = async (st, s, patch) => {
+    if (!s || !s.saleId) {
+      toast.error('Cannot update this sale record');
       return;
     }
-    const cid = String(st.customerId);
 
-    const matchedCust = customers.find(
-      (c) => String(c._id) === cid || c.name.toLowerCase() === String(st.name || '').trim().toLowerCase()
-    );
-    const resolvedCustId = matchedCust ? String(matchedCust._id) : cid;
-
-    const matchedVendor = vendors.find(
-      (v) => String(v._id) === String(targetLine.vendorId || '') || v.name.toLowerCase() === String(targetLine.vendorName || '').trim().toLowerCase()
-    );
-    const resolvedVendorId = matchedVendor ? String(matchedVendor._id) : (vendors[0]?._id ? String(vendors[0]._id) : '');
-
-    const matchedMat = materials.find(
-      (m) => String(m._id) === String(targetLine.materialId || '') || m.name.toLowerCase() === String(targetLine.material || '').trim().toLowerCase()
-    );
-    const resolvedMatId = matchedMat ? String(matchedMat._id) : (materials[0]?._id ? String(materials[0]._id) : '');
-
-    setEditingCid(cid);
-    setEditingRowKey(rowKey || `${cid}_${targetLine.saleId}`);
-    setEditingSale(targetLine);
-    setEditForm({
-      saleId: targetLine.saleId,
-      customerId: resolvedCustId,
-      vendorId: resolvedVendorId,
-      materialId: resolvedMatId,
-      bags: targetLine.bags || 1,
-      weight: targetLine.weight || 0,
-      ratePerKg: targetLine.ratePerKg || (targetLine.weight ? (targetLine.amount / targetLine.weight) : (targetLine.amount / (targetLine.bags || 1))),
-      saleType: targetLine.saleType || 'by_weight',
-      handlingCharges: targetLine.cooly || targetLine.handlingCharges || 0,
-      coolyRate: targetLine.coolyRate || 0,
-      coolyPerBag: targetLine.coolyPerBag || false,
-    });
-  };
-
-  const handleSaveEdit = async (e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-    if (!editForm.saleId) return;
-    setSavingEdit(true);
     try {
-      const isByBag = editForm.saleType === 'by_bag';
-      const bagsCount = Math.max(1, Number(editForm.bags) || 1);
-      const totalKg = Number(editForm.weight) || 0;
-      const rate = Number(editForm.ratePerKg) || 0;
+      const cid = String(st.customerId);
+      const matchedCust = customers.find(
+        (c) => String(c._id) === cid || c.name.toLowerCase() === String(st.name || '').trim().toLowerCase()
+      );
+      const resolvedCustId = matchedCust ? String(matchedCust._id) : cid;
+
+      const matchedVendor = vendors.find(
+        (v) => String(v._id) === String(s.vendorId || '') || v.name.toLowerCase() === String(s.vendorName || '').trim().toLowerCase()
+      );
+      const resolvedVendorId = matchedVendor ? String(matchedVendor._id) : (vendors[0]?._id ? String(vendors[0]._id) : '');
+
+      const isByBag = patch.saleType !== undefined ? patch.saleType === 'by_bag' : s.saleType === 'by_bag';
+      const bagsCount = patch.bags !== undefined ? Math.max(1, Math.floor(Number(patch.bags)) || 1) : (Number(s.bags) || 1);
+      const totalKg = patch.weight !== undefined ? (Number(patch.weight) || 0) : (Number(s.weight) || 0);
+      const rate = patch.ratePerKg !== undefined ? (Number(patch.ratePerKg) || 0) : (Number(s.ratePerKg) || 0);
+      const cooly = patch.cooly !== undefined ? (Number(patch.cooly) || 0) : (Number(s.cooly || s.handlingCharges) || 0);
+
+      let matId = patch.materialId;
+      if (!matId) {
+        const matchedMat = materials.find(
+          (m) => String(m._id) === String(s.materialId || '') || m.name.toLowerCase() === String(s.material || '').trim().toLowerCase()
+        );
+        matId = matchedMat ? String(matchedMat._id) : (materials[0]?._id ? String(materials[0]._id) : '');
+      }
 
       let bagEntries = [];
       if (!isByBag && totalKg > 0) {
@@ -426,15 +390,15 @@ export default function SalesPrint({ path: windowPath }) {
       }
 
       const payload = {
-        customerId: editForm.customerId,
-        vendorId: editForm.vendorId,
-        date: startDate,
-        handlingCharges: Number(editForm.handlingCharges) || 0,
-        coolyRate: Number(editForm.coolyRate) || Number(editForm.handlingCharges) || 0,
-        coolyPerBag: editForm.coolyPerBag || false,
+        customerId: resolvedCustId,
+        vendorId: resolvedVendorId,
+        date: s.date || startDate,
+        handlingCharges: cooly,
+        coolyRate: s.coolyRate || cooly,
+        coolyPerBag: s.coolyPerBag || false,
         lines: [
           {
-            materialId: editForm.materialId,
+            materialId: matId,
             saleType: isByBag ? 'by_bag' : 'by_weight',
             ratePerKg: rate,
             bags: bagEntries,
@@ -444,18 +408,12 @@ export default function SalesPrint({ path: windowPath }) {
         ],
       };
 
-      const currentSaleId = editForm.saleId;
-      setEditingCid('');
-      setEditingRowKey('');
-      setEditingSale(null);
-
-      await api.put(`/sales/${currentSaleId}`, payload);
-      toast.success('Sale updated successfully');
+      await api.put(`/sales/${s.saleId}`, payload);
+      toast.success('Sale updated');
       await fetchSalesBills();
+      window.dispatchEvent(new CustomEvent('jsr_data_updated'));
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Failed to update sale');
-    } finally {
-      setSavingEdit(false);
     }
   };
 
@@ -750,164 +708,144 @@ export default function SalesPrint({ path: windowPath }) {
                         <thead>
                           <tr className="border-b border-primary-200 text-primary-600 font-semibold text-left bg-primary-50/70 whitespace-nowrap">
                             <th className="py-1.5 px-1 font-bold">తేదీ</th>
-                            <th className="py-1.5 px-1 font-bold">వస్తువు</th>
-                            <th className="py-1.5 px-1 text-right font-bold">బ్యాగ్</th>
-                            <th className="py-1.5 px-1 text-right font-bold">బరువు (kg)</th>
-                            <th className="py-1.5 px-1 text-right font-bold">ధర</th>
+                            <th className="py-1.5 px-1 font-bold min-w-[7rem]">వస్తువు</th>
+                            <th className="py-1.5 px-1 text-right font-bold w-12">బ్యాగ్</th>
+                            <th className="py-1.5 px-1 text-right font-bold w-16">బరువు (kg)</th>
+                            <th className="py-1.5 px-1 text-right font-bold w-16">ధర</th>
                             <th className="py-1.5 px-1 text-right font-bold">మొత్తం</th>
-                            <th className="py-1.5 px-1 text-center font-bold w-6"></th>
                           </tr>
                         </thead>
-                      <tbody className="divide-y divide-primary-100">
-                        {(st.sales || []).map((s, idx) => {
-                          const rowKey = `${st.customerId}_${s.saleId || idx}_${idx}`;
-                          const isEditingRow = editingRowKey === rowKey;
+                        <tbody className="divide-y divide-primary-100">
+                          {(st.sales || []).map((s, idx) => {
+                            const rowKey = `${st.customerId}_${s.saleId || idx}_${idx}`;
+                            const baseAmount = Number(s.amount) || 0;
+                            const coolyAmt = Number(s.cooly) || Number(s.handlingCharges) || 0;
+                            const lineTotal = baseAmount + coolyAmt;
 
-                          if (isEditingRow) {
+                            const selectedMatId =
+                              materials.find(
+                                (m) =>
+                                  String(m._id) === String(s.materialId || '') ||
+                                  m.name.toLowerCase() === String(s.material || '').trim().toLowerCase()
+                              )?._id || s.materialId || '';
+
                             return (
-                              <tr key={rowKey} onClick={(e) => e.stopPropagation()} className="bg-amber-50/90 border-2 border-amber-400">
-                                <td className="py-1.5 px-1 text-[11px] font-medium text-primary-600">
+                              <tr key={rowKey} className="hover:bg-primary-50/40 transition">
+                                <td className="py-1 px-1 text-primary-500 whitespace-nowrap">
                                   {formatDateOnly(s.date)}
                                 </td>
-                                <td className="py-1.5 px-1">
+                                <td className="py-1 px-1 min-w-[7rem]">
                                   <select
-                                    className="input-field !h-7 !py-0 !px-1 text-xs w-full font-medium"
-                                    value={editForm.materialId}
+                                    key={`${s.saleId}-mat-${s.materialId || s.material}`}
+                                    className={`${cellStyle} font-semibold text-primary-800 cursor-pointer`}
+                                    defaultValue={selectedMatId}
                                     onChange={(e) => {
-                                      const mat = materials.find((m) => m._id === e.target.value);
-                                      const newRate = mat?.sellingPricePerKg || editForm.ratePerKg;
-                                      setEditForm({ ...editForm, materialId: e.target.value, ratePerKg: newRate });
+                                      const newMatId = e.target.value;
+                                      if (!newMatId) return;
+                                      const mat = materials.find((m) => String(m._id) === newMatId);
+                                      const newRate =
+                                        mat?.sellingPricePerKg != null && mat.sellingPricePerKg > 0
+                                          ? mat.sellingPricePerKg
+                                          : s.ratePerKg;
+                                      persistSaleLine(st, s, { materialId: newMatId, ratePerKg: newRate });
                                     }}
                                   >
+                                    {!materials.some((m) => String(m._id) === String(selectedMatId)) && s.material && (
+                                      <option value="">{s.material}</option>
+                                    )}
                                     {materials.map((m) => (
-                                      <option key={m._id} value={m._id}>{m.name}</option>
+                                      <option key={m._id} value={m._id}>
+                                        {m.name}
+                                      </option>
                                     ))}
                                   </select>
                                 </td>
-                                <td className="py-1.5 px-1">
+                                <td className="py-1 px-1 w-12 text-right">
                                   <input
-                                    type="number"
-                                    className="input-field !h-7 !py-0 !px-1 text-xs w-12 text-right font-medium"
-                                    value={editForm.bags}
-                                    onChange={(e) => setEditForm({ ...editForm, bags: e.target.value })}
-                                    onFocus={(e) => e.target.select()}
-                                    min="1"
+                                    key={`${s.saleId}-bags-${s.bags}`}
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="off"
+                                    defaultValue={s.bags || 1}
+                                    className={`${cellStyle} text-right font-medium tabular-nums text-primary-800`}
+                                    onBlur={(e) => {
+                                      const newBags = Math.max(1, Math.floor(Number(e.target.value)) || 1);
+                                      if (newBags === Number(s.bags)) return;
+                                      persistSaleLine(st, s, { bags: newBags });
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') e.currentTarget.blur();
+                                    }}
                                   />
                                 </td>
-                                <td className="py-1.5 px-1">
-                                  <input
-                                    type="number"
-                                    step="0.1"
-                                    className="input-field !h-7 !py-0 !px-1 text-xs w-14 text-right font-medium"
-                                    value={editForm.weight}
-                                    onChange={(e) => setEditForm({ ...editForm, weight: e.target.value })}
-                                    onFocus={(e) => e.target.select()}
-                                  />
+                                <td className="py-1 px-1 w-16 text-right">
+                                  {s.saleType === 'by_bag' ? (
+                                    <span className="text-primary-400 font-medium py-1 px-1 block">—</span>
+                                  ) : (
+                                    <input
+                                      key={`${s.saleId}-weight-${s.weight}`}
+                                      type="text"
+                                      inputMode="decimal"
+                                      autoComplete="off"
+                                      defaultValue={s.weight != null ? s.weight : ''}
+                                      className={`${cellStyle} text-right font-medium tabular-nums text-primary-700`}
+                                      onBlur={(e) => {
+                                        const newWeight = Number(e.target.value) || 0;
+                                        if (newWeight === Number(s.weight)) return;
+                                        persistSaleLine(st, s, { weight: newWeight });
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') e.currentTarget.blur();
+                                      }}
+                                    />
+                                  )}
                                 </td>
-                                <td className="py-1.5 px-1">
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="input-field !h-7 !py-0 !px-1 text-xs w-14 text-right font-medium"
-                                    value={editForm.ratePerKg}
-                                    onChange={(e) => setEditForm({ ...editForm, ratePerKg: e.target.value })}
-                                    onFocus={(e) => e.target.select()}
-                                  />
-                                </td>
-                                <td className="py-1.5 px-1">
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="input-field !h-7 !py-0 !px-1 text-xs w-16 text-right font-medium"
-                                    value={editForm.handlingCharges}
-                                    onChange={(e) => setEditForm({ ...editForm, handlingCharges: e.target.value })}
-                                    onFocus={(e) => e.target.select()}
-                                    placeholder="Cooly"
-                                  />
-                                </td>
-                                <td className="py-1.5 px-1 text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <button
-                                      type="button"
-                                      title="Save inline edit"
-                                      onClick={handleSaveEdit}
-                                      disabled={savingEdit}
-                                      className="p-1 rounded bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold"
-                                    >
-                                      ✓
-                                    </button>
-                                    <button
-                                      type="button"
-                                      title="Cancel edit"
-                                      onClick={(e) => { e.stopPropagation(); setEditingCid(''); setEditingRowKey(''); }}
-                                      className="p-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-xs font-bold"
-                                    >
-                                      ✕
-                                    </button>
+                                <td className="py-1 px-1 w-16 text-right">
+                                  <div className="flex flex-col items-end">
+                                    <input
+                                      key={`${s.saleId}-rate-${s.ratePerKg}`}
+                                      type="text"
+                                      inputMode="decimal"
+                                      autoComplete="off"
+                                      defaultValue={s.ratePerKg != null ? s.ratePerKg : ''}
+                                      className={`${cellStyle} text-right font-medium tabular-nums text-primary-700`}
+                                      onBlur={(e) => {
+                                        const newRate = Number(e.target.value) || 0;
+                                        if (newRate === Number(s.ratePerKg)) return;
+                                        persistSaleLine(st, s, { ratePerKg: newRate });
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') e.currentTarget.blur();
+                                      }}
+                                    />
+                                    {s.saleType === 'by_bag' && (
+                                      <span className="inline-block text-[9px] font-semibold px-1 py-0.2 rounded bg-amber-100 text-amber-800 leading-none whitespace-nowrap">
+                                        per bag
+                                      </span>
+                                    )}
                                   </div>
+                                </td>
+                                <td className="py-1 px-1 text-right font-bold text-primary-800 whitespace-nowrap">
+                                  {formatCurrency(lineTotal)}
+                                  {coolyAmt > 0 ? (
+                                    <span className="text-[10px] text-emerald-700 block font-normal">
+                                      (incl. ₹{coolyAmt} cooly)
+                                    </span>
+                                  ) : null}
                                 </td>
                               </tr>
                             );
-                          }
-
-                          const baseAmount = Number(s.amount) || 0;
-                          const coolyAmt = Number(s.cooly) || Number(s.handlingCharges) || 0;
-                          const lineTotal = baseAmount + coolyAmt;
-
-                          return (
-                            <tr
-                              key={rowKey}
-                              onClick={() => openInlineEdit(st, s, rowKey)}
-                              className="cursor-pointer hover:bg-amber-50/50 transition group"
-                              title="Click anywhere on row to edit inline"
-                            >
-                              <td className="py-1.5 px-1 text-primary-500">{formatDateOnly(s.date)}</td>
-                              <td className="py-1.5 px-1 font-medium text-primary-800">
-                                <div>{s.material || 'Sale'}</div>
-                                {teluguMap[String(s.material || '').trim().toLowerCase()] &&
-                                teluguMap[String(s.material || '').trim().toLowerCase()] !== String(s.material || '').trim() ? (
-                                  <span className="text-[10px] text-primary-400 font-normal block">
-                                    {teluguMap[String(s.material || '').trim().toLowerCase()]}
-                                  </span>
-                                ) : null}
-                              </td>
-                              <td className="py-1.5 px-1 text-right">{s.bags || '—'}</td>
-                              <td className="py-1.5 px-1 text-right text-primary-600">
-                                {s.weight ? `${s.weight}` : '—'}
-                              </td>
-                              <td className="py-1.5 px-1 text-right text-primary-600">
-                                {s.ratePerKg ? `₹${s.ratePerKg}` : '—'}
-                              </td>
-                              <td className="py-1.5 px-1 text-right font-bold text-primary-800">
-                                {formatCurrency(lineTotal)}
-                                {coolyAmt > 0 ? (
-                                  <span className="text-[10px] text-emerald-700 block font-normal">
-                                    (incl. ₹{coolyAmt} cooly)
-                                  </span>
-                                ) : null}
-                              </td>
-                              <td className="py-1.5 px-1 text-center">
-                                <button
-                                  type="button"
-                                  className="opacity-0 group-hover:opacity-100 text-primary-400 hover:text-primary-800 transition"
-                                  title="Edit inline"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        <tr className="font-bold text-primary-900 border-t border-primary-200 bg-primary-50/50 whitespace-nowrap">
-                          <td className="py-2 px-1 font-bold text-xs" colSpan={5}>
-                            Total
-                          </td>
-                          <td className="py-2 px-1 text-right font-bold text-sm text-primary-900" colSpan={2}>
-                            {formatCurrency(st.totalSale)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                          })}
+                          <tr className="font-bold text-primary-900 border-t border-primary-200 bg-primary-50/50 whitespace-nowrap">
+                            <td className="py-2 px-1 font-bold text-xs" colSpan={5}>
+                              Total
+                            </td>
+                            <td className="py-2 px-1 text-right font-bold text-sm text-primary-900">
+                              {formatCurrency(st.totalSale)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 );

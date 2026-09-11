@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { FileBarChart, Download } from 'lucide-react';
+import { FileBarChart, Download, Eye, X, Scale } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../api';
 import { formatCurrency, formatDate } from '../utils/format';
@@ -20,6 +20,7 @@ export default function SalesReport() {
   const [materials, setMaterials] = useState([]);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedBagRecord, setSelectedBagRecord] = useState(null);
 
   useEffect(() => {
     Promise.all([api.get('/customers'), api.get('/materials')]).then(([c, m]) => {
@@ -95,6 +96,7 @@ export default function SalesReport() {
       Bags: row.bagCount,
       Rate: row.ratePerKg,
       'Weight (kg)': row.saleType === 'by_bag' || !row.totalWeight ? '—' : row.totalWeight,
+      'Individual Bag Weights (kg)': row.bags && row.bags.length ? row.bags.join(', ') : '—',
       'Total Price (₹)': row.totalAmount,
     }));
 
@@ -106,6 +108,7 @@ export default function SalesReport() {
       Bags: summary.totalBags,
       Rate: '',
       'Weight (kg)': summary.totalWeight,
+      'Individual Bag Weights (kg)': '',
       'Total Price (₹)': summary.totalAmount,
     });
 
@@ -117,6 +120,7 @@ export default function SalesReport() {
       { wch: 8 },
       { wch: 8 },
       { wch: 12 },
+      { wch: 28 },
       { wch: 14 },
     ];
     const wb = XLSX.utils.book_new();
@@ -238,21 +242,34 @@ export default function SalesReport() {
         ) : (
           <>
             <div className="md:hidden divide-y divide-primary-100">
-              {rows.map((row) => (
-                <div key={row.id} className="px-4 py-3">
-                  <div className="flex justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-primary-700">{row.materialName}</p>
-                      <p className="text-xs text-primary-400">{row.customerName}</p>
-                      <p className="text-xs text-primary-400 mt-0.5">{formatDate(row.date)}</p>
-                      <p className="text-xs text-primary-500 mt-1">
-                        {row.bagCount} bags · Rate {row.ratePerKg} · {formatWeight(row.totalWeight)}
-                      </p>
+              {rows.map((row) => {
+                const hasBags = row.bags && row.bags.length > 0;
+                return (
+                  <div key={row.id} className="px-4 py-3">
+                    <div className="flex justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-primary-700">{row.materialName}</p>
+                        <p className="text-xs text-primary-400">{row.customerName}</p>
+                        <p className="text-xs text-primary-400 mt-0.5">{formatDate(row.date)}</p>
+                        <div className="flex items-center gap-1.5 text-xs text-primary-500 mt-1 flex-wrap">
+                          <span>{row.bagCount} bags · Rate {row.ratePerKg} · {formatWeight(row.totalWeight)}</span>
+                          {hasBags && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedBagRecord(row)}
+                              title="View individual bag weights"
+                              className="p-1 rounded-md transition border bg-primary-50 text-primary-600 border-primary-200 hover:bg-primary-100"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <p className="font-semibold text-primary-700 shrink-0">{formatCurrency(row.totalAmount)}</p>
                     </div>
-                    <p className="font-semibold text-primary-700 shrink-0">{formatCurrency(row.totalAmount)}</p>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <div className="px-4 py-3 bg-primary-50 flex justify-between text-sm font-semibold text-primary-700">
                 <span>Total</span>
                 <span>{formatCurrency(summary.totalAmount)}</span>
@@ -273,19 +290,40 @@ export default function SalesReport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id} className="border-b border-primary-50 hover:bg-primary-50/40">
-                      <td className="py-2.5 px-4 text-sm text-primary-600 whitespace-nowrap">{formatDate(row.date)}</td>
-                      <td className="py-2.5 px-4 text-sm font-medium text-primary-700">{row.customerName}</td>
-                      <td className="py-2.5 px-4 text-sm text-primary-600">{row.materialName}</td>
-                      <td className="py-2.5 px-4 text-sm text-primary-600 text-right">{row.bagCount}</td>
-                      <td className="py-2.5 px-4 text-sm text-primary-600 text-right tabular-nums">{row.ratePerKg}</td>
-                      <td className="py-2.5 px-4 text-sm text-primary-600 text-right">{row.saleType === 'by_bag' || !row.totalWeight ? '—' : formatWeight(row.totalWeight)}</td>
-                      <td className="py-2.5 px-4 text-sm font-semibold text-primary-700 text-right">
-                        {formatCurrency(row.totalAmount)}
-                      </td>
-                    </tr>
-                  ))}
+                  {rows.map((row) => {
+                    const hasBags = row.bags && row.bags.length > 0;
+                    return (
+                      <tr key={row.id} className="border-b border-primary-50 hover:bg-primary-50/40">
+                        <td className="py-2.5 px-4 text-sm text-primary-600 whitespace-nowrap">{formatDate(row.date)}</td>
+                        <td className="py-2.5 px-4 text-sm font-medium text-primary-700">{row.customerName}</td>
+                        <td className="py-2.5 px-4 text-sm text-primary-600">{row.materialName}</td>
+                        <td className="py-2.5 px-4 text-sm text-primary-600 text-right">{row.bagCount}</td>
+                        <td className="py-2.5 px-4 text-sm text-primary-600 text-right tabular-nums">{row.ratePerKg}</td>
+                        <td className="py-2.5 px-4 text-sm text-primary-600 text-right">
+                          {row.saleType === 'by_bag' || !row.totalWeight ? (
+                            '—'
+                          ) : (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span>{formatWeight(row.totalWeight)}</span>
+                              {hasBags && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedBagRecord(row)}
+                                  title="View individual bag weights"
+                                  className="p-1 rounded-md transition border bg-primary-50 text-primary-600 hover:text-primary-900 hover:bg-primary-100 border-primary-200"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-4 text-sm font-semibold text-primary-700 text-right">
+                          {formatCurrency(row.totalAmount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="bg-primary-50 border-t border-primary-200">
@@ -305,6 +343,78 @@ export default function SalesReport() {
           </>
         )}
       </div>
+
+      {selectedBagRecord && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setSelectedBagRecord(null)}
+        >
+          <div
+            className="bg-surface rounded-2xl border border-primary-200 shadow-card max-w-md w-full p-5 space-y-4 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-primary-100 pb-3">
+              <div>
+                <h3 className="font-bold text-primary-800 text-base flex items-center gap-2">
+                  <Scale className="w-5 h-5 text-primary-600" /> Individual Bag Weights
+                </h3>
+                <p className="text-xs text-primary-500 mt-0.5">
+                  {selectedBagRecord.customerName} · <span className="font-semibold text-primary-700">{selectedBagRecord.materialName}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedBagRecord(null)}
+                className="p-1 text-primary-400 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 bg-primary-50/70 p-3 rounded-xl border border-primary-100 text-center text-xs">
+              <div>
+                <span className="block text-primary-400 text-[11px]">Bags</span>
+                <span className="font-semibold text-primary-700 text-sm">{selectedBagRecord.bagCount}</span>
+              </div>
+              <div>
+                <span className="block text-primary-400 text-[11px]">Total Weight</span>
+                <span className="font-semibold text-primary-700 text-sm">{formatWeight(selectedBagRecord.totalWeight)}</span>
+              </div>
+              <div>
+                <span className="block text-primary-400 text-[11px]">Rate</span>
+                <span className="font-semibold text-primary-700 text-sm">₹{selectedBagRecord.ratePerKg}</span>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-primary-600 mb-2">
+                Bag Weight Breakdown ({selectedBagRecord.bags?.length || 0} bags)
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto p-1 bg-primary-50/30 rounded-xl border border-primary-100">
+                {selectedBagRecord.bags?.map((w, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between px-3 py-2 bg-surface border border-primary-100 rounded-lg shadow-xs text-xs"
+                  >
+                    <span className="text-primary-400 font-medium">Bag #{idx + 1}</span>
+                    <span className="font-bold text-primary-800 tabular-nums">{w} kg</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedBagRecord(null)}
+                className="btn-secondary !py-1.5 !px-4 text-xs font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

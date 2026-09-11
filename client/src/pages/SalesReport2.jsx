@@ -71,7 +71,7 @@ export default function SalesReport2() {
         <div>
           <h1 className="page-title">Day wise sale report</h1>
           <p className="text-primary-400 text-sm mt-0.5">
-            Product columns — customer and bag weights, grouped by rate
+            Vendor columns — vegetable sections with customer bag weights & rates
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">

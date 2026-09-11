@@ -66,7 +66,7 @@ async function processSaleLines(lines, load, { extraStockMap } = {}) {
       lineKg = 0;
       bagEntries = [];
     } else if (bags?.length) {
-      bagEntries = bags.map((b) => ({ kgs: Number(b.kgs) })).filter((b) => b.kgs > 0);
+      bagEntries = bags.map((b) => ({ kgs: Number(b.kgs != null ? b.kgs : b) })).filter((b) => b.kgs > 0);
       lineBagCount = bagEntries.length;
       lineKg = bagEntries.reduce((s, b) => s + b.kgs, 0);
     } else if (totalKg != null && Number(totalKg) > 0) {
@@ -205,7 +205,7 @@ function bagKgList(line) {
   return kg > 0 ? [Number(Number.isInteger(kg) ? kg : kg.toFixed(1))] : [];
 }
 
-/** Day-wise packing sheet: product columns, customer + bag weights, rate groups. */
+/** Day-wise packing sheet: vendor columns, vegetable sub-sections, customer + bag weights. */
 router.get('/report-2', async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
@@ -218,21 +218,37 @@ router.get('/report-2', async (req, res) => {
       .sort({ createdAt: 1 })
       .lean();
 
-    const materials = new Map();
+    const vendorsMap = new Map();
 
     for (const sale of sales) {
+      const vendorDoc = sale.vendor && typeof sale.vendor === 'object' ? sale.vendor : null;
+      const vendorId = String(vendorDoc?._id || sale.vendor || 'unknown');
+      const vendorName = vendorDoc?.name || 'Unknown Vendor';
+      const vendorNameTelugu = vendorDoc?.nameTelugu || '';
+
       const customerName = sale.customer?.name || '—';
       const customerId = String(sale.customer?._id || sale.customer || '');
-      const vendorName = sale.vendor?.name || '';
-      const vendorNameTelugu = sale.vendor?.nameTelugu || '';
+
+      if (!vendorsMap.has(vendorId)) {
+        vendorsMap.set(vendorId, {
+          vendorId,
+          vendorName,
+          vendorNameTelugu,
+          materialsMap: new Map(),
+          bagCount: 0,
+          totalKg: 0,
+        });
+      }
+      const vendObj = vendorsMap.get(vendorId);
 
       for (const line of sale.lines || []) {
         const matDoc = line.material && typeof line.material === 'object' ? line.material : null;
         const materialId = String(matDoc?._id || line.material || line.materialName || '');
         const materialName = matDoc?.name || line.materialName || 'Item';
         const materialNameTelugu = matDoc?.nameTelugu || '';
-        if (!materials.has(materialId)) {
-          materials.set(materialId, {
+
+        if (!vendObj.materialsMap.has(materialId)) {
+          vendObj.materialsMap.set(materialId, {
             materialId,
             materialName,
             materialNameTelugu,
@@ -241,7 +257,8 @@ router.get('/report-2', async (req, res) => {
             totalKg: 0,
           });
         }
-        const mat = materials.get(materialId);
+        const matObj = vendObj.materialsMap.get(materialId);
+
         const rate = Number(line.ratePerKg != null ? line.ratePerKg : line.rate) || 0;
         const isByBag = line.saleType === 'by_bag' || (line.bagCount > 0 && (!line.bags || line.bags.length === 0) && Number(line.totalKg) === 0);
         const bags = bagKgList(line);
@@ -257,12 +274,10 @@ router.get('/report-2', async (req, res) => {
           ? [`${count} ${count === 1 ? 'Bag' : 'Bags'}`]
           : bags;
 
-        mat.entries.push({
+        matObj.entries.push({
           saleId: sale._id,
           customerId,
           name: customerName,
-          vendorName,
-          vendorNameTelugu,
           bags: bagStrList,
           count,
           weight: Number(lineTotalKg.toFixed(1)),
@@ -270,24 +285,28 @@ router.get('/report-2', async (req, res) => {
           amount: Math.round(lineAmount),
         });
 
-        mat.bagCount += count;
-        mat.totalKg += lineTotalKg;
+        matObj.bagCount += count;
+        matObj.totalKg += lineTotalKg;
+
+        vendObj.bagCount += count;
+        vendObj.totalKg += lineTotalKg;
       }
     }
 
-    const columns = [...materials.values()].map((mat) => ({
-      materialId: mat.materialId,
-      materialName: mat.materialName,
-      materialNameTelugu: mat.materialNameTelugu,
-      bagCount: mat.bagCount,
-      totalKg: Number(mat.totalKg.toFixed(1)),
-      entries: mat.entries,
-      rateGroups: [
-        {
-          rate: 0,
-          entries: mat.entries,
-        },
-      ],
+    const columns = [...vendorsMap.values()].map((vend) => ({
+      vendorId: vend.vendorId,
+      vendorName: vend.vendorName,
+      vendorNameTelugu: vend.vendorNameTelugu,
+      bagCount: vend.bagCount,
+      totalKg: Number(vend.totalKg.toFixed(1)),
+      materials: [...vend.materialsMap.values()].map((mat) => ({
+        materialId: mat.materialId,
+        materialName: mat.materialName,
+        materialNameTelugu: mat.materialNameTelugu,
+        bagCount: mat.bagCount,
+        totalKg: Number(mat.totalKg.toFixed(1)),
+        entries: mat.entries,
+      })),
     }));
 
     const totalBags = columns.reduce((acc, c) => acc + (c.bagCount || 0), 0);
@@ -329,17 +348,25 @@ router.get('/report', async (req, res) => {
         if (rate !== undefined && rate !== '' && Number(rate) !== lineRate) continue;
 
         const key = `${line.materialName}|${lineRate}`;
+        const isByBag = line.saleType === 'by_bag' || (line.bagCount > 0 && (!line.bags || line.bags.length === 0) && Number(line.totalKg) === 0);
+        const lineBags = isByBag ? [] : bagKgList(line);
+
         const existing = byMaterial.get(key) || {
           materialName: line.materialName,
           materialId: line.material,
           ratePerKg: lineRate,
+          saleType: isByBag ? 'by_bag' : 'by_weight',
           bagCount: 0,
           totalWeight: 0,
           totalAmount: 0,
+          bags: [],
         };
         existing.bagCount += Number(line.bagCount) || 0;
         existing.totalWeight += Number(line.totalKg) || 0;
         existing.totalAmount += Number(line.totalAmount) || 0;
+        if (lineBags.length) {
+          existing.bags.push(...lineBags);
+        }
         byMaterial.set(key, existing);
       }
 
@@ -356,6 +383,8 @@ router.get('/report', async (req, res) => {
           bagCount: mat.bagCount,
           totalWeight: Number(mat.totalWeight.toFixed(1)),
           totalAmount: Number(mat.totalAmount.toFixed(2)),
+          saleType: mat.saleType,
+          bags: mat.bags || [],
         });
       }
     }

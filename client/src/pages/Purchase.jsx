@@ -78,10 +78,10 @@ export default function Purchase({ path: windowPath }) {
     let weight = 0;
     let amount = 0;
     for (const line of lines) {
-      const b = Math.floor(Number(line.bags)) || 0;
-      const kg = Number(line.totalKg) || 0;
-      const rate = Number(line.ratePerKg) || 0;
       const isByBag = line.purchaseType === 'by_bag';
+      const b = isByBag ? Math.floor(Number(line.bags)) || 0 : 0;
+      const kg = isByBag ? 0 : Number(line.totalKg) || 0;
+      const rate = Number(line.ratePerKg) || 0;
       bags += b;
       weight += kg;
       amount += isByBag ? b * rate : kg * rate;
@@ -136,8 +136,8 @@ export default function Purchase({ path: windowPath }) {
     for (const line of lines) {
       if (!line.materialName?.trim() && !line.materialId) continue;
       const isByBag = line.purchaseType === 'by_bag';
-      const bags = Math.floor(Number(line.bags)) || 0;
-      const totalKg = Number(line.totalKg) || 0;
+      const bags = isByBag ? Math.floor(Number(line.bags)) || 0 : 0;
+      const totalKg = isByBag ? 0 : Number(line.totalKg) || 0;
       const ratePerKg = Number(line.ratePerKg);
       if (isByBag) {
         if (!bags || bags <= 0) {
@@ -216,7 +216,7 @@ export default function Purchase({ path: windowPath }) {
                 checked={globalPurchaseType === 'by_weight'}
                 onChange={() => {
                   setGlobalPurchaseType('by_weight');
-                  setLines(lines.map((l) => ({ ...l, purchaseType: 'by_weight' })));
+                  setLines(lines.map((l) => ({ ...l, purchaseType: 'by_weight', bags: '' })));
                 }}
               />
               By Weight (kg)
@@ -229,7 +229,7 @@ export default function Purchase({ path: windowPath }) {
                 checked={globalPurchaseType === 'by_bag'}
                 onChange={() => {
                   setGlobalPurchaseType('by_bag');
-                  setLines(lines.map((l) => ({ ...l, purchaseType: 'by_bag' })));
+                  setLines(lines.map((l) => ({ ...l, purchaseType: 'by_bag', totalKg: '' })));
                 }}
               />
               By Bag (Fixed Rate)
@@ -336,7 +336,7 @@ export default function Purchase({ path: windowPath }) {
                       name={`line-type-${idx}`}
                       value="by_weight"
                       checked={line.purchaseType !== 'by_bag'}
-                      onChange={() => updateLine(idx, { purchaseType: 'by_weight' })}
+                      onChange={() => updateLine(idx, { purchaseType: 'by_weight', bags: '' })}
                     />
                     By Weight
                   </label>
@@ -346,7 +346,7 @@ export default function Purchase({ path: windowPath }) {
                       name={`line-type-${idx}`}
                       value="by_bag"
                       checked={line.purchaseType === 'by_bag'}
-                      onChange={() => updateLine(idx, { purchaseType: 'by_bag' })}
+                      onChange={() => updateLine(idx, { purchaseType: 'by_bag', totalKg: '' })}
                     />
                     By Bag
                   </label>
@@ -378,35 +378,38 @@ export default function Purchase({ path: windowPath }) {
                 }
                 required
               />
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>
-                  <label className="label">{isByBag ? 'No. of Bags *' : 'No. of Bags'}</label>
-                  <input
-                    className="input-field"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={line.bags}
-                    onChange={(e) =>
-                      updateLine(idx, { bags: e.target.value.replace(/[^\d]/g, '') })
-                    }
-                    required={isByBag}
-                  />
-                </div>
-                <div>
-                  <label className="label">{isByBag ? 'Weight (kg)' : 'Weight (kg) *'}</label>
-                  <input
-                    className="input-field"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder={isByBag ? 'Optional' : '0.0'}
-                    value={line.totalKg}
-                    onChange={(e) =>
-                      updateLine(idx, { totalKg: e.target.value.replace(/[^\d.]/g, '') })
-                    }
-                    required={!isByBag}
-                  />
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {isByBag ? (
+                  <div>
+                    <label className="label">No. of Bags *</label>
+                    <input
+                      className="input-field"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={line.bags}
+                      onChange={(e) =>
+                        updateLine(idx, { bags: e.target.value.replace(/[^\d]/g, '') })
+                      }
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="label">Weight (kg) *</label>
+                    <input
+                      className="input-field"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.0"
+                      value={line.totalKg}
+                      onChange={(e) =>
+                        updateLine(idx, { totalKg: e.target.value.replace(/[^\d.]/g, '') })
+                      }
+                      required
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="label">{isByBag ? 'Rate / Bag *' : 'Rate / Kg *'}</label>
                   <input
@@ -420,7 +423,7 @@ export default function Purchase({ path: windowPath }) {
                     required
                   />
                 </div>
-                <div className="col-span-2 sm:col-span-1 flex items-end">
+                <div className="flex items-end">
                   <p className="text-sm text-primary-600 pb-3">
                     Amount: <strong>{formatCurrency(lineAmount)}</strong>
                   </p>

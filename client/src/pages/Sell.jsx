@@ -739,13 +739,18 @@ export default function Sell({ path: windowPath }) {
         if (isByBag) {
           base.totalKg = 0;
           base.bagCount = bags;
+          delete base.bags;
         } else {
           const qty = patch.qty !== undefined ? Number(patch.qty) : Number(l.totalKg);
           if (!qty || qty <= 0) throw new Error('Enter quantity (kg)');
           base.totalKg = qty;
           base.bagCount = bags;
+          if (l.bags && l.bags.length === bags) {
+            base.bags = l.bags;
+          } else {
+            delete base.bags;
+          }
         }
-        delete base.bags;
       }
       return base;
     });
