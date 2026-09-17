@@ -46,7 +46,11 @@ router.get('/ledger', async (req, res) => {
 
       const [txs, sales] = await Promise.all([
         Transaction.find({ vendor: vendorId })
-          .populate('sale', 'totalAmount createdAt lines totalBags totalWeight')
+          .populate({
+            path: 'sale',
+            select: 'totalAmount createdAt lines totalBags totalWeight customer',
+            populate: { path: 'customer', select: 'name nameTelugu' },
+          })
           .sort({ createdAt: 1 })
           .lean(),
         Sale.find({ vendor: vendorId })
@@ -56,6 +60,8 @@ router.get('/ledger', async (req, res) => {
       ]);
 
       const items = [];
+      const handledSaleIds = new Set();
+
       for (const tx of txs) {
         const isPayment = tx.type === 'vendor_payment';
         const lessAmt = isPayment ? Math.max(0, Number(tx.lessAmount) || 0) : 0;
@@ -64,21 +70,49 @@ router.get('/ledger', async (req, res) => {
         const saleAmt = !isPayment ? totalTxAmt : 0;
         const delta = isPayment ? -totalTxAmt : totalTxAmt;
 
+        const sId = tx.sale?._id ? String(tx.sale._id) : tx.sale ? String(tx.sale) : null;
+        if (sId) {
+          handledSaleIds.add(sId);
+        }
+
+        let particulars = tx.description || (isPayment ? 'Payment to Vendor' : 'Vendor Credit');
+
+        if (tx.sale && typeof tx.sale === 'object' && tx.sale.lines) {
+          const custName = tx.sale.customer?.name || (tx.description ? tx.description.split('-')[0].replace(/^Sale to\s+/i, '').trim() : '');
+          const mats = tx.sale.lines
+            ?.map((l) => {
+              const bags = Number(l.bagCount) || (Array.isArray(l.bags) ? l.bags.length : 0) || 0;
+              const weight = Number(l.totalKg) || (Array.isArray(l.bags) ? l.bags.reduce((s, b) => s + (Number(b?.kgs || b) || 0), 0) : 0) || 0;
+              const name = l.materialName || 'Item';
+              const details = [];
+              if (bags) details.push(`${bags} ${bags === 1 ? 'bag' : 'bags'}`);
+              if (weight) details.push(`${weight % 1 === 0 ? weight : Number(weight.toFixed(1))} kg`);
+              return details.length ? `${name} (${details.join(', ')})` : name;
+            })
+            .filter(Boolean)
+            .join(' · ');
+          particulars = `Sale to ${custName || 'Customer'}${mats ? ` (${mats})` : ''}`;
+        }
+
         items.push({
           date: txWhen(tx),
           created: new Date(tx.createdAt),
-          kind: isPayment ? 'paid' : 'other',
-          particulars: tx.description || (isPayment ? 'Payment to Vendor' : 'Vendor Credit'),
+          kind: isPayment ? 'paid' : (sId ? 'sale' : 'other'),
+          particulars,
           saleAmt,
           paidAmt,
           lessAmt,
           delta,
-          saleId: tx.sale?._id ? String(tx.sale._id) : tx.sale ? String(tx.sale) : null,
+          saleId: sId,
         });
       }
 
       for (const sale of sales) {
-        const saleAmt = Number(sale.lines?.reduce((s, l) => s + (l.totalAmount || 0), 0) || 0);
+        const sId = String(sale._id);
+        if (handledSaleIds.has(sId)) {
+          continue;
+        }
+        const saleAmt = Number(sale.lines?.reduce((s, l) => s + (l.totalAmount || 0), 0) || Number(sale.totalAmount || 0));
         const mats = sale.lines
           ?.map((l) => {
             const bags = Number(l.bagCount) || (Array.isArray(l.bags) ? l.bags.length : 0) || 0;
@@ -100,7 +134,7 @@ router.get('/ledger', async (req, res) => {
           paidAmt: 0,
           lessAmt: 0,
           delta: saleAmt,
-          saleId: String(sale._id),
+          saleId: sId,
         });
       }
 

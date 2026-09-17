@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MessageSquare, CheckCircle, AlertCircle, Send, Key, Phone, Building } from 'lucide-react';
+import { MessageSquare, CheckCircle, AlertCircle, Send, Key, Phone, Building, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
@@ -10,16 +10,51 @@ export default function WhatsAppSettings() {
 
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [savingConfig, setSavingConfig] = useState(false);
   const [testPhone, setTestPhone] = useState('9010253076');
   const [sendingTest, setSendingTest] = useState(false);
 
-  useEffect(() => {
+  const [form, setForm] = useState({
+    phoneNumberId: '',
+    wabaId: '',
+    senderNumber: '',
+    accessToken: '',
+  });
+
+  const fetchConfig = () => {
     api
       .get('/whatsapp/config')
-      .then((res) => setConfig(res.data))
+      .then((res) => {
+        setConfig(res.data);
+        setForm({
+          phoneNumberId: res.data.phoneNumberId || '',
+          wabaId: res.data.wabaId || '',
+          senderNumber: res.data.senderNumber || '',
+          accessToken: '',
+        });
+      })
       .catch(() => toast.error('Failed to load WhatsApp API status'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchConfig();
   }, []);
+
+  const handleSaveConfig = async (e) => {
+    e.preventDefault();
+    setSavingConfig(true);
+    try {
+      const res = await api.post('/whatsapp/config', form);
+      toast.success('WhatsApp API credentials saved successfully!');
+      setConfig(res.data);
+      setForm((prev) => ({ ...prev, accessToken: '' }));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save WhatsApp config');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
 
   const handleTestSend = async () => {
     if (!testPhone || testPhone.length < 10) {
@@ -59,6 +94,8 @@ export default function WhatsAppSettings() {
     return <div className="text-center py-16 text-primary-400">Loading WhatsApp configuration...</div>;
   }
 
+  const isConnected = config?.isConfigured;
+
   return (
     <div className="space-y-5 max-w-3xl">
       <div>
@@ -71,46 +108,114 @@ export default function WhatsAppSettings() {
       </div>
 
       {/* Status Card */}
-      <div className="card !p-5 border-l-4 border-emerald-500 bg-white space-y-4">
+      <div className={`card !p-5 border-l-4 ${isConnected ? 'border-emerald-500' : 'border-amber-500'} bg-white space-y-4`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-emerald-100 text-emerald-700 rounded-2xl">
-              <CheckCircle className="w-6 h-6" />
+            <div className={`p-3 rounded-2xl ${isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              {isConnected ? <CheckCircle className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
             </div>
             <div>
-              <h2 className="font-bold text-slate-800 text-base">Meta WhatsApp API Connected</h2>
+              <h2 className="font-bold text-slate-800 text-base">
+                {isConnected ? 'Meta WhatsApp API Configured' : 'WhatsApp API Credentials Needed'}
+              </h2>
               <p className="text-xs text-slate-500">Sender Number: {config?.senderNumber || '+91 89774 81054'}</p>
             </div>
           </div>
-          <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold uppercase border border-emerald-300">
-            Active
+          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${isConnected ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'}`}>
+            {isConnected ? 'Active' : 'Attention Required'}
           </span>
         </div>
 
-        {/* Credentials Grid */}
+        {/* Current Credentials Details */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs border-t border-slate-100">
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
             <span className="text-slate-400 font-semibold uppercase text-[10px] flex items-center gap-1">
               <Phone className="w-3 h-3 text-emerald-600" /> Phone Number ID
             </span>
-            <p className="font-mono font-bold text-slate-800">{config?.phoneNumberId || '1318838441307212'}</p>
+            <p className="font-mono font-bold text-slate-800">{config?.phoneNumberId || 'Not Set'}</p>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
             <span className="text-slate-400 font-semibold uppercase text-[10px] flex items-center gap-1">
               <Building className="w-3 h-3 text-emerald-600" /> WABA Account ID
             </span>
-            <p className="font-mono font-bold text-slate-800">{config?.wabaId || '1962348571140826'}</p>
+            <p className="font-mono font-bold text-slate-800">{config?.wabaId || 'Not Set'}</p>
           </div>
 
           <div className="sm:col-span-2 p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
             <span className="text-slate-400 font-semibold uppercase text-[10px] flex items-center gap-1">
               <Key className="w-3 h-3 text-emerald-600" /> Permanent Access Token
             </span>
-            <p className="font-mono text-slate-700 truncate">{config?.maskedToken || 'EAAPJuO8eoZAoBSTyZAe19oYRbaYLWcC7HX5...'}</p>
+            <p className="font-mono text-slate-700 truncate">{config?.maskedToken || 'Not Set'}</p>
           </div>
         </div>
       </div>
+
+      {/* Edit Configuration Form */}
+      <form onSubmit={handleSaveConfig} className="card !p-5 space-y-4">
+        <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+          <Key className="w-4 h-4 text-emerald-600" /> Update API Credentials
+        </h3>
+        <p className="text-xs text-slate-500">
+          Obtain your <strong>Phone Number ID</strong> and <strong>Permanent System User Access Token</strong> from your Meta WhatsApp Developer App dashboard and save them below:
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="label text-xs">Phone Number ID *</label>
+            <input
+              type="text"
+              className="input-field text-xs font-mono"
+              placeholder="e.g. 105938472819401"
+              value={form.phoneNumberId}
+              onChange={(e) => setForm({ ...form, phoneNumberId: e.target.value })}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="label text-xs">WABA Account ID</label>
+            <input
+              type="text"
+              className="input-field text-xs font-mono"
+              placeholder="e.g. 1962348571140826"
+              value={form.wabaId}
+              onChange={(e) => setForm({ ...form, wabaId: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="label text-xs">Sender Phone Number</label>
+            <input
+              type="text"
+              className="input-field text-xs font-mono"
+              placeholder="e.g. +918977481054"
+              value={form.senderNumber}
+              onChange={(e) => setForm({ ...form, senderNumber: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="label text-xs">Access Token (Leave empty to keep current)</label>
+            <input
+              type="password"
+              className="input-field text-xs font-mono"
+              placeholder="Paste Meta Permanent Access Token..."
+              value={form.accessToken}
+              onChange={(e) => setForm({ ...form, accessToken: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={savingConfig}
+          className="btn-primary !py-2.5 !px-5 text-xs flex items-center gap-2"
+        >
+          <Save className="w-4 h-4" />
+          {savingConfig ? 'Saving Settings...' : 'Save API Credentials'}
+        </button>
+      </form>
 
       {/* Test Sending Card */}
       <div className="card !p-5 space-y-4">
@@ -118,7 +223,7 @@ export default function WhatsAppSettings() {
           <Send className="w-4 h-4 text-emerald-600" /> Test WhatsApp Delivery
         </h3>
         <p className="text-xs text-slate-500">
-          Enter a phone number below to send a sample test PDF bill directly to WhatsApp:
+          Enter a mobile number below to verify your WhatsApp Cloud API connection:
         </p>
 
         <div className="flex items-center gap-3">

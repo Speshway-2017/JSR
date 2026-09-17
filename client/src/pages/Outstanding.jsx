@@ -114,7 +114,7 @@ export default function Outstanding({ path: windowPath }) {
       <div>
         <h1 className="page-title">Outstanding</h1>
         <p className="text-primary-400 text-sm mt-0.5">
-          Customer credit as of a date — opening on that day and closing up to that day
+          Customer credit balance as of a date
         </p>
       </div>
 
@@ -168,10 +168,6 @@ export default function Outstanding({ path: windowPath }) {
                 <tr className="bg-primary-50 text-left text-primary-600">
                   <th className="px-3 py-2 font-semibold">Customer</th>
                   <th className="px-3 py-2 font-semibold">Schedule</th>
-                  <th className="px-3 py-2 font-semibold text-right">Opening</th>
-                  <th className="px-3 py-2 font-semibold text-right">Sales</th>
-                  <th className="px-3 py-2 font-semibold text-right">Paid</th>
-                  <th className="px-3 py-2 font-semibold text-right">Less</th>
                   <th className="px-3 py-2 font-semibold text-right">Closing</th>
                   <th className="px-3 py-2 font-semibold text-center">WhatsApp</th>
                 </tr>
@@ -179,7 +175,7 @@ export default function Outstanding({ path: windowPath }) {
               <tbody>
                 {data.rows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-10 text-center text-primary-400">
+                    <td colSpan={4} className="px-3 py-10 text-center text-primary-400">
                       No outstanding for this date / schedule
                     </td>
                   </tr>
@@ -188,18 +184,6 @@ export default function Outstanding({ path: windowPath }) {
                     <tr key={row.customerId} className="border-t border-primary-50 hover:bg-primary-50/50">
                       <td className="px-3 py-2 font-medium text-primary-800">{row.name}</td>
                       <td className="px-3 py-2 text-primary-500">{row.schedule || '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatCurrency(row.opening)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatCurrency(row.sales)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatCurrency(row.paid)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-primary-400">
-                        {formatCurrency(row.less)}
-                      </td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold">
                         {formatCurrency(row.closing)}
                       </td>
@@ -224,18 +208,6 @@ export default function Outstanding({ path: windowPath }) {
                   <tr className="bg-accent-50 border-t border-primary-100 font-semibold">
                     <td className="px-3 py-3" colSpan={2}>
                       Total
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {formatCurrency(data.totals.opening)}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {formatCurrency(data.totals.sales)}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {formatCurrency(data.totals.paid)}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {formatCurrency(data.totals.less)}
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums">
                       {formatCurrency(data.totals.closing)}

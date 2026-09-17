@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import WhatsAppSetting from '../models/WhatsAppSetting.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,15 +26,42 @@ export function formatPhoneNumber(rawPhone) {
   return cleaned;
 }
 
+export async function getWhatsAppCredentials(customCreds = {}) {
+  let phoneNumberId = customCreds.phoneNumberId;
+  let accessToken = customCreds.accessToken;
+  let wabaId = customCreds.wabaId;
+  let senderNumber = customCreds.senderNumber;
+
+  if (!phoneNumberId || !accessToken) {
+    try {
+      const dbConfig = await WhatsAppSetting.findOne().lean();
+      if (dbConfig) {
+        if (!phoneNumberId && dbConfig.phoneNumberId) phoneNumberId = dbConfig.phoneNumberId;
+        if (!accessToken && dbConfig.accessToken) accessToken = dbConfig.accessToken;
+        if (!wabaId && dbConfig.wabaId) wabaId = dbConfig.wabaId;
+        if (!senderNumber && dbConfig.senderNumber) senderNumber = dbConfig.senderNumber;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  phoneNumberId = (phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
+  accessToken = (accessToken || process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
+  wabaId = (wabaId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '').trim();
+  senderNumber = (senderNumber || process.env.WHATSAPP_SENDER_NUMBER || '').trim();
+
+  return { phoneNumberId, accessToken, wabaId, senderNumber };
+}
+
 /**
  * Upload PDF Buffer to Meta WhatsApp Media Endpoint
  */
 export async function uploadPdfToMetaMedia(pdfBuffer, filename = 'document.pdf', customCreds = {}) {
-  const phoneNumberId = customCreds.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = customCreds.accessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+  const { phoneNumberId, accessToken } = await getWhatsAppCredentials(customCreds);
 
   if (!phoneNumberId || !accessToken) {
-    throw new Error('Meta WhatsApp Cloud API credentials missing (Phone Number ID or Access Token)');
+    throw new Error('Meta WhatsApp Cloud API credentials missing (Phone Number ID or Access Token). Please configure them in WhatsApp Settings.');
   }
 
   const url = `https://graph.facebook.com/v20.0/${phoneNumberId}/media`;
@@ -55,8 +83,15 @@ export async function uploadPdfToMetaMedia(pdfBuffer, filename = 'document.pdf',
   const data = await response.json();
   if (!response.ok || !data.id) {
     let errorMsg = data.error?.message || data.error?.error_user_msg || JSON.stringify(data);
-    if (data.error?.code === 190 || errorMsg.includes('Authentication Error') || errorMsg.includes('OAuth')) {
-      errorMsg = 'Meta Access Token in server/.env is expired or invalid (Authentication Error). Please generate a new System User Access Token from Meta Developer Console.';
+    if (
+      data.error?.code === 190 ||
+      data.error?.code === 100 ||
+      errorMsg.includes('Object with ID') ||
+      errorMsg.includes('does not exist') ||
+      errorMsg.includes('missing permissions') ||
+      errorMsg.includes('OAuth')
+    ) {
+      errorMsg = `Meta WhatsApp API Error: Phone Number ID ("${phoneNumberId}") or Access Token is invalid/expired or lacks permissions. Please check your Meta WhatsApp App settings and update the Phone Number ID and Access Token in WhatsApp Settings page.`;
     }
     throw new Error(`Meta Media Upload Failed: ${errorMsg}`);
   }
@@ -76,11 +111,10 @@ export async function sendWhatsAppDocumentMessage({
   templateParams = [],
   customCreds = {},
 }) {
-  const phoneNumberId = customCreds.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = customCreds.accessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+  const { phoneNumberId, accessToken } = await getWhatsAppCredentials(customCreds);
 
   if (!phoneNumberId || !accessToken) {
-    throw new Error('Meta WhatsApp Cloud API credentials missing (Phone Number ID or Access Token)');
+    throw new Error('Meta WhatsApp Cloud API credentials missing (Phone Number ID or Access Token). Please configure them in WhatsApp Settings.');
   }
 
   const formattedPhone = formatPhoneNumber(to);
@@ -176,7 +210,7 @@ export async function sendWhatsAppDocumentMessage({
   if (!response.ok || data.error) {
     let errDetails = data.error?.message || data.error?.error_user_msg || JSON.stringify(data);
     if (data.error?.code === 190 || errDetails.includes('Authentication Error') || errDetails.includes('OAuth')) {
-      errDetails = 'Meta Access Token in server/.env is expired or invalid. Please generate a new System User Access Token from Meta Developer Console.';
+      errDetails = 'Meta Access Token is expired or invalid. Please update the Permanent Access Token in WhatsApp Settings.';
     }
     throw new Error(`Meta WhatsApp Message Failed: ${errDetails}`);
   }

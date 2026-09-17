@@ -1,32 +1,76 @@
 import express from 'express';
-import { sendWhatsAppDocumentMessage, formatPhoneNumber } from '../utils/whatsapp.js';
+import { sendWhatsAppDocumentMessage, formatPhoneNumber, getWhatsAppCredentials } from '../utils/whatsapp.js';
+import WhatsAppSetting from '../models/WhatsAppSetting.js';
 import { auth as protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
 /**
  * GET /api/whatsapp/config
- * Returns current Meta WhatsApp API status (masked token)
+ * Returns current Meta WhatsApp API status & credentials
  */
 router.get('/config', protect, async (req, res) => {
   try {
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
-    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '';
-    const senderNumber = process.env.WHATSAPP_SENDER_NUMBER || '';
-    const token = process.env.WHATSAPP_ACCESS_TOKEN || '';
-
-    const isConfigured = Boolean(phoneNumberId && token);
-    const maskedToken = token ? `${token.slice(0, 8)}...${token.slice(-6)}` : '';
+    const creds = await getWhatsAppCredentials();
+    const isConfigured = Boolean(creds.phoneNumberId && creds.accessToken);
+    const maskedToken = creds.accessToken ? `${creds.accessToken.slice(0, 8)}...${creds.accessToken.slice(-6)}` : '';
 
     res.json({
       isConfigured,
-      phoneNumberId,
-      wabaId,
-      senderNumber,
+      phoneNumberId: creds.phoneNumberId,
+      wabaId: creds.wabaId,
+      senderNumber: creds.senderNumber,
       maskedToken,
+      hasToken: Boolean(creds.accessToken),
     });
   } catch (err) {
     res.status(500).json({ message: err.message || 'Failed to fetch WhatsApp config' });
+  }
+});
+
+/**
+ * POST /api/whatsapp/config
+ * Save Meta WhatsApp API settings (Phone Number ID, WABA ID, Access Token, Sender Number)
+ */
+router.post('/config', protect, async (req, res) => {
+  try {
+    const { phoneNumberId, wabaId, senderNumber, accessToken } = req.body;
+
+    let config = await WhatsAppSetting.findOne();
+    if (!config) {
+      config = new WhatsAppSetting({});
+    }
+
+    if (phoneNumberId !== undefined) config.phoneNumberId = String(phoneNumberId).trim();
+    if (wabaId !== undefined) config.wabaId = String(wabaId).trim();
+    if (senderNumber !== undefined) config.senderNumber = String(senderNumber).trim();
+    if (accessToken !== undefined && accessToken.trim() && !accessToken.includes('...')) {
+      config.accessToken = String(accessToken).trim();
+    }
+
+    await config.save();
+
+    if (config.phoneNumberId) process.env.WHATSAPP_PHONE_NUMBER_ID = config.phoneNumberId;
+    if (config.wabaId) process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = config.wabaId;
+    if (config.senderNumber) process.env.WHATSAPP_SENDER_NUMBER = config.senderNumber;
+    if (config.accessToken) process.env.WHATSAPP_ACCESS_TOKEN = config.accessToken;
+
+    const creds = await getWhatsAppCredentials();
+    const isConfigured = Boolean(creds.phoneNumberId && creds.accessToken);
+    const maskedToken = creds.accessToken ? `${creds.accessToken.slice(0, 8)}...${creds.accessToken.slice(-6)}` : '';
+
+    res.json({
+      success: true,
+      message: 'WhatsApp configuration saved successfully',
+      isConfigured,
+      phoneNumberId: creds.phoneNumberId,
+      wabaId: creds.wabaId,
+      senderNumber: creds.senderNumber,
+      maskedToken,
+      hasToken: Boolean(creds.accessToken),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Failed to save WhatsApp config' });
   }
 });
 

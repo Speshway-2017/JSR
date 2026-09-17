@@ -75,7 +75,7 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const { name, nameTelugu, mobile, schedule, address, handlingCharges } = req.body;
+    const { name, nameTelugu, mobile, schedule, address, handlingCharges, credit, debit, creditBalance } = req.body;
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (nameTelugu !== undefined) updates.nameTelugu = String(nameTelugu || '').trim();
@@ -83,6 +83,17 @@ router.put('/:id', async (req, res) => {
     if (schedule !== undefined) updates.schedule = schedule;
     if (address !== undefined) updates.address = address;
     if (handlingCharges !== undefined) updates.handlingCharges = !!handlingCharges;
+
+    const creditVal = credit !== undefined && credit !== '' ? Number(credit) : undefined;
+    const debitVal = debit !== undefined && debit !== '' ? Number(debit) : undefined;
+
+    if (debitVal !== undefined && !Number.isNaN(debitVal) && debitVal > 0) {
+      updates.creditBalance = debitVal;
+    } else if (creditVal !== undefined && !Number.isNaN(creditVal)) {
+      updates.creditBalance = creditVal;
+    } else if (creditBalance !== undefined) {
+      updates.creditBalance = Number(creditBalance) || 0;
+    }
 
     const customer = await Customer.findByIdAndUpdate(req.params.id, updates, {
       new: true,
