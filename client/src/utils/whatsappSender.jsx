@@ -112,7 +112,7 @@ export async function sendWhatsAppBillPdf({
   htmlString,
   filename = 'JSR_Sales_Bill.pdf',
   caption,
-  templateName = 'customer_sales_bill',
+  templateName = 'ledger_statement',
   templateParams = [],
 }) {
   if (!hasInternet()) {

@@ -13,7 +13,26 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
+  async (err) => {
+    const config = err.config;
+
+    // Retry transparently on 503 (Service Unavailable) or transient network errors during server restarts
+    const isRetryable =
+      config &&
+      (err.response?.status === 503 ||
+        !err.response ||
+        err.code === 'ECONNABORTED' ||
+        err.code === 'ERR_NETWORK');
+
+    if (isRetryable) {
+      config._retryCount = (config._retryCount || 0) + 1;
+      if (config._retryCount <= 3) {
+        const delay = config._retryCount * 800;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return api(config);
+      }
+    }
+
     const raw = err.response?.data?.message || err.message || '';
     if (/ECONNREFUSED|MongoServerSelection|buffering timed out|topology was destroyed|reconnecting/i.test(raw)) {
       if (!err.response) err.response = { data: {} };

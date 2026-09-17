@@ -187,6 +187,8 @@ export default function CustomerDetail({ path: windowPath }) {
         htmlString,
         filename: `Customer_Statement_${data.customer.name}.pdf`,
         caption: `Dear ${data.customer.name}, your Account Statement from JSR Traders is attached. Balance: ${formatCurrency(data.customer.creditBalance)}. Thank you!`,
+        templateName: 'ledger_statement',
+        templateParams: [data.customer.name, new Date().toLocaleDateString('en-IN')],
       });
     } catch (err) {
       toast.error(err.message || 'Failed to send WhatsApp statement');

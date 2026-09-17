@@ -72,7 +72,7 @@ export async function sendWhatsAppDocumentMessage({
   pdfBuffer,
   filename = 'Bill.pdf',
   caption = 'Your bill from JSR Traders',
-  templateName = 'customer_sales_bill',
+  templateName = 'ledger_statement',
   templateParams = [],
   customCreds = {},
 }) {

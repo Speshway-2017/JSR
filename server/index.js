@@ -12,7 +12,7 @@ try {
 } catch {
   /* ignore */
 }
-import connectDB, { isDbReady } from './config/db.js';
+import connectDB, { isDbReady, waitForDb } from './config/db.js';
 import { ensureDefaultUsers } from './utils/ensureAdmin.js';
 import { initSocket, notifyDataChange } from './utils/socket.js';
 import authRoutes from './routes/auth.js';
@@ -65,8 +65,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/api/health', (_, res) => {
-  const dbOk = isDbReady();
+app.get('/api/health', async (_, res) => {
+  const dbOk = await waitForDb(1500);
   res.status(dbOk ? 200 : 503).json({
     status: dbOk ? 'ok' : 'degraded',
     message: 'JSR API running',
@@ -75,10 +75,11 @@ app.get('/api/health', (_, res) => {
   });
 });
 
-// Fail fast with a clear message when embedded MongoDB is down
-app.use('/api', (req, res, next) => {
+// Fail fast with a clear message when embedded MongoDB is down (waiting briefly if connecting)
+app.use('/api', async (req, res, next) => {
   if (req.path === '/health') return next();
-  if (!isDbReady()) {
+  const dbReady = await waitForDb(4000);
+  if (!dbReady) {
     return res.status(503).json({
       message:
         'Database is not ready. Close JSR completely from the system tray/taskbar, wait a few seconds, and open it again.',

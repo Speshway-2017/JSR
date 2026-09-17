@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
 import { matchesSearchFields } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
 import { useMDI } from '../context/MDIContext';
+import { generateLedgerReportHtml } from '../utils/statementPdf';
+import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function Ledger() {
+  const isOnline = useOnlineStatus();
   const { openWindow } = useMDI();
   const today = todayInputValue();
   const [partyType, setPartyType] = useState('customer'); // 'customer' | 'vendor'
@@ -22,6 +26,7 @@ export default function Ledger() {
   const [endDate, setEndDate] = useState(today);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [sendingWa, setSendingWa] = useState(false);
 
   const fetchParties = useCallback(() => {
     const endpoint = partyType === 'vendor' ? '/vendors' : '/customers';
@@ -153,6 +158,39 @@ export default function Ledger() {
     openWindow({ path: `/sell?${params.toString()}`, title: 'Sales Entry' });
   };
 
+  const handleSendWhatsApp = async () => {
+    if (!data) return;
+    const targetPhone = selected?.mobile || data.customer?.mobile || '';
+    let phoneToUse = targetPhone;
+
+    if (!phoneToUse || String(phoneToUse).replace(/\D/g, '').length < 10) {
+      const input = window.prompt(`Enter WhatsApp mobile number for ${data.customer?.name || 'Party'}:`, '');
+      if (!input) return;
+      phoneToUse = input;
+    }
+
+    setSendingWa(true);
+    try {
+      const htmlString = generateLedgerReportHtml({ data, partyPhone: phoneToUse });
+      const partyName = data.customer?.name || 'Party';
+      const rangeStr = `${formatDateOnly(data.startDate)} to ${formatDateOnly(data.endDate)}`;
+
+      await sendWhatsAppBillPdf({
+        recipientPhone: phoneToUse,
+        recipientName: partyName,
+        htmlString,
+        filename: `Ledger_${partyName.replace(/\s+/g, '_')}_${formatDateOnly(data.startDate)}.pdf`,
+        caption: `Dear ${partyName}, your Ledger Statement (${rangeStr}) from JSR AGRI TRADES is attached. Opening: ${formatCurrency(data.openingBalance)}, Closing: ${formatCurrency(data.closingBalance)}. Thank you!`,
+        templateName: 'ledger_statement',
+        templateParams: [partyName, rangeStr],
+      });
+    } catch (err) {
+      toast.error(err.message || 'Failed to send WhatsApp ledger statement');
+    } finally {
+      setSendingWa(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -279,11 +317,24 @@ export default function Ledger() {
 
       {data && (
         <div className="card !p-0 overflow-hidden">
-          <div className="px-4 py-3 border-b border-primary-100">
-            <p className="font-bold text-primary-800">{data.customer.name}</p>
-            <p className="text-xs text-primary-400">
-              {formatDateOnly(data.startDate)} — {formatDateOnly(data.endDate)}
-            </p>
+          <div className="px-4 py-3 border-b border-primary-100 flex items-center justify-between gap-3">
+            <div>
+              <p className="font-bold text-primary-800">{data.customer.name}</p>
+              <p className="text-xs text-primary-400">
+                {formatDateOnly(data.startDate)} — {formatDateOnly(data.endDate)}
+              </p>
+            </div>
+            {isOnline && (
+              <button
+                type="button"
+                onClick={handleSendWhatsApp}
+                disabled={sendingWa}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                <Send className="w-4 h-4" />
+                {sendingWa ? 'Sending...' : 'Send to WhatsApp'}
+              </button>
+            )}
           </div>
           <div className="px-4 py-2.5 bg-primary-50/80 border-b border-primary-100 flex items-center justify-between gap-3 text-sm">
             <span className="text-primary-500">Opening</span>

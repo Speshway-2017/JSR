@@ -57,15 +57,22 @@ router.get('/ledger', async (req, res) => {
 
       const items = [];
       for (const tx of txs) {
+        const isPayment = tx.type === 'vendor_payment';
+        const lessAmt = isPayment ? Math.max(0, Number(tx.lessAmount) || 0) : 0;
+        const totalTxAmt = Number(tx.amount || 0);
+        const paidAmt = isPayment ? Math.max(0, totalTxAmt - lessAmt) : 0;
+        const saleAmt = !isPayment ? totalTxAmt : 0;
+        const delta = isPayment ? -totalTxAmt : totalTxAmt;
+
         items.push({
           date: txWhen(tx),
           created: new Date(tx.createdAt),
-          kind: tx.type === 'vendor_payment' ? 'paid' : 'other',
-          particulars: tx.description || (tx.type === 'vendor_payment' ? 'Payment to Vendor' : 'Transaction'),
-          saleAmt: 0,
-          paidAmt: Number(tx.amount || 0),
-          lessAmt: 0,
-          delta: -Number(tx.amount || 0),
+          kind: isPayment ? 'paid' : 'other',
+          particulars: tx.description || (isPayment ? 'Payment to Vendor' : 'Vendor Credit'),
+          saleAmt,
+          paidAmt,
+          lessAmt,
+          delta,
           saleId: tx.sale?._id ? String(tx.sale._id) : tx.sale ? String(tx.sale) : null,
         });
       }

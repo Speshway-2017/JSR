@@ -40,9 +40,9 @@ router.post('/send-pdf', protect, async (req, res) => {
       recipientPhone,
       recipientName,
       pdfBase64,
-      filename = 'JSR_Sales_Bill.pdf',
-      caption = 'Your sales bill from JSR Traders',
-      templateName = 'customer_sales_bill',
+      filename = 'JSR_Ledger_Statement.pdf',
+      caption = 'Your ledger statement from JSR Traders',
+      templateName = 'ledger_statement',
       templateParams = [],
     } = req.body;
 
