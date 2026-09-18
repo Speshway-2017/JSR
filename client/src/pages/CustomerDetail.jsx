@@ -195,16 +195,6 @@ export default function CustomerDetail({ path: windowPath }) {
     }
   };
 
-  const handleTogglePaid = async (saleId, targetIsPaid) => {
-    try {
-      await api.patch(`/sales/${saleId}/toggle-paid`, { isPaid: targetIsPaid });
-      toast.success(targetIsPaid ? 'Marked as Paid Direct' : 'Marked as Unpaid');
-      fetchData();
-      window.dispatchEvent(new CustomEvent('jsr_data_updated'));
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update payment status');
-    }
-  };
 
   if (loading) return <div className="text-center py-20 text-primary-400">Loading...</div>;
   if (!data) return <div className="text-center py-20 text-primary-400">Customer not found</div>;
@@ -361,24 +351,10 @@ export default function CustomerDetail({ path: windowPath }) {
                     <p className="font-semibold text-primary-700">{formatCurrency(sale.totalAmount)}</p>
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
                       {sale.isPaid ? (
-                        <button
-                          type="button"
-                          onClick={() => handleTogglePaid(sale._id, false)}
-                          className="px-2 py-1 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 hover:bg-amber-100 hover:text-amber-800 transition cursor-pointer"
-                          title="Paid Direct — Click to mark unpaid"
-                        >
+                        <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Paid Direct
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleTogglePaid(sale._id, true)}
-                          className="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-gray-100 text-gray-700 hover:bg-emerald-600 hover:text-white border border-gray-300 transition cursor-pointer"
-                          title="Click to mark as paid direct"
-                        >
-                          Mark as Paid
-                        </button>
-                      )}
+                        </span>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => handleViewSaleBill(sale)}

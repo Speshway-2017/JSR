@@ -4,8 +4,10 @@ const purchaseLineSchema = new mongoose.Schema(
   {
     material: { type: mongoose.Schema.Types.ObjectId, ref: 'Material' },
     materialName: { type: String, required: true, trim: true },
-    purchaseType: { type: String, enum: ['by_weight', 'by_bag'], default: 'by_weight' },
+    purchaseType: { type: String, enum: ['by_weight', 'by_bag', 'by_box'], default: 'by_weight' },
     bags: { type: Number, default: 0, min: 0 },
+    boxes: { type: Number, default: 0, min: 0 },
+    weightPerBox: { type: Number, default: 0, min: 0 },
     totalKg: { type: Number, default: 0, min: 0 },
     ratePerKg: { type: Number, required: true, min: 0 },
     amount: { type: Number, required: true, min: 0 },

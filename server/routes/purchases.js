@@ -73,24 +73,42 @@ router.post('/', async (req, res) => {
 
     for (const line of lines) {
       const material = await resolveMaterial(line);
-      const purchaseType = line.purchaseType === 'by_bag' ? 'by_bag' : 'by_weight';
-      const isByBag = purchaseType === 'by_bag';
-      const bags = isByBag ? Math.floor(Number(line.bags)) || 0 : 0;
-      const totalKg = isByBag ? 0 : Number(line.totalKg) || 0;
+      const purchaseType = ['by_bag', 'by_box'].includes(line.purchaseType) ? line.purchaseType : 'by_weight';
       const ratePerKg = Number(line.ratePerKg);
+      let bags = 0;
+      let boxes = 0;
+      let weightPerBox = 0;
+      let totalKg = 0;
 
       if (!material) {
         return res.status(400).json({ message: 'Each line needs a product' });
       }
 
-      if (isByBag) {
+      if (purchaseType === 'by_bag') {
+        bags = Math.floor(Number(line.bags)) || 0;
         if (!bags || bags <= 0) {
           return res.status(400).json({ message: 'Enter number of bags for by-bag product line' });
         }
         if (Number.isNaN(ratePerKg) || ratePerKg < 0) {
           return res.status(400).json({ message: 'Enter a valid rate per bag' });
         }
+      } else if (purchaseType === 'by_box') {
+        boxes = Math.floor(Number(line.boxes || line.bags)) || 0;
+        weightPerBox = Number(line.weightPerBox) || 0;
+        if (!boxes || boxes <= 0) {
+          return res.status(400).json({ message: 'Enter number of boxes for by-box product line' });
+        }
+        if (!weightPerBox || weightPerBox <= 0) {
+          return res.status(400).json({ message: 'Enter weight per box for by-box product line' });
+        }
+        if (Number.isNaN(ratePerKg) || ratePerKg < 0) {
+          return res.status(400).json({ message: 'Enter a valid rate per kg' });
+        }
+        totalKg = Number((boxes * weightPerBox).toFixed(1));
+        bags = boxes;
       } else {
+        bags = Math.floor(Number(line.bags)) || 0;
+        totalKg = Number(line.totalKg) || 0;
         if (!totalKg || totalKg <= 0) {
           return res.status(400).json({ message: 'Enter weight for by-weight product line' });
         }
@@ -99,7 +117,7 @@ router.post('/', async (req, res) => {
         }
       }
 
-      const amount = Number((isByBag ? bags * ratePerKg : totalKg * ratePerKg).toFixed(2));
+      const amount = Number((purchaseType === 'by_bag' ? bags * ratePerKg : totalKg * ratePerKg).toFixed(2));
       totalAmount += amount;
       totalWeight += totalKg;
       totalBags += bags;
@@ -108,6 +126,8 @@ router.post('/', async (req, res) => {
         materialName: material.name,
         purchaseType,
         bags,
+        boxes,
+        weightPerBox,
         totalKg,
         ratePerKg,
         amount,

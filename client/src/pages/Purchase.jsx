@@ -19,6 +19,8 @@ const emptyLine = (type = 'by_weight') => ({
   materialId: '',
   purchaseType: type,
   bags: '',
+  boxes: '',
+  weightPerBox: '',
   totalKg: '',
   ratePerKg: '10',
 });
@@ -78,13 +80,26 @@ export default function Purchase({ path: windowPath }) {
     let weight = 0;
     let amount = 0;
     for (const line of lines) {
-      const isByBag = line.purchaseType === 'by_bag';
-      const b = isByBag ? Math.floor(Number(line.bags)) || 0 : 0;
-      const kg = isByBag ? 0 : Number(line.totalKg) || 0;
+      const type = line.purchaseType || 'by_weight';
       const rate = Number(line.ratePerKg) || 0;
-      bags += b;
-      weight += kg;
-      amount += isByBag ? b * rate : kg * rate;
+      if (type === 'by_bag') {
+        const b = Math.floor(Number(line.bags)) || 0;
+        bags += b;
+        amount += b * rate;
+      } else if (type === 'by_box') {
+        const bx = Math.floor(Number(line.boxes)) || 0;
+        const w = Number(line.weightPerBox) || 0;
+        const kg = Number((bx * w).toFixed(1));
+        bags += bx;
+        weight += kg;
+        amount += kg * rate;
+      } else {
+        const b = Math.floor(Number(line.bags)) || 0;
+        const kg = Number(line.totalKg) || 0;
+        bags += b;
+        weight += kg;
+        amount += kg * rate;
+      }
     }
     return { bags, weight: Number(weight.toFixed(1)), amount: Number(amount.toFixed(2)) };
   }, [lines]);
@@ -135,17 +150,33 @@ export default function Purchase({ path: windowPath }) {
     const payloadLines = [];
     for (const line of lines) {
       if (!line.materialName?.trim() && !line.materialId) continue;
-      const isByBag = line.purchaseType === 'by_bag';
-      const bags = isByBag ? Math.floor(Number(line.bags)) || 0 : 0;
-      const totalKg = isByBag ? 0 : Number(line.totalKg) || 0;
+      const type = line.purchaseType || 'by_weight';
+      const bags = Math.floor(Number(line.bags)) || 0;
+      const boxes = Math.floor(Number(line.boxes)) || 0;
+      const weightPerBox = Number(line.weightPerBox) || 0;
+      const totalKg = type === 'by_box' ? Number((boxes * weightPerBox).toFixed(1)) : (type === 'by_bag' ? 0 : Number(line.totalKg) || 0);
       const ratePerKg = Number(line.ratePerKg);
-      if (isByBag) {
+
+      if (type === 'by_bag') {
         if (!bags || bags <= 0) {
           toast.error('Enter number of bags for each by-bag line');
           return;
         }
         if (Number.isNaN(ratePerKg) || ratePerKg < 0) {
           toast.error('Enter rate per bag for each product line');
+          return;
+        }
+      } else if (type === 'by_box') {
+        if (!boxes || boxes <= 0) {
+          toast.error('Enter number of boxes for each by-box line');
+          return;
+        }
+        if (!weightPerBox || weightPerBox <= 0) {
+          toast.error('Enter weight per box for each by-box line');
+          return;
+        }
+        if (Number.isNaN(ratePerKg) || ratePerKg < 0) {
+          toast.error('Enter rate per kg for each product line');
           return;
         }
       } else {
@@ -161,8 +192,10 @@ export default function Purchase({ path: windowPath }) {
       payloadLines.push({
         materialId: line.materialId || undefined,
         materialName: line.materialName,
-        purchaseType: line.purchaseType || 'by_weight',
-        bags,
+        purchaseType: type,
+        bags: type === 'by_box' ? boxes : bags,
+        boxes,
+        weightPerBox,
         totalKg,
         ratePerKg,
       });
@@ -206,7 +239,7 @@ export default function Purchase({ path: windowPath }) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="card space-y-4">
-          <div className="flex items-center gap-3 bg-primary-50/70 px-3 py-2 rounded-xl border border-primary-100">
+          <div className="flex items-center gap-3 bg-primary-50/70 px-3 py-2 rounded-xl border border-primary-100 flex-wrap">
             <span className="text-xs font-semibold text-primary-600 shrink-0">Purchase Type:</span>
             <label className="inline-flex items-center gap-1.5 text-xs text-primary-700 font-medium cursor-pointer">
               <input
@@ -216,7 +249,7 @@ export default function Purchase({ path: windowPath }) {
                 checked={globalPurchaseType === 'by_weight'}
                 onChange={() => {
                   setGlobalPurchaseType('by_weight');
-                  setLines(lines.map((l) => ({ ...l, purchaseType: 'by_weight', bags: '' })));
+                  setLines(lines.map((l) => ({ ...l, purchaseType: 'by_weight' })));
                 }}
               />
               By Weight (kg)
@@ -229,10 +262,23 @@ export default function Purchase({ path: windowPath }) {
                 checked={globalPurchaseType === 'by_bag'}
                 onChange={() => {
                   setGlobalPurchaseType('by_bag');
-                  setLines(lines.map((l) => ({ ...l, purchaseType: 'by_bag', totalKg: '' })));
+                  setLines(lines.map((l) => ({ ...l, purchaseType: 'by_bag' })));
                 }}
               />
               By Bag (Fixed Rate)
+            </label>
+            <label className="inline-flex items-center gap-1.5 text-xs text-primary-700 font-medium cursor-pointer">
+              <input
+                type="radio"
+                name="globalPurchaseType"
+                value="by_box"
+                checked={globalPurchaseType === 'by_box'}
+                onChange={() => {
+                  setGlobalPurchaseType('by_box');
+                  setLines(lines.map((l) => ({ ...l, purchaseType: 'by_box' })));
+                }}
+              />
+              By Box
             </label>
           </div>
 
@@ -318,10 +364,20 @@ export default function Purchase({ path: windowPath }) {
         </div>
 
         {lines.map((line, idx) => {
-          const isByBag = line.purchaseType === 'by_bag';
-          const lineAmount = isByBag
-            ? (Math.floor(Number(line.bags)) || 0) * (Number(line.ratePerKg) || 0)
-            : (Number(line.totalKg) || 0) * (Number(line.ratePerKg) || 0);
+          const type = line.purchaseType || 'by_weight';
+          const rate = Number(line.ratePerKg) || 0;
+          const bagsCount = Math.floor(Number(line.bags)) || 0;
+          const boxesCount = Math.floor(Number(line.boxes)) || 0;
+          const weightPerBoxKg = Number(line.weightPerBox) || 0;
+          const weightKg = Number(line.totalKg) || 0;
+
+          const boxTotalKg = Number((boxesCount * weightPerBoxKg).toFixed(1));
+          const lineAmount =
+            type === 'by_bag'
+              ? bagsCount * rate
+              : type === 'by_box'
+              ? boxTotalKg * rate
+              : weightKg * rate;
 
           return (
             <div key={idx} className="card space-y-3">
@@ -329,14 +385,14 @@ export default function Purchase({ path: windowPath }) {
                 <h3 className="font-semibold text-primary-700 flex items-center gap-2 text-sm">
                   <Package className="w-4 h-4" /> Product {idx + 1}
                 </h3>
-                <div className="flex items-center gap-2 bg-primary-50/70 px-2 py-1 rounded-lg border border-primary-100 text-xs">
+                <div className="flex items-center gap-2 bg-primary-50/70 px-2 py-1 rounded-lg border border-primary-100 text-xs flex-wrap">
                   <label className="inline-flex items-center gap-1 font-medium cursor-pointer text-primary-700">
                     <input
                       type="radio"
                       name={`line-type-${idx}`}
                       value="by_weight"
-                      checked={line.purchaseType !== 'by_bag'}
-                      onChange={() => updateLine(idx, { purchaseType: 'by_weight', bags: '' })}
+                      checked={line.purchaseType === 'by_weight'}
+                      onChange={() => updateLine(idx, { purchaseType: 'by_weight' })}
                     />
                     By Weight
                   </label>
@@ -346,9 +402,19 @@ export default function Purchase({ path: windowPath }) {
                       name={`line-type-${idx}`}
                       value="by_bag"
                       checked={line.purchaseType === 'by_bag'}
-                      onChange={() => updateLine(idx, { purchaseType: 'by_bag', totalKg: '' })}
+                      onChange={() => updateLine(idx, { purchaseType: 'by_bag' })}
                     />
                     By Bag
+                  </label>
+                  <label className="inline-flex items-center gap-1 font-medium cursor-pointer text-primary-700">
+                    <input
+                      type="radio"
+                      name={`line-type-${idx}`}
+                      value="by_box"
+                      checked={line.purchaseType === 'by_box'}
+                      onChange={() => updateLine(idx, { purchaseType: 'by_box' })}
+                    />
+                    By Box
                   </label>
                 </div>
                 {lines.length > 1 && (
@@ -378,8 +444,9 @@ export default function Purchase({ path: windowPath }) {
                 }
                 required
               />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {isByBag ? (
+
+              {type === 'by_bag' && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                   <div>
                     <label className="label">No. of Bags *</label>
                     <input
@@ -394,7 +461,94 @@ export default function Purchase({ path: windowPath }) {
                       required
                     />
                   </div>
-                ) : (
+                  <div>
+                    <label className="label">Rate / Bag *</label>
+                    <input
+                      className="input-field"
+                      type="text"
+                      inputMode="decimal"
+                      value={line.ratePerKg}
+                      onChange={(e) =>
+                        updateLine(idx, { ratePerKg: e.target.value.replace(/[^\d.]/g, '') })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="pb-2">
+                    <p className="text-sm text-primary-600">
+                      Amount: <strong>{formatCurrency(lineAmount)}</strong>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {type === 'by_box' && (
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                  <div>
+                    <label className="label">No. of Boxes *</label>
+                    <input
+                      className="input-field"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={line.boxes}
+                      onChange={(e) =>
+                        updateLine(idx, { boxes: e.target.value.replace(/[^\d]/g, '') })
+                      }
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Weight / Box (kg) *</label>
+                    <input
+                      className="input-field"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.0"
+                      value={line.weightPerBox}
+                      onChange={(e) =>
+                        updateLine(idx, { weightPerBox: e.target.value.replace(/[^\d.]/g, '') })
+                      }
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Rate / Kg *</label>
+                    <input
+                      className="input-field"
+                      type="text"
+                      inputMode="decimal"
+                      value={line.ratePerKg}
+                      onChange={(e) =>
+                        updateLine(idx, { ratePerKg: e.target.value.replace(/[^\d.]/g, '') })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="pb-1">
+                    <p className="text-xs text-primary-400">Total Wt: {boxTotalKg.toFixed(1)} kg</p>
+                    <p className="text-sm text-primary-600">
+                      Amount: <strong>{formatCurrency(lineAmount)}</strong>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {type === 'by_weight' && (
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                  <div>
+                    <label className="label">No. of Bags</label>
+                    <input
+                      className="input-field"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0 (optional)"
+                      value={line.bags}
+                      onChange={(e) =>
+                        updateLine(idx, { bags: e.target.value.replace(/[^\d]/g, '') })
+                      }
+                    />
+                  </div>
                   <div>
                     <label className="label">Weight (kg) *</label>
                     <input
@@ -409,26 +563,26 @@ export default function Purchase({ path: windowPath }) {
                       required
                     />
                   </div>
-                )}
-                <div>
-                  <label className="label">{isByBag ? 'Rate / Bag *' : 'Rate / Kg *'}</label>
-                  <input
-                    className="input-field"
-                    type="text"
-                    inputMode="decimal"
-                    value={line.ratePerKg}
-                    onChange={(e) =>
-                      updateLine(idx, { ratePerKg: e.target.value.replace(/[^\d.]/g, '') })
-                    }
-                    required
-                  />
+                  <div>
+                    <label className="label">Rate / Kg *</label>
+                    <input
+                      className="input-field"
+                      type="text"
+                      inputMode="decimal"
+                      value={line.ratePerKg}
+                      onChange={(e) =>
+                        updateLine(idx, { ratePerKg: e.target.value.replace(/[^\d.]/g, '') })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="pb-2">
+                    <p className="text-sm text-primary-600">
+                      Amount: <strong>{formatCurrency(lineAmount)}</strong>
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-end">
-                  <p className="text-sm text-primary-600 pb-3">
-                    Amount: <strong>{formatCurrency(lineAmount)}</strong>
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
           );
         })}

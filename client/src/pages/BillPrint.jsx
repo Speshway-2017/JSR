@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Printer, Send, FileText, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -34,8 +34,14 @@ export default function BillPrint({ path: windowPath }) {
   const [startDate, setStartDate] = useState(dateParam);
   const [endDate, setEndDate] = useState(dateParam);
 
+  /* Track whether the windowPath change was triggered internally by our own
+     updateWindowPath call (i.e. the user changed the From date), vs externally
+     (e.g. navigating from another page). We skip re-syncing endDate on internal updates. */
+  const isInternalPathUpdate = useRef(false);
+
   useEffect(() => {
     if (startDate && typeof updateWindowPath === 'function') {
+      isInternalPathUpdate.current = true;
       updateWindowPath('/bill-print', `/bill-print?date=${startDate}`);
     }
   }, [startDate, updateWindowPath]);
@@ -47,6 +53,13 @@ export default function BillPrint({ path: windowPath }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
+    /* If this effect was triggered by our own startDate → updateWindowPath call,
+       skip re-syncing so the user's endDate is preserved. */
+    if (isInternalPathUpdate.current) {
+      isInternalPathUpdate.current = false;
+      return;
+    }
+
     const pDate = effectiveSearchParams.get('date');
     const pCust = effectiveSearchParams.get('customer');
     const pVend = effectiveSearchParams.get('vendor');

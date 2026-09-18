@@ -75,4 +75,25 @@ router.post('/change-password', auth, async (req, res) => {
   }
 });
 
+router.post('/verify-password', auth, async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const ok = await user.comparePassword(password);
+    if (!ok) {
+      return res.status(401).json({ message: 'Incorrect admin password' });
+    }
+
+    res.json({ success: true, message: 'Password verified successfully' });
+  } catch (error) {
+    res.status(500).json({ message: apiErrorMessage(error) });
+  }
+});
+
 export default router;

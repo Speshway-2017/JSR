@@ -83,10 +83,12 @@ router.get('/ledger', async (req, res) => {
             ?.map((l) => {
               const bags = Number(l.bagCount) || (Array.isArray(l.bags) ? l.bags.length : 0) || 0;
               const weight = Number(l.totalKg) || (Array.isArray(l.bags) ? l.bags.reduce((s, b) => s + (Number(b?.kgs || b) || 0), 0) : 0) || 0;
+              const rate = Number(l.ratePerKg != null ? l.ratePerKg : l.rate) || 0;
               const name = l.materialName || 'Item';
               const details = [];
               if (bags) details.push(`${bags} ${bags === 1 ? 'bag' : 'bags'}`);
               if (weight) details.push(`${weight % 1 === 0 ? weight : Number(weight.toFixed(1))} kg`);
+              if (rate) details.push(`@ ₹${rate % 1 === 0 ? rate : Number(rate.toFixed(2))}${l.saleType === 'by_bag' ? '/bag' : '/kg'}`);
               return details.length ? `${name} (${details.join(', ')})` : name;
             })
             .filter(Boolean)
@@ -117,10 +119,12 @@ router.get('/ledger', async (req, res) => {
           ?.map((l) => {
             const bags = Number(l.bagCount) || (Array.isArray(l.bags) ? l.bags.length : 0) || 0;
             const weight = Number(l.totalKg) || (Array.isArray(l.bags) ? l.bags.reduce((s, b) => s + (Number(b?.kgs || b) || 0), 0) : 0) || 0;
+            const rate = Number(l.ratePerKg != null ? l.ratePerKg : l.rate) || 0;
             const name = l.materialName || 'Item';
             const details = [];
             if (bags) details.push(`${bags} ${bags === 1 ? 'bag' : 'bags'}`);
             if (weight) details.push(`${weight % 1 === 0 ? weight : Number(weight.toFixed(1))} kg`);
+            if (rate) details.push(`@ ₹${rate % 1 === 0 ? rate : Number(rate.toFixed(2))}${l.saleType === 'by_bag' ? '/bag' : '/kg'}`);
             return details.length ? `${name} (${details.join(', ')})` : name;
           })
           .filter(Boolean)
@@ -404,7 +408,11 @@ router.get('/sales-bills', async (req, res) => {
     }
 
     const sales = await Sale.find({ createdAt: { $gte: start, $lte: end } })
-      .populate('customer', 'name nameTelugu')
+      .populate({
+        path: 'customer',
+        select: 'name nameTelugu schedule creditBalance',
+        populate: { path: 'schedule', select: 'name' },
+      })
       .populate('vendor', 'name city mobile')
       .sort({ createdAt: 1 })
       .lean();
@@ -417,11 +425,18 @@ router.get('/sales-bills', async (req, res) => {
       const key = String(cid);
 
       if (!byCustomer.has(key)) {
+        const custObj = sale.customer && typeof sale.customer === 'object' ? sale.customer : null;
+        const schedObj = custObj?.schedule && typeof custObj.schedule === 'object' ? custObj.schedule : null;
         byCustomer.set(key, {
           customerId: key,
-          name: sale.customer?.name || '—',
-          nameTelugu: sale.customer?.nameTelugu || '',
+          name: custObj?.name || '—',
+          nameTelugu: custObj?.nameTelugu || '',
+          scheduleId: schedObj?._id ? String(schedObj._id) : (custObj?.schedule ? String(custObj.schedule) : ''),
+          scheduleName: schedObj?.name || '',
+          creditBalance: custObj?.creditBalance || 0,
+          opening: 0,
           sales: [],
+          payments: [],
         });
       }
 
@@ -479,23 +494,69 @@ router.get('/sales-bills', async (req, res) => {
       }
     }
 
+    const customerIds = [...byCustomer.keys()];
+    if (customerIds.length) {
+      const txs = await Transaction.find({
+        customer: { $in: customerIds },
+        type: { $in: ['customer_credit', 'customer_payment'] },
+      }).lean();
+
+      for (const tx of txs) {
+        const cid = String(tx.customer?._id || tx.customer || '');
+        if (!cid || !byCustomer.has(cid)) continue;
+        const bucket = byCustomer.get(cid);
+        const when = txWhen(tx);
+        if (when < start) {
+          bucket.opening += balanceDelta(tx);
+          continue;
+        }
+        if (when > end) continue;
+        if (tx.type === 'customer_payment' && cashPaid(tx) > 0) {
+          bucket.payments.push({
+            date: when,
+            amount: cashPaid(tx),
+          });
+        } else if (tx.type === 'customer_credit' && !tx.sale && creditAmount(tx) > 0) {
+          bucket.sales.push({
+            date: when,
+            material: tx.description || 'Credit',
+            bags: 0,
+            weight: 0,
+            ratePerKg: 0,
+            amount: creditAmount(tx),
+            cooly: 0,
+          });
+        }
+      }
+    }
+
     const statements = [...byCustomer.values()]
       .map((b) => {
         const totalSale = b.sales.reduce((s, r) => s + r.amount + (r.cooly || 0), 0);
+        const totalPaid = b.payments.reduce((s, r) => s + r.amount, 0);
+        const opening = Number(b.opening.toFixed(2));
+        const closing = Number((opening + totalSale - totalPaid).toFixed(2));
         return {
           customerId: b.customerId,
           name: b.name,
           nameTelugu: b.nameTelugu,
-          opening: 0,
+          scheduleId: b.scheduleId || '',
+          scheduleName: b.scheduleName || '',
+          creditBalance: b.creditBalance || 0,
+          opening,
           sales: b.sales.map((r) => ({
             ...r,
             weight: Number(Number(r.weight).toFixed(1)),
             amount: Number(Number(r.amount).toFixed(2)),
           })),
-          payments: [],
+          payments: b.payments.map((r) => ({
+            ...r,
+            amount: Number(Number(r.amount).toFixed(2)),
+          })),
           totalSale: Number(totalSale.toFixed(2)),
-          totalPaid: 0,
-          closing: Number(totalSale.toFixed(2)),
+          totalPaid: Number(totalPaid.toFixed(2)),
+          closing,
+          overallBalance: closing,
         };
       })
       .filter((s) => s.sales.length > 0)

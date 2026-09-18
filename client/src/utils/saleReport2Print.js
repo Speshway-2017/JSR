@@ -85,6 +85,8 @@ export function saleReport2InnerHtml(data) {
               const matTe = mat.materialNameTelugu ? `<span class="mat-te"> (${esc(mat.materialNameTelugu)})</span>` : '';
 
               const lines = (mat.entries || [])
+                .slice()
+                .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base', numeric: true }))
                 .map((e) => {
                   const bagsText = esc(fmtBags(e.bags));
                   const rateVal = e.rate != null ? e.rate : (e.amount != null ? e.amount : 0);
@@ -187,9 +189,11 @@ export const SALE_REPORT_2_CSS = `
   font-weight: 800;
   border-bottom: 2px solid #111111;
   margin-bottom: 8px;
-  padding-bottom: 3px;
-  background: #f8fafc;
+  padding: 5px 4px 4px;
+  background: #1e293b;
+  color: #ffffff;
   text-transform: uppercase;
+  border-radius: 3px 3px 0 0;
   break-after: avoid;
   page-break-after: avoid;
 }
@@ -312,6 +316,11 @@ export const SALE_REPORT_2_CSS = `
   .mat .head {
     break-after: avoid !important;
     page-break-after: avoid !important;
+    background: #1e293b !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
   }
   .col-summary {
     break-before: avoid !important;

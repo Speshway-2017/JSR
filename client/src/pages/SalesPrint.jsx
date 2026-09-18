@@ -417,23 +417,54 @@ export default function SalesPrint({ path: windowPath }) {
     }
   };
 
-  const toggleBillPaid = async (st, targetIsPaid) => {
-    try {
-      const saleIds = Array.from(new Set((st.sales || []).map((s) => s.saleId).filter(Boolean)));
-      if (!saleIds.length) {
-        toast.error('No sale ID found to update status');
-        return;
+  const handleGridKeyDown = (e, rowIdx, colIdx) => {
+    const { key } = e;
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) return;
+
+    let targetRow = rowIdx;
+    let targetCol = colIdx;
+
+    if (key === 'ArrowDown') {
+      targetRow = rowIdx + 1;
+    } else if (key === 'ArrowUp') {
+      targetRow = Math.max(0, rowIdx - 1);
+    } else if (key === 'ArrowRight') {
+      targetCol = Math.min(3, colIdx + 1);
+    } else if (key === 'ArrowLeft') {
+      targetCol = Math.max(0, colIdx - 1);
+    }
+
+    if (targetRow === rowIdx && targetCol === colIdx) return;
+
+    const selector = `[data-print-row="${targetRow}"][data-print-col="${targetCol}"]`;
+    const targetEl = document.querySelector(selector);
+    if (targetEl) {
+      e.preventDefault();
+      targetEl.focus();
+      if (typeof targetEl.select === 'function') {
+        setTimeout(() => {
+          try { targetEl.select(); } catch (_) {}
+        }, 0);
       }
-      for (const saleId of saleIds) {
-        await api.patch(`/sales/${saleId}/toggle-paid`, { isPaid: targetIsPaid });
+    } else if (key === 'ArrowDown' || key === 'ArrowUp') {
+      const rowCells = document.querySelectorAll(`[data-print-row="${targetRow}"]`);
+      if (rowCells.length > 0) {
+        e.preventDefault();
+        const closestCell = Array.from(rowCells).reduce((prev, curr) => {
+          const prevCol = parseInt(prev.getAttribute('data-print-col') || '0', 10);
+          const currCol = parseInt(curr.getAttribute('data-print-col') || '0', 10);
+          return Math.abs(currCol - colIdx) < Math.abs(prevCol - colIdx) ? curr : prev;
+        });
+        closestCell.focus();
+        if (typeof closestCell.select === 'function') {
+          setTimeout(() => {
+            try { closestCell.select(); } catch (_) {}
+          }, 0);
+        }
       }
-      toast.success(targetIsPaid ? `Marked as Paid for ${st.name}` : `Marked as Unpaid for ${st.name}`);
-      fetchSalesBills();
-      window.dispatchEvent(new CustomEvent('jsr_data_updated'));
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update payment status');
     }
   };
+
 
   const SortHeader = ({ column, label }) => {
     const active = sortKey === column;
@@ -589,7 +620,10 @@ export default function SalesPrint({ path: windowPath }) {
                       <SortHeader column="name" label="Customer" />
                     </th>
                     <th className="px-2 py-2 font-semibold text-right">
-                      <SortHeader column="totalSale" label="Total" />
+                      <SortHeader column="totalSale" label="Sale" />
+                    </th>
+                    <th className="px-2 py-2 font-semibold text-right">
+                      <SortHeader column="closing" label="Closing" />
                     </th>
                   </tr>
                 </thead>
@@ -615,13 +649,16 @@ export default function SalesPrint({ path: windowPath }) {
                           </button>
                         </td>
                         <td className="px-2 py-1.5 text-primary-800">
-                          <div className="font-semibold text-xs leading-snug truncate max-w-[120px]">{st.name}</div>
+                          <div className="font-semibold text-xs leading-snug truncate max-w-[110px]">{st.name}</div>
                           {st.nameTelugu ? (
                             <span className="text-[11px] text-primary-400 truncate block">{st.nameTelugu}</span>
                           ) : null}
                         </td>
-                        <td className="px-2 py-1.5 text-right text-primary-800 font-bold tabular-nums text-xs">
+                        <td className="px-2 py-1.5 text-right text-primary-700 font-semibold tabular-nums text-xs">
                           {formatCurrency(st.totalSale)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-primary-800 font-bold tabular-nums text-xs">
+                          {formatCurrency(st.closing)}
                         </td>
                       </tr>
                     );
@@ -667,164 +704,174 @@ export default function SalesPrint({ path: windowPath }) {
                 <p className="text-xs mt-1 text-primary-400">Select customers on the left to see live preview</p>
               </div>
             ) : (
-              <div className="grid gap-4 grid-cols-1 xl:grid-cols-2">
-                {selectedStatements.slice(0, 12).map((st) => {
-                  const allPaid = (st.sales || []).length > 0 && (st.sales || []).every((s) => s.isPaid);
-                  return (
-                      <div
-                        key={st.customerId}
-                        className="card !p-3.5 border border-primary-200 shadow-sm bg-white text-xs space-y-2.5 relative overflow-hidden"
-                      >
-                        <div className="flex items-center justify-between border-b border-primary-100 pb-2">
-                          <div className="text-left flex-1">
+              (() => {
+                let globalRowIdx = 0;
+                return (
+                  <div className="grid gap-4 grid-cols-1 xl:grid-cols-2">
+                    {selectedStatements.slice(0, 12).map((st) => {
+                      return (
+                        <div
+                          key={st.customerId}
+                          className="card !p-3.5 border border-primary-200 shadow-sm bg-white text-xs space-y-2.5 relative overflow-hidden"
+                        >
+                          <div className="text-center border-b border-primary-100 pb-2">
                             <p className="font-bold text-primary-900 text-base">{st.name}</p>
                             {st.nameTelugu ? (
                               <p className="text-xs text-primary-500 font-medium">{st.nameTelugu}</p>
                             ) : null}
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {allPaid ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Paid Direct
-                              </span>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => toggleBillPaid(st, !allPaid)}
-                              className={`px-3 py-1 rounded-md text-xs font-bold border transition shadow-2xs cursor-pointer ${
-                                allPaid
-                                  ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
-                                  : 'bg-emerald-600 text-white hover:bg-emerald-700 border-emerald-700'
-                              }`}
-                              title={allPaid ? 'Click to mark as unpaid' : 'Click to mark as paid direct'}
-                            >
-                              {allPaid ? 'Mark Unpaid' : 'Mark as Paid'}
-                            </button>
-                          </div>
-                        </div>
 
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs min-w-[340px]">
-                        <thead>
-                          <tr className="border-b border-primary-200 text-primary-600 font-semibold text-left bg-primary-50/70 whitespace-nowrap">
-                            <th className="py-1.5 px-1 font-bold">తేదీ</th>
-                            <th className="py-1.5 px-1 font-bold min-w-[7rem]">వస్తువు</th>
-                            <th className="py-1.5 px-1 text-right font-bold w-12">బ్యాగ్</th>
-                            <th className="py-1.5 px-1 text-right font-bold w-16">బరువు (kg)</th>
-                            <th className="py-1.5 px-1 text-right font-bold w-16">ధర</th>
-                            <th className="py-1.5 px-1 text-right font-bold">మొత్తం</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-primary-100">
-                          {(st.sales || []).map((s, idx) => {
-                            const rowKey = `${st.customerId}_${s.saleId || idx}_${idx}`;
-                            const baseAmount = Number(s.amount) || 0;
-                            const coolyAmt = Number(s.cooly) || Number(s.handlingCharges) || 0;
-                            const lineTotal = baseAmount + coolyAmt;
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs min-w-[340px]">
+                              <thead>
+                                <tr className="border-b border-primary-200 text-primary-600 font-semibold text-left bg-primary-50/70 whitespace-nowrap">
+                                  <th className="py-1.5 px-1 font-bold">తేదీ</th>
+                                  <th className="py-1.5 px-1 font-bold min-w-[7rem]">వస్తువు</th>
+                                  <th className="py-1.5 px-1 text-right font-bold w-12">బ్యాగ్</th>
+                                  <th className="py-1.5 px-1 text-right font-bold w-16">బరువు (kg)</th>
+                                  <th className="py-1.5 px-1 text-right font-bold w-16">ధర</th>
+                                  <th className="py-1.5 px-1 text-right font-bold">మొత్తం</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-primary-100">
+                                <tr>
+                                  <td className="py-1 px-1"></td>
+                                  <td className="py-1 px-1 font-medium text-primary-700">Opening</td>
+                                  <td className="py-1 px-1"></td>
+                                  <td className="py-1 px-1"></td>
+                                  <td className="py-1 px-1"></td>
+                                  <td className="py-1 px-1 text-right font-semibold">{formatCurrency(st.opening || 0)}</td>
+                                </tr>
+                                {(st.sales || []).map((s, idx) => {
+                                  const rIdx = globalRowIdx++;
+                                  const rowKey = `${st.customerId}_${s.saleId || idx}_${idx}`;
+                                  const baseAmount = Number(s.amount) || 0;
+                                  const coolyAmt = Number(s.cooly) || Number(s.handlingCharges) || 0;
+                                  const lineTotal = baseAmount + coolyAmt;
 
-                            const selectedMatId =
-                              materials.find(
-                                (m) =>
-                                  String(m._id) === String(s.materialId || '') ||
-                                  m.name.toLowerCase() === String(s.material || '').trim().toLowerCase()
-                              )?._id || s.materialId || '';
+                                  const selectedMatId =
+                                    materials.find(
+                                      (m) =>
+                                        String(m._id) === String(s.materialId || '') ||
+                                        m.name.toLowerCase() === String(s.material || '').trim().toLowerCase()
+                                    )?._id || s.materialId || '';
 
-                            return (
-                              <tr key={rowKey} className="hover:bg-primary-50/40 transition">
-                                <td className="py-1 px-1 text-primary-500 whitespace-nowrap">
-                                  {formatDateOnly(s.date)}
-                                </td>
-                                <td className="py-1 px-1 min-w-[7rem]">
-                                  <select
-                                    key={`${s.saleId}-mat-${s.materialId || s.material}`}
-                                    className={`${cellStyle} font-semibold text-primary-800 cursor-pointer`}
-                                    defaultValue={selectedMatId}
-                                    onChange={(e) => {
-                                      const newMatId = e.target.value;
-                                      if (!newMatId) return;
-                                      const mat = materials.find((m) => String(m._id) === newMatId);
-                                      const newRate =
-                                        mat?.sellingPricePerKg != null && mat.sellingPricePerKg > 0
-                                          ? mat.sellingPricePerKg
-                                          : s.ratePerKg;
-                                      persistSaleLine(st, s, { materialId: newMatId, ratePerKg: newRate });
-                                    }}
-                                  >
-                                    {!materials.some((m) => String(m._id) === String(selectedMatId)) && s.material && (
-                                      <option value="">{s.material}</option>
-                                    )}
-                                    {materials.map((m) => (
-                                      <option key={m._id} value={m._id}>
-                                        {m.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td className="py-1 px-1 w-12 text-right">
-                                  <input
-                                    key={`${s.saleId}-bags-${s.bags}`}
-                                    type="text"
-                                    inputMode="numeric"
-                                    autoComplete="off"
-                                    defaultValue={s.bags || 1}
-                                    className={`${cellStyle} text-right font-medium tabular-nums text-primary-800`}
-                                    onBlur={(e) => {
-                                      const newBags = Math.max(1, Math.floor(Number(e.target.value)) || 1);
-                                      if (newBags === Number(s.bags)) return;
-                                      persistSaleLine(st, s, { bags: newBags });
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') e.currentTarget.blur();
-                                    }}
-                                  />
-                                </td>
-                                <td className="py-1 px-1 w-16 text-right">
-                                  {s.saleType === 'by_bag' ? (
-                                    <span className="text-primary-400 font-medium py-1 px-1 block">—</span>
-                                  ) : (
-                                    <input
-                                      key={`${s.saleId}-weight-${s.weight}`}
-                                      type="text"
-                                      inputMode="decimal"
-                                      autoComplete="off"
-                                      defaultValue={s.weight != null ? s.weight : ''}
-                                      className={`${cellStyle} text-right font-medium tabular-nums text-primary-700`}
-                                      onBlur={(e) => {
-                                        const newWeight = Number(e.target.value) || 0;
-                                        if (newWeight === Number(s.weight)) return;
-                                        persistSaleLine(st, s, { weight: newWeight });
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') e.currentTarget.blur();
-                                      }}
-                                    />
-                                  )}
-                                </td>
-                                <td className="py-1 px-1 w-16 text-right">
-                                  <div className="flex flex-col items-end">
-                                    <input
-                                      key={`${s.saleId}-rate-${s.ratePerKg}`}
-                                      type="text"
-                                      inputMode="decimal"
-                                      autoComplete="off"
-                                      defaultValue={s.ratePerKg != null ? s.ratePerKg : ''}
-                                      className={`${cellStyle} text-right font-medium tabular-nums text-primary-700`}
-                                      onBlur={(e) => {
-                                        const newRate = Number(e.target.value) || 0;
-                                        if (newRate === Number(s.ratePerKg)) return;
-                                        persistSaleLine(st, s, { ratePerKg: newRate });
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') e.currentTarget.blur();
-                                      }}
-                                    />
-                                    {s.saleType === 'by_bag' && (
-                                      <span className="inline-block text-[9px] font-semibold px-1 py-0.2 rounded bg-amber-100 text-amber-800 leading-none whitespace-nowrap">
-                                        per bag
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
+                                  return (
+                                    <tr key={rowKey} className="hover:bg-primary-50/40 transition">
+                                      <td className="py-1 px-1 text-primary-500 whitespace-nowrap">
+                                        {formatDateOnly(s.date)}
+                                      </td>
+                                      <td className="py-1 px-1 min-w-[7rem]">
+                                        <select
+                                          key={`${s.saleId}-mat-${s.materialId || s.material}`}
+                                          data-print-row={rIdx}
+                                          data-print-col={0}
+                                          onKeyDown={(e) => handleGridKeyDown(e, rIdx, 0)}
+                                          className={`${cellStyle} font-semibold text-primary-800 cursor-pointer`}
+                                          defaultValue={selectedMatId}
+                                          onChange={(e) => {
+                                            const newMatId = e.target.value;
+                                            if (!newMatId) return;
+                                            const mat = materials.find((m) => String(m._id) === newMatId);
+                                            const newRate =
+                                              mat?.sellingPricePerKg != null && mat.sellingPricePerKg > 0
+                                                ? mat.sellingPricePerKg
+                                                : s.ratePerKg;
+                                            persistSaleLine(st, s, { materialId: newMatId, ratePerKg: newRate });
+                                          }}
+                                        >
+                                          {!materials.some((m) => String(m._id) === String(selectedMatId)) && s.material && (
+                                            <option value="">{s.material}</option>
+                                          )}
+                                          {materials.map((m) => (
+                                            <option key={m._id} value={m._id}>
+                                              {m.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </td>
+                                      <td className="py-1 px-1 w-12 text-right">
+                                        <input
+                                          key={`${s.saleId}-bags-${s.bags}`}
+                                          data-print-row={rIdx}
+                                          data-print-col={1}
+                                          type="text"
+                                          inputMode="numeric"
+                                          autoComplete="off"
+                                          defaultValue={s.bags || 1}
+                                          className={`${cellStyle} text-right font-medium tabular-nums text-primary-800`}
+                                          onBlur={(e) => {
+                                            const newBags = Math.max(1, Math.floor(Number(e.target.value)) || 1);
+                                            if (newBags === Number(s.bags)) return;
+                                            persistSaleLine(st, s, { bags: newBags });
+                                          }}
+                                          onKeyDown={(e) => {
+                                            handleGridKeyDown(e, rIdx, 1);
+                                            if (e.key === 'Enter') e.currentTarget.blur();
+                                          }}
+                                        />
+                                      </td>
+                                      <td className="py-1 px-1 w-16 text-right">
+                                        {s.saleType === 'by_bag' ? (
+                                          <span
+                                            tabIndex={0}
+                                            data-print-row={rIdx}
+                                            data-print-col={2}
+                                            onKeyDown={(e) => handleGridKeyDown(e, rIdx, 2)}
+                                            className="text-primary-400 font-medium py-1 px-1 block outline-none focus:ring-1 focus:ring-amber-500 rounded cursor-pointer"
+                                          >
+                                            —
+                                          </span>
+                                        ) : (
+                                          <input
+                                            key={`${s.saleId}-weight-${s.weight}`}
+                                            data-print-row={rIdx}
+                                            data-print-col={2}
+                                            type="text"
+                                            inputMode="decimal"
+                                            autoComplete="off"
+                                            defaultValue={s.weight != null ? s.weight : ''}
+                                            className={`${cellStyle} text-right font-medium tabular-nums text-primary-700`}
+                                            onBlur={(e) => {
+                                              const newWeight = Number(e.target.value) || 0;
+                                              if (newWeight === Number(s.weight)) return;
+                                              persistSaleLine(st, s, { weight: newWeight });
+                                            }}
+                                            onKeyDown={(e) => {
+                                              handleGridKeyDown(e, rIdx, 2);
+                                              if (e.key === 'Enter') e.currentTarget.blur();
+                                            }}
+                                          />
+                                        )}
+                                      </td>
+                                      <td className="py-1 px-1 w-16 text-right">
+                                        <div className="flex flex-col items-end">
+                                          <input
+                                            key={`${s.saleId}-rate-${s.ratePerKg}`}
+                                            data-print-row={rIdx}
+                                            data-print-col={3}
+                                            type="text"
+                                            inputMode="decimal"
+                                            autoComplete="off"
+                                            defaultValue={s.ratePerKg != null ? s.ratePerKg : ''}
+                                            className={`${cellStyle} text-right font-medium tabular-nums text-primary-700`}
+                                            onBlur={(e) => {
+                                              const newRate = Number(e.target.value) || 0;
+                                              if (newRate === Number(s.ratePerKg)) return;
+                                              persistSaleLine(st, s, { ratePerKg: newRate });
+                                            }}
+                                            onKeyDown={(e) => {
+                                              handleGridKeyDown(e, rIdx, 3);
+                                              if (e.key === 'Enter') e.currentTarget.blur();
+                                            }}
+                                          />
+                                          {s.saleType === 'by_bag' && (
+                                            <span className="inline-block text-[9px] font-semibold px-1 py-0.2 rounded bg-amber-100 text-amber-800 leading-none whitespace-nowrap">
+                                              per bag
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
                                 <td className="py-1 px-1 text-right font-bold text-primary-800 whitespace-nowrap">
                                   {formatCurrency(lineTotal)}
                                   {coolyAmt > 0 ? (
@@ -836,12 +883,27 @@ export default function SalesPrint({ path: windowPath }) {
                               </tr>
                             );
                           })}
-                          <tr className="font-bold text-primary-900 border-t border-primary-200 bg-primary-50/50 whitespace-nowrap">
-                            <td className="py-2 px-1 font-bold text-xs" colSpan={5}>
+                          {(st.payments || []).map((p, pIdx) => (
+                            <tr key={`payment-${pIdx}`} className="text-emerald-700 bg-emerald-50/30">
+                              <td className="py-1 px-1">{formatDateOnly(p.date)}</td>
+                              <td className="py-1 px-1 font-medium" colSpan={4}>Paid</td>
+                              <td className="py-1 px-1 text-right font-bold">- {formatCurrency(p.amount)}</td>
+                            </tr>
+                          ))}
+                          <tr className="font-bold text-primary-900 border-t border-primary-200 bg-primary-50/30 whitespace-nowrap">
+                            <td className="py-1.5 px-1 font-bold text-xs" colSpan={5}>
                               Total
                             </td>
-                            <td className="py-2 px-1 text-right font-bold text-sm text-primary-900">
+                            <td className="py-1.5 px-1 text-right font-bold text-sm text-primary-900">
                               {formatCurrency(st.totalSale)}
+                            </td>
+                          </tr>
+                          <tr className="font-bold text-primary-900 border-t border-primary-200 bg-primary-50/60 whitespace-nowrap">
+                            <td className="py-1.5 px-1 font-bold text-xs" colSpan={5}>
+                              Closing
+                            </td>
+                            <td className="py-1.5 px-1 text-right font-bold text-sm text-primary-900">
+                              {formatCurrency(st.closing)}
                             </td>
                           </tr>
                         </tbody>
@@ -851,7 +913,9 @@ export default function SalesPrint({ path: windowPath }) {
                 );
               })}
             </div>
-            )}
+          );
+        })()
+      )}
           </div>
         </div>
       </div>

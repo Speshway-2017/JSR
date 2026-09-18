@@ -52,11 +52,13 @@ export function particulars(tx) {
       const parts = lines.map((l) => {
         const bags = Number(l.bagCount) || (Array.isArray(l.bags) ? l.bags.length : 0) || 0;
         const weight = Number(l.totalKg) || (Array.isArray(l.bags) ? l.bags.reduce((s, b) => s + (Number(b?.kgs || b) || 0), 0) : 0) || 0;
+        const rate = Number(l.ratePerKg != null ? l.ratePerKg : l.rate) || 0;
         const name = l.materialName || 'Item';
-        if (!bags && !weight) return name;
+        if (!bags && !weight && !rate) return name;
         const details = [];
         if (bags) details.push(`${bags} ${bags === 1 ? 'bag' : 'bags'}`);
         if (weight) details.push(`${weight % 1 === 0 ? weight : Number(weight.toFixed(1))} kg`);
+        if (rate) details.push(`@ ₹${rate % 1 === 0 ? rate : Number(rate.toFixed(2))}${l.saleType === 'by_bag' ? '/bag' : '/kg'}`);
         return `${name} (${details.join(', ')})`;
       });
       return `Sale - ${parts.join(' · ')}`;
