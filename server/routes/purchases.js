@@ -27,10 +27,16 @@ async function resolveMaterial({ materialId, materialName }) {
 
 router.get('/', async (req, res) => {
   try {
-    const { vendorId, date } = req.query;
+    const { vendorId, date, startDate, endDate, sort } = req.query;
     const filter = {};
     if (vendorId) filter.vendor = vendorId;
-    if (date) {
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.purchaseDate = { $gte: start, $lte: end };
+    } else if (date) {
       const start = new Date(date);
       start.setHours(0, 0, 0, 0);
       const end = new Date(date);
@@ -38,9 +44,11 @@ router.get('/', async (req, res) => {
       filter.purchaseDate = { $gte: start, $lte: end };
     }
 
+    const sortOption = sort === 'asc' ? { purchaseDate: 1, createdAt: 1 } : { purchaseDate: -1, createdAt: -1 };
+
     const purchases = await Purchase.find(filter)
-      .populate('vendor', 'name city mobile')
-      .sort({ purchaseDate: 1, createdAt: 1 });
+      .populate('vendor', 'name nameTelugu city mobile address creditBalance')
+      .sort(sortOption);
     res.json(purchases);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -174,7 +182,7 @@ router.get('/:id', async (req, res) => {
   try {
     const purchase = await Purchase.findById(req.params.id).populate(
       'vendor',
-      'name city mobile creditBalance'
+      'name nameTelugu city mobile address creditBalance'
     );
     if (!purchase) return res.status(404).json({ message: 'Purchase not found' });
     res.json(purchase);

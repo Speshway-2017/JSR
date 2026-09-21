@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, ArrowUpDown, Printer, Trash2, Edit2, CheckCircle2, Lock, Eye, EyeOff, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Printer, Trash2, CheckCircle2, Lock, Eye, EyeOff, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDate, formatDateTimeSplit } from '../utils/format';
@@ -36,16 +36,10 @@ export default function Sell({ path: windowPath }) {
   const [customers, setCustomers] = useState([]);
   const [sales, setSales] = useState([]);
   const initialSaleId = effectiveSearchParams.get('saleId') || effectiveSearchParams.get('highlightSaleId') || '';
-  const [editingSaleId, setEditingSaleId] = useState(initialSaleId);
+  const [editingSaleId, setEditingSaleId] = useState('');
   const [editingLineIndex, setEditingLineIndex] = useState(0);
   const [focusSaleId, setFocusSaleId] = useState(initialSaleId);
   const [isPaid, setIsPaid] = useState(false);
-
-  useEffect(() => {
-    if (date && typeof updateWindowPath === 'function') {
-      updateWindowPath('/sell', `/sell?date=${date}`);
-    }
-  }, [date, updateWindowPath]);
 
   useEffect(() => {
     const pDate = effectiveSearchParams.get('date');
@@ -53,13 +47,20 @@ export default function Sell({ path: windowPath }) {
     const pCustId = effectiveSearchParams.get('customerId');
     const pVendId = effectiveSearchParams.get('vendorId');
 
-    if (pDate && pDate !== date) setDate(pDate);
+    if (pDate && pDate !== date) {
+      setDate(pDate);
+    }
+
     if (pSaleId) {
       setFocusSaleId(pSaleId);
-      setEditingSaleId(pSaleId);
+      // Clear filters so all records on that date are shown
+      setFilterCustomer('');
+      setFilterVendor('');
+      setFilterItem('');
+    } else {
+      if (pCustId) setFilterCustomer(pCustId);
+      if (pVendId) setFilterVendor(pVendId);
     }
-    if (pCustId) setFilterCustomer(pCustId);
-    if (pVendId) setFilterVendor(pVendId);
   }, [windowPath, effectiveSearchParams]);
   const fillingRef = useRef(false);
   const queryApplied = useRef(false);
@@ -102,11 +103,49 @@ export default function Sell({ path: windowPath }) {
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [verifyingPassword, setVerifyingPassword] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   const nameRef = useRef(null);
   const bagInputRefs = useRef({});
   const rateRef = useRef(null);
   const coolyRef = useRef(null);
+  const pendingFocusCell = useRef(null);
+  const originalCellRef = useRef(null);
+  const cancelEditRef = useRef(false);
+  const editingSaleIdRef = useRef(editingSaleId);
+  editingSaleIdRef.current = editingSaleId;
+
+  // Restore focus to pending cell immediately after React commits DOM mutations
+  useLayoutEffect(() => {
+    if (pendingFocusCell.current) {
+      const { row, col } = pendingFocusCell.current;
+      const selector = `[data-table-row="${row}"][data-table-col="${col}"]`;
+      const target = document.querySelector(selector);
+      if (target) {
+        target.focus();
+        if (typeof target.select === 'function' && target.tagName === 'INPUT') {
+          target.select();
+        }
+        pendingFocusCell.current = null;
+      }
+    }
+  });
+
+  // Secondary fallback for asynchronous state updates
+  useEffect(() => {
+    if (pendingFocusCell.current) {
+      const { row, col } = pendingFocusCell.current;
+      const selector = `[data-table-row="${row}"][data-table-col="${col}"]`;
+      const target = document.querySelector(selector);
+      if (target) {
+        target.focus();
+        if (typeof target.select === 'function' && target.tagName === 'INPUT') {
+          target.select();
+        }
+        pendingFocusCell.current = null;
+      }
+    }
+  });
 
   const material = materials.find((m) => m._id === materialId);
   const customer = customers.find((c) => c._id === customerId);
@@ -437,7 +476,9 @@ export default function Sell({ path: windowPath }) {
     const custId = cust?._id || (typeof cust === 'string' ? cust : '');
     const custObj = customers.find((c) => c._id === custId) || (typeof cust === 'object' ? cust : null);
 
+    editingSaleIdRef.current = sale._id;
     setEditingSaleId(sale._id);
+    setEditingLineIndex(lineIndex);
     setFocusSaleId(sale._id);
 
     const vId = sale.vendor?._id || (typeof sale.vendor === 'string' ? sale.vendor : '');
@@ -476,40 +517,63 @@ export default function Sell({ path: windowPath }) {
     }
     setCoolyPerBag(!!sale.coolyPerBag);
     setCooly(String(sale.coolyRate != null && sale.coolyRate !== '' ? sale.coolyRate : sale.handlingCharges || 0));
+    setIsPaid(!!sale.isPaid);
     setTimeout(() => {
       fillingRef.current = false;
     }, 0);
   };
 
-  const requestEditSale = (sale, lineIndex = 0) => {
-    if (!sale) return;
+  const requestEditSale = (sale, lineIndex = 0, forceAuth = false, cellTarget = null) => {
+    if (!sale) return false;
+    // Always require password on first edit attempt (not yet authorized)
     if (!editAuthorized) {
-      setPendingEditSale({ sale, lineIndex });
+      setPendingEditSale({ sale, lineIndex, cellTarget });
       setAdminPasswordInput('');
+      setAuthError('');
       setShowAuthModal(true);
-      return;
+      return false;
+    }
+    if (editingSaleId === sale._id && editingLineIndex === lineIndex && !forceAuth) {
+      return true;
     }
     fillFromSale(sale, lineIndex);
+    return true;
   };
 
   const handleVerifyPassword = async (e) => {
     e?.preventDefault?.();
     if (!adminPasswordInput) {
-      toast.error('Enter admin password');
+      setAuthError('Please enter the admin password.');
       return;
     }
+    setAuthError('');
     setVerifyingPassword(true);
     try {
       await api.post('/auth/verify-password', { password: adminPasswordInput });
       setEditAuthorized(true);
       setShowAuthModal(false);
+      setAuthError('');
       toast.success('Admin verified — edit access granted');
       if (pendingEditSale) {
         fillFromSale(pendingEditSale.sale, pendingEditSale.lineIndex);
+        const cellTarget = pendingEditSale.cellTarget;
         setPendingEditSale(null);
+        if (cellTarget) {
+          setTimeout(() => {
+            const selector = `[data-table-row="${cellTarget.row}"][data-table-col="${cellTarget.col}"]`;
+            const el = document.querySelector(selector);
+            if (el) {
+              el.focus();
+              if (typeof el.select === 'function' && el.tagName === 'INPUT') {
+                el.select();
+              }
+            }
+          }, 80);
+        }
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Incorrect password. Edit access denied.');
+      setAuthError(err.response?.data?.message || 'Wrong password. Please try again.');
+      setAdminPasswordInput('');
     } finally {
       setVerifyingPassword(false);
     }
@@ -562,46 +626,29 @@ export default function Sell({ path: windowPath }) {
   }, [date]);
 
   useEffect(() => {
-    if (queryApplied.current) return;
-    if (!customers.length) return;
-    const qSale = searchParams.get('saleId');
-    const qCust = searchParams.get('customerId');
-    if (qSale) {
-      const sale = sales.find((s) => s._id === qSale);
-      if (sale) {
-        fillFromSale(sale);
-        queryApplied.current = true;
-        return;
+    if (!focusSaleId) return;
+    const target = sales.find((s) => s._id === focusSaleId);
+    if (target) {
+      if (editingSaleId !== target._id) {
+        fillFromSale(target, 0);
       }
-      if (fetchingSale.current) return;
-      fetchingSale.current = true;
-      api
-        .get(`/sales/${qSale}`)
-        .then((res) => {
-          fillFromSale(res.data);
-          const d = new Date(res.data.createdAt).toISOString().slice(0, 10);
-          setDate(d);
-        })
-        .catch(() => {})
-        .finally(() => {
-          queryApplied.current = true;
-        });
       return;
     }
-    if (qCust) {
-      const c = customers.find((x) => x._id === qCust);
-      if (c) {
-        setCustomerId(c._id);
-        setNameQuery(c.name);
-        const hasCooly = !!c.handlingCharges;
-        setCoolyOn(hasCooly);
-        if (hasCooly) {
-          setCooly((prev) => (!prev || prev === '0' ? salesCoolyRate : prev));
-        }
-      }
-      queryApplied.current = true;
-    }
-  }, [sales, customers, searchParams, salesCoolyRate]);
+    // If not found in current day's sales list, fetch directly
+    let active = true;
+    api
+      .get(`/sales/${focusSaleId}`)
+      .then((res) => {
+        if (!active || !res.data) return;
+        fillFromSale(res.data, 0);
+        const d = new Date(res.data.createdAt).toISOString().slice(0, 10);
+        if (d !== date) setDate(d);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [sales, focusSaleId, editingSaleId, date]);
 
   useEffect(() => {
     if (!focusSaleId || !focusRowRef.current) return;
@@ -668,7 +715,9 @@ export default function Sell({ path: windowPath }) {
   };
 
   const clearEntry = ({ clearFocus = true } = {}) => {
+    editingSaleIdRef.current = '';
     setEditingSaleId('');
+    setEditingLineIndex(0);
     if (clearFocus) {
       setFocusSaleId('');
     }
@@ -770,6 +819,20 @@ export default function Sell({ path: windowPath }) {
       return;
     }
 
+    if (editingSaleId && !editAuthorized) {
+      const rowData =
+        displayedRows.find((r) => r.saleId === editingSaleId) ||
+        flatRows.find((r) => r.saleId === editingSaleId);
+      setPendingEditSale({
+        sale: rowData?.sale || { _id: editingSaleId },
+        lineIndex: editingLineIndex,
+      });
+      setAdminPasswordInput('');
+      setShowAuthModal(true);
+      toast.error('Admin password required to update sales entry');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -829,9 +892,22 @@ export default function Sell({ path: windowPath }) {
     }
   };
 
+  const commitCellEdit = async (row, patch) => {
+    if (!editAuthorized) {
+      requestEditSale(row.sale, row.lineIndex, true);
+      return;
+    }
+    try {
+      await persistTableRow(row, patch);
+      toast.success('Sale updated');
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to update');
+    }
+  };
+
   const persistTableRow = async (row, patch) => {
     if (!editAuthorized) {
-      requestEditSale(row.sale, row.lineIndex);
+      requestEditSale(row.sale, row.lineIndex, true);
       toast.error('Admin password required to edit sales entry');
       return;
     }
@@ -895,7 +971,6 @@ export default function Sell({ path: windowPath }) {
       return base;
     });
 
-    setSavingRowId(row.saleId);
     try {
       const res = await api.put(`/sales/${sale._id}`, {
         customerId: customerIdNext,
@@ -910,15 +985,13 @@ export default function Sell({ path: windowPath }) {
       window.dispatchEvent(new CustomEvent('jsr_data_updated'));
       setFocusSaleId(sale._id);
       const freshSale = (updatedSales || []).find((s) => s._id === sale._id) || res.data;
-      if (freshSale) {
+      if (freshSale && editingSaleIdRef.current === sale._id) {
         fillFromSale(freshSale, row.lineIndex);
       }
       api.get('/customers').then((r) => setCustomers(r.data));
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Failed to update');
       await loadDaySales();
-    } finally {
-      setSavingRowId('');
     }
   };
 
@@ -1070,351 +1143,334 @@ export default function Sell({ path: windowPath }) {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-2 min-h-full overflow-y-auto">
-      <div className="shrink-0">
-        <h1 className="page-title">Sales Entry</h1>
-        <p className="text-primary-400 text-sm mt-0.5">
-          {editingSaleId
-            ? 'Editing a sale from this date — change bags, rate, or customer, then save'
-            : 'Select product, vendor & date — then enter customers one by one'}
-        </p>
+    <div className="flex flex-col flex-1 min-h-0 gap-1 min-h-full overflow-hidden">
+      {/* ── Page Header ── */}
+      <div className="shrink-0 px-0.5 flex items-center justify-between">
+        <div>
+          <h1 className="page-title text-lg md:text-xl font-bold">Sales Entry</h1>
+          <p className="text-primary-400 text-xs mt-0">
+            Select product, vendor & date — then enter customers one by one
+          </p>
+        </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-3 flex-1 min-h-0 overflow-hidden">
+      {/* ── Responsive Horizontal Entry Form ── */}
       <form
         onSubmit={handleSave}
-        className="card border-2 border-primary-200 w-full lg:w-[26rem] xl:w-[28rem] shrink-0 min-h-0 max-h-[48vh] lg:max-h-full h-full flex flex-col overflow-hidden !p-4"
+        className="shrink-0 bg-surface border border-primary-200 rounded-xl shadow-2xs overflow-hidden"
       >
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-0.5">
-        <div className="flex items-center gap-3 bg-primary-50/70 px-2.5 py-1.5 rounded-xl border border-primary-100 mb-0.5">
-          <span className="text-[11px] font-semibold text-primary-600 shrink-0">Sale Type:</span>
-          <label className="inline-flex items-center gap-1 text-[11px] text-primary-700 font-medium cursor-pointer">
-            <input
-              type="radio"
-              name="saleType"
-              value="by_weight"
-              checked={saleType === 'by_weight'}
-              onChange={() => setSaleType('by_weight')}
-            />
-            By Weight (kg)
-          </label>
-          <label className="inline-flex items-center gap-1 text-[11px] text-primary-700 font-medium cursor-pointer">
-            <input
-              type="radio"
-              name="saleType"
-              value="by_bag"
-              checked={saleType === 'by_bag'}
-              onChange={() => setSaleType('by_bag')}
-            />
-            By Bag (Fixed Rate)
-          </label>
-        </div>
+        {/* Top toolbar: Mode & actions */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-accent-50/70 border-b border-primary-100">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-primary-800">
+                New Sales Entry
+              </span>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-surface border border-primary-200 text-[10px] font-bold text-primary-700">
+                S.No {nextSerial}
+              </span>
+            </div>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <div>
-            <label className="block text-xs font-semibold text-primary-600 mb-1">Serial</label>
-            <input className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm text-primary-700 font-semibold focus:outline-none" value={nextSerial} readOnly />
+            <div className="h-3.5 w-px bg-primary-200 shrink-0" />
+
+            {/* Sale Type radios */}
+            <div className="flex items-center gap-2.5">
+              <label className="inline-flex items-center gap-1 text-xs text-primary-700 font-medium cursor-pointer">
+                <input
+                  type="radio"
+                  name="saleType"
+                  value="by_weight"
+                  checked={saleType === 'by_weight'}
+                  onChange={() => setSaleType('by_weight')}
+                  className="w-3.5 h-3.5 text-primary-600 focus:ring-primary-500"
+                />
+                By kg
+              </label>
+              <label className="inline-flex items-center gap-1 text-xs text-primary-700 font-medium cursor-pointer">
+                <input
+                  type="radio"
+                  name="saleType"
+                  value="by_bag"
+                  checked={saleType === 'by_bag'}
+                  onChange={() => setSaleType('by_bag')}
+                  className="w-3.5 h-3.5 text-primary-600 focus:ring-primary-500"
+                />
+                By bag
+              </label>
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-primary-600 mb-1">Date *</label>
-            <input
-              type="date"
-              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-primary-600 mb-1">Product *</label>
-            <select
-              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
-              value={materialId}
-              onChange={(e) => setMaterialId(e.target.value)}
-              required
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="submit"
+              className="btn-primary !py-1 !px-3.5 !text-xs font-semibold"
+              disabled={saving}
             >
-              <option value="">Select product...</option>
-              {materials.map((m) => (
-                <option key={m._id} value={m._id}>
-                  {m.name}
-                  {m.nameTelugu ? ` · ${m.nameTelugu}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-primary-600 mb-1">Vendor *</label>
-            <select
-              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
-              value={vendorId}
-              onChange={(e) => setVendorId(e.target.value)}
-              required
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary !py-1 !px-2.5 !text-xs font-semibold"
+              onClick={clearEntry}
             >
-              <option value="">
-                {vendors.length ? 'Select vendor...' : 'No vendors yet'}
-              </option>
-              {vendors.map((v) => (
-                <option key={v._id} value={v._id}>
-                  {v.name}
-                  {v.city ? ` · ${v.city}` : ''}
-                </option>
-              ))}
-            </select>
+              Clear
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-2.5 border-t border-primary-100 pt-2.5">
-          <div className="relative">
-            <label className="block text-xs font-semibold text-primary-600 mb-1">Name *</label>
-            <input
-              ref={nameRef}
-              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
-              value={nameQuery}
-              onChange={(e) => {
-                const val = e.target.value;
-                setNameQuery(val);
-                const match = customers.find(
-                  (c) => c.name.trim().toLowerCase() === val.trim().toLowerCase()
-                );
-                if (match) {
-                  setCustomerId(match._id);
-                  const hasCooly = !!match.handlingCharges;
-                  setCoolyOn(hasCooly);
-                  if (hasCooly) {
-                    setCooly((prev) => (!prev || prev === '0' ? salesCoolyRate : prev));
+        {/* Fixed 2-Row Inputs Structure — Identical height & layout for both by_weight and by_bag */}
+        <div className="p-2.5 space-y-2">
+          {/* Row 1: Primary Transaction Details (Fixed 1 Row, Never Wraps) */}
+          <div className="flex items-end gap-2">
+            {/* Date */}
+            <div className="flex flex-col shrink-0 w-28">
+              <label className="text-[10px] font-semibold text-primary-500 mb-0.5">Date *</label>
+              <input
+                type="date"
+                className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+                value={date}
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  setDate(newDate);
+                  clearEntry();
+                  if (typeof updateWindowPath === 'function') {
+                    updateWindowPath('/sell', `/sell?date=${newDate}`);
                   }
-                } else {
-                  setCustomerId('');
-                }
-                setSuggestOpen(true);
-              }}
-              onFocus={() => setSuggestOpen(true)}
-              onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
-              onKeyDown={onNameKeyDown}
-              placeholder="Customer name..."
-              autoComplete="off"
-            />
-            {suggestOpen && suggestions.length > 0 && (
-              <ul
-                ref={custSuggestListRef}
-                className="absolute z-20 mt-1 w-full max-h-40 overflow-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+                }}
+                required
+              />
+            </div>
+
+            {/* Product */}
+            <div className="flex flex-col flex-1 min-w-[120px]">
+              <label className="text-[10px] font-semibold text-primary-500 mb-0.5">Product *</label>
+              <select
+                className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+                value={materialId}
+                onChange={(e) => setMaterialId(e.target.value)}
+                required
               >
-                {suggestions.map((c, i) => (
-                  <li key={c._id}>
-                    <button
-                      type="button"
-                      data-idx={i}
-                      className={`w-full text-left px-3 py-1.5 text-xs ${
-                        i === highlight ? 'bg-primary-100 text-primary-800' : 'hover:bg-primary-50'
-                      }`}
-                      onMouseDown={(ev) => {
-                        ev.preventDefault();
-                        pickCustomer(c);
-                      }}
-                    >
-                      {c.name}
-                      {c.nameTelugu ? (
-                        <span className="block text-[11px] text-primary-400">{c.nameTelugu}</span>
-                      ) : null}
-                    </button>
-                  </li>
+                <option value="">Select product...</option>
+                {materials.map((m) => (
+                  <option key={m._id} value={m._id}>
+                    {m.name}{m.nameTelugu ? ` · ${m.nameTelugu}` : ''}
+                  </option>
                 ))}
-              </ul>
-            )}
+              </select>
+            </div>
+
+            {/* Vendor */}
+            <div className="flex flex-col flex-1 min-w-[110px]">
+              <label className="text-[10px] font-semibold text-primary-500 mb-0.5">Vendor *</label>
+              <select
+                className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+                value={vendorId}
+                onChange={(e) => setVendorId(e.target.value)}
+                required
+              >
+                <option value="">{vendors.length ? 'Select vendor...' : 'No vendors'}</option>
+                {vendors.map((v) => (
+                  <option key={v._id} value={v._id}>
+                    {v.name}{v.city ? ` · ${v.city}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Customer Name */}
+            <div className="flex flex-col relative flex-1 min-w-[130px]">
+              <label className="text-[10px] font-semibold text-primary-500 mb-0.5">Name *</label>
+              <input
+                ref={nameRef}
+                className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+                value={nameQuery}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNameQuery(val);
+                  const match = customers.find((c) => c.name.trim().toLowerCase() === val.trim().toLowerCase());
+                  if (match) {
+                    setCustomerId(match._id);
+                    const hasCooly = !!match.handlingCharges;
+                    setCoolyOn(hasCooly);
+                    if (hasCooly) setCooly((prev) => (!prev || prev === '0' ? salesCoolyRate : prev));
+                  } else {
+                    setCustomerId('');
+                  }
+                  setSuggestOpen(true);
+                }}
+                onFocus={() => setSuggestOpen(true)}
+                onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
+                onKeyDown={onNameKeyDown}
+                placeholder="Customer name..."
+                autoComplete="off"
+              />
+              {suggestOpen && suggestions.length > 0 && (
+                <ul
+                  ref={custSuggestListRef}
+                  className="absolute top-full left-0 z-30 mt-0.5 w-56 max-h-40 overflow-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+                >
+                  {suggestions.map((c, idx) => (
+                    <li key={c._id}>
+                      <button
+                        type="button"
+                        data-idx={idx}
+                        className={`w-full text-left px-3 py-1.5 text-xs ${idx === highlight ? 'bg-primary-100 text-primary-800' : 'hover:bg-primary-50'}`}
+                        onMouseDown={(ev) => { ev.preventDefault(); pickCustomer(c); }}
+                      >
+                        {c.name}
+                        {c.nameTelugu ? <span className="block text-[10px] text-primary-400">{c.nameTelugu}</span> : null}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Amount */}
+            <div className="flex flex-col shrink-0 w-24">
+              <label className="text-[10px] font-semibold text-primary-500 mb-0.5">Amount</label>
+              <input
+                className="h-8 w-full rounded-lg border border-primary-200 bg-accent-100 px-2 py-1 text-xs font-bold text-accent-800 text-right focus:outline-none tabular-nums shadow-2xs"
+                value={amount ? formatCurrency(amount) : ''}
+                readOnly
+              />
+            </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2.5">
-            <div>
-              <label className="block text-xs font-semibold text-primary-600 mb-1">{isByBag ? 'Bags *' : 'Bags'}</label>
+          {/* Row 2: Quantities, Rates, Cooly & Bag Weights (Fixed 1 Row, Constant Height) */}
+          <div className="flex items-center gap-2 pt-1 border-t border-primary-100/70 h-8">
+            {/* Bags */}
+            <div className="flex items-center gap-1 shrink-0">
+              <label className="text-[10px] font-semibold text-primary-500 shrink-0">
+                {isByBag ? 'Bags *' : 'Bags:'}
+              </label>
               {isByBag ? (
                 <input
                   type="text"
                   inputMode="numeric"
-                  className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
-                  placeholder="Bags"
+                  autoComplete="off"
+                  className="h-7 w-14 rounded-md border border-primary-200 bg-surface px-1.5 py-0.5 text-xs text-primary-700 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+                  placeholder="0"
                   value={directBagCount}
                   onChange={(e) => setDirectBagCount(e.target.value.replace(/[^\d]/g, ''))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      rateRef.current?.focus();
-                    }
-                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); rateRef.current?.focus(); } }}
                 />
               ) : (
-                <input className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm text-primary-700 focus:outline-none" value={bagCount || ''} readOnly />
+                <input
+                  className="h-7 w-12 rounded-md border border-primary-200 bg-primary-50 px-1 py-0.5 text-xs text-primary-700 text-right focus:outline-none tabular-nums font-semibold"
+                  value={bagCount || '0'}
+                  readOnly
+                />
               )}
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-primary-600 mb-1">Qty (kg)</label>
+
+            {/* Qty (kg) */}
+            <div className="flex items-center gap-1 shrink-0">
+              <label className="text-[10px] font-semibold text-primary-500 shrink-0">Qty (kg):</label>
               <input
-                className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm text-primary-700 focus:outline-none"
-                value={isByBag ? '—' : qty ? qty.toFixed(1) : ''}
+                className={`h-7 w-16 rounded-md border border-primary-200 px-1.5 py-0.5 text-xs text-right focus:outline-none tabular-nums font-semibold ${
+                  isByBag ? 'bg-primary-50/70 text-primary-400' : 'bg-primary-50 text-primary-700'
+                }`}
+                value={isByBag ? '—' : (qty ? qty.toFixed(1) : '')}
                 readOnly
               />
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-primary-600 mb-1">{isByBag ? 'Rate/bag *' : 'Rate/kg *'}</label>
+
+            {/* Rate */}
+            <div className="flex items-center gap-1 shrink-0">
+              <label className="text-[10px] font-semibold text-primary-500 shrink-0">
+                {isByBag ? 'Rate/bag *' : 'Rate/kg *'}
+              </label>
               <input
                 ref={rateRef}
                 type="text"
                 inputMode="decimal"
                 autoComplete="off"
-                className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
+                className="h-7 w-16 rounded-md border border-primary-200 bg-surface px-1.5 py-0.5 text-xs text-primary-700 text-right font-semibold focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                 value={rate}
                 onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ''))}
                 onKeyDown={(e) => {
                   if (e.key !== 'Enter') return;
                   e.preventDefault();
                   if (coolyOn) coolyRef.current?.focus();
-                  else handleSave();
+                  else handleSave(e);
                 }}
               />
             </div>
-          </div>
-        </div>
 
-        {!isByBag && (
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-semibold text-primary-600">Bag weights (kg) *</label>
-              {bagWeights.length > 0 && (
-                <span className="text-[11px] font-semibold text-primary-500">
-                  {bagCount} {bagCount === 1 ? 'Bag' : 'Bags'} ({qty.toFixed(1)} kg)
+            {/* Cooly */}
+            <div className="flex items-center gap-1 shrink-0">
+              <label className="text-[10px] font-semibold text-primary-500 shrink-0 flex items-center gap-1">
+                <span className="inline-flex items-center gap-0.5">
+                  Cooly <input type="checkbox" checked={coolyOn} onChange={(e) => { setCoolyOn(e.target.checked); if (e.target.checked) setCooly((p) => (!p || p === '0' ? salesCoolyRate : p)); else setCooly('0'); }} className="w-3 h-3" />
                 </span>
+                <span className="inline-flex items-center gap-0.5 font-normal text-primary-400">
+                  /bag <input type="checkbox" checked={coolyPerBag} disabled={!coolyOn} onChange={(e) => setCoolyPerBag(e.target.checked)} className="w-3 h-3" />
+                </span>
+              </label>
+              <input
+                ref={coolyRef}
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                className="h-7 w-14 rounded-md border border-primary-200 bg-surface px-1.5 py-0.5 text-xs text-primary-700 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition disabled:bg-primary-50 disabled:text-primary-400"
+                value={cooly}
+                disabled={!coolyOn}
+                onChange={(e) => setCooly(e.target.value.replace(/[^\d.]/g, ''))}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSave(e); } }}
+              />
+            </div>
+
+            {/* Vertical Divider */}
+            <div className="h-5 w-px bg-primary-200 shrink-0 mx-0.5" />
+
+            {/* Bag weights or by_bag indicator (always present, same height) */}
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto no-scrollbar">
+              {isByBag ? (
+                <span className="text-[11px] text-primary-400 font-medium italic whitespace-nowrap">
+                  By bag sale — {directBagCount || '0'} bags · weights not applicable
+                </span>
+              ) : (
+                <>
+                  <span className="text-[10px] font-semibold text-primary-600 shrink-0">Bag wts:</span>
+                  {bagWeights.map((bag, idx) => (
+                    <div key={idx} className="relative inline-flex items-center shrink-0">
+                      <input
+                        ref={(el) => { bagInputRefs.current[idx] = el; }}
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        className="w-12 h-6 rounded border border-primary-200 bg-surface px-1 text-xs text-primary-700 pr-3.5 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+                        placeholder={`${idx + 1}`}
+                        value={bag}
+                        onChange={(e) => updateBag(idx, e.target.value.replace(/[^\d.]/g, ''))}
+                        onKeyDown={(e) => handleBagEnter(e, idx)}
+                      />
+                      {bagWeights.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeBag(idx)}
+                          className="absolute right-0.5 top-1/2 -translate-y-1/2 text-primary-400 hover:text-rose-600 text-[10px] px-0.5 font-bold rounded cursor-pointer leading-none"
+                        >×</button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => { setBagWeights([...bagWeights, '']); setFocusBagIdx(bagWeights.length); }}
+                    className="px-1.5 py-0.5 text-[10px] font-semibold text-accent-800 bg-accent-100 hover:bg-accent-200 border border-accent-300/80 rounded transition cursor-pointer shrink-0"
+                  >+ Add</button>
+                </>
               )}
             </div>
-            <p className="text-[11px] text-primary-400 mb-1.5">
-              Type weight and press Enter for next bag — empty Enter moves to Rate
-            </p>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {bagWeights.map((bag, idx) => (
-                <div key={idx} className="relative inline-flex items-center group">
-                  <input
-                    ref={(el) => {
-                      bagInputRefs.current[idx] = el;
-                    }}
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    className="w-20 rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 pr-5 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
-                    placeholder={`Bag ${idx + 1}`}
-                    value={bag}
-                    onChange={(e) => updateBag(idx, e.target.value.replace(/[^\d.]/g, ''))}
-                    onKeyDown={(e) => handleBagEnter(e, idx)}
-                  />
-                  {bagWeights.length > 1 && (
-                    <button
-                      type="button"
-                      title="Delete this bag"
-                      onClick={() => removeBag(idx)}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 text-primary-400 hover:text-rose-600 text-xs px-1 font-bold rounded cursor-pointer"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  setBagWeights([...bagWeights, '']);
-                  setFocusBagIdx(bagWeights.length);
-                }}
-                className="px-2 py-1 text-xs font-semibold text-accent-700 bg-accent-50 hover:bg-accent-100 border border-accent-200/80 rounded-lg transition cursor-pointer shrink-0"
-              >
-                + Add Bag
-              </button>
-            </div>
           </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-2.5">
-          <div>
-            <label className="block text-xs font-semibold text-primary-600 mb-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
-              <span className="inline-flex items-center gap-1">
-                Cooly
-                <input
-                  type="checkbox"
-                  checked={coolyOn}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setCoolyOn(checked);
-                    if (checked) {
-                      setCooly((prev) => (!prev || prev === '0' ? salesCoolyRate : prev));
-                    } else {
-                      setCooly('0');
-                    }
-                  }}
-                />
-              </span>
-              <span className="inline-flex items-center gap-1 font-normal text-primary-500">
-                Per bag
-                <input
-                  type="checkbox"
-                  checked={coolyPerBag}
-                  disabled={!coolyOn}
-                  onChange={(e) => setCoolyPerBag(e.target.checked)}
-                />
-              </span>
-            </label>
-            <input
-              ref={coolyRef}
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
-              value={cooly}
-              disabled={!coolyOn}
-              onChange={(e) => setCooly(e.target.value.replace(/[^\d.]/g, ''))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleSave();
-                }
-              }}
-            />
-            <p className="text-[10px] text-primary-400 mt-0.5">
-              {!coolyOn
-                ? customerCoolyDefault
-                  ? 'Customer default is cooly on — uncheck to skip'
-                  : 'Customer default is no cooly — tick to add'
-                : coolyPerBag
-                  ? `Per bag · ${formatCurrency(Number(cooly) || 0)} × ${bagCount} = ${formatCurrency(coolyApplied)}`
-                  : `Overall · ${formatCurrency(coolyApplied)}`}
-            </p>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-primary-600 mb-1">Amount</label>
-            <input
-              className="w-full rounded-xl border border-primary-200 bg-accent-100 px-3 py-1.5 text-sm font-semibold text-accent-700 focus:outline-none"
-              value={amount ? formatCurrency(amount) : ''}
-              readOnly
-            />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-xs font-semibold text-primary-600 mb-1">Detail</label>
-            <input
-              className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-1.5 text-sm text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
-              value={detail}
-              onChange={(e) => setDetail(e.target.value)}
-              placeholder="Optional note"
-            />
-          </div>
-        </div>
-
-        </div>
-        <div className="flex flex-wrap gap-2 justify-center pt-2.5 mt-2 border-t border-primary-100 shrink-0">
-          <button type="submit" className="btn-primary !py-1.5 !px-4 !text-sm min-w-[100px]" disabled={saving}>
-            {saving ? 'Saving...' : editingSaleId ? 'Update' : 'Save'}
-          </button>
-          <button type="button" className="btn-secondary !py-1.5 !px-4 !text-sm min-w-[100px]" onClick={clearEntry}>
-            {editingSaleId ? 'Cancel edit' : 'Clear'}
-          </button>
         </div>
       </form>
 
-      <div className="card p-0 w-full min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden">
+      {/* ── Full-Width Table Card ── */}
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+
+        <div className="card p-0 w-full min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden">
         <div className="flex items-center justify-between gap-2 border-b border-primary-100 px-3 py-2 bg-accent-50 shrink-0 min-w-0">
           <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto no-scrollbar py-0.5">
             <select
@@ -1489,37 +1545,37 @@ export default function Sell({ path: windowPath }) {
             Print
           </button>
         </div>
-        <div className="flex-1 min-h-0 overflow-auto">
-        <table className="w-full text-sm">
-          <thead>
+        <div className="flex-1 min-h-0 overflow-auto border-t border-primary-200 bg-surface">
+        <table className="w-full min-w-[760px] text-xs excel-grid">
+          <thead className="sticky top-0 z-20 bg-accent-200">
             <tr className="bg-accent-200 text-accent-800 text-left">
-              <th className="px-3 py-2.5 font-semibold">
+              <th className="bg-accent-200 px-1.5 py-1.5 font-semibold whitespace-nowrap sticky top-0 z-20 text-center w-10">
                 <SortLabel column="serial">S No</SortLabel>
               </th>
-              <th className="px-3 py-2.5 font-semibold">
+              <th className="bg-accent-200 px-2 py-1.5 font-semibold whitespace-nowrap sticky top-0 z-20 w-24">
                 <SortLabel column="vendor">Vendor</SortLabel>
               </th>
-              <th className="px-3 py-2.5 font-semibold">
+              <th className="bg-accent-200 px-2 py-1.5 font-semibold whitespace-nowrap sticky top-0 z-20 w-28">
                 <SortLabel column="item">Item</SortLabel>
               </th>
-              <th className="px-3 py-2.5 font-semibold">Name</th>
-              <th className="px-3 py-2.5 font-semibold text-right">Bags</th>
-              <th className="px-3 py-2.5 font-semibold text-right">Qty</th>
-              <th className="px-3 py-2.5 font-semibold text-right">Rate</th>
-              <th className="px-3 py-2.5 font-semibold text-right">Cooly</th>
-              <th className="px-3 py-2.5 font-semibold text-right">Amount</th>
-              <th className="px-3 py-2 font-semibold text-right leading-tight whitespace-nowrap">
+              <th className="bg-accent-200 px-2 py-1.5 font-semibold whitespace-nowrap sticky top-0 z-20">Name</th>
+              <th className="bg-accent-200 px-1.5 py-1.5 font-semibold text-right whitespace-nowrap sticky top-0 z-20 w-12">Bags</th>
+              <th className="bg-accent-200 px-1.5 py-1.5 font-semibold text-right whitespace-nowrap sticky top-0 z-20 w-14">Qty</th>
+              <th className="bg-accent-200 px-1.5 py-1.5 font-semibold text-right whitespace-nowrap sticky top-0 z-20 w-14">Rate</th>
+              <th className="bg-accent-200 px-1.5 py-1.5 font-semibold text-right whitespace-nowrap sticky top-0 z-20 w-14">Cooly</th>
+              <th className="bg-accent-200 px-1.5 py-1.5 font-semibold text-right whitespace-nowrap sticky top-0 z-20 w-18">Amount</th>
+              <th className="bg-accent-200 px-1.5 py-1.5 font-semibold text-right leading-tight whitespace-nowrap sticky top-0 z-20 w-28">
                 <SortLabel column="createdAt" align="right">
                   <span>Entry Date Time</span>
                 </SortLabel>
               </th>
-              <th className="px-2 py-2 font-semibold text-center w-10">Action</th>
+              <th className="bg-accent-200 px-1 py-1.5 font-semibold text-center whitespace-nowrap sticky top-0 z-20 w-10">Action</th>
             </tr>
           </thead>
           <tbody>
             {displayedRows.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-primary-400">
+                <td colSpan={11} className="px-3 py-8 text-center text-primary-400">
                   {flatRows.length && hasActiveFilters
                     ? 'No sales match the selected filters'
                     : `No sales for this date yet`}
@@ -1528,13 +1584,28 @@ export default function Sell({ path: windowPath }) {
             ) : (
               displayedRows.map((r, i) => {
                 const busy = savingRowId === r.saleId;
-                const cell =
-                  'w-full bg-transparent rounded-lg border border-transparent hover:border-primary-200 focus:border-primary-400 focus:bg-surface outline-none px-1.5 py-1 disabled:opacity-60';
+                const cell = 'grid-input tabular-nums disabled:opacity-60';
 
                 const handleGridKeyDown = (e, colIdx) => {
                   if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
                     return;
                   }
+
+                  const el = e.currentTarget || e.target;
+                  const isInput = el.tagName === 'INPUT' && !el.readOnly;
+                  const isSelect = el.tagName === 'SELECT';
+
+                  // For text inputs, ArrowLeft/Right should move cursor within the
+                  // text unless the caret is already at the boundary (start/end).
+                  if (isInput && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                    const pos = el.selectionStart;
+                    const len = (el.value || '').length;
+                    const hasSelection = el.selectionStart !== el.selectionEnd;
+                    if (hasSelection) return; // let browser collapse selection first
+                    if (e.key === 'ArrowLeft' && pos > 0) return;   // cursor not at start
+                    if (e.key === 'ArrowRight' && pos < len) return; // cursor not at end
+                  }
+
                   let targetRow = i;
                   let targetCol = colIdx;
 
@@ -1551,13 +1622,85 @@ export default function Sell({ path: windowPath }) {
                   if (targetRow === i && targetCol === colIdx) return;
 
                   e.preventDefault();
-                  const selector = `[data-table-row="${targetRow}"][data-table-col="${targetCol}"]`;
-                  const el = document.querySelector(selector);
-                  if (el) {
-                    el.focus();
-                    if (typeof el.select === 'function') {
-                      el.select();
+                  e.stopPropagation();
+
+                  // If moving to a different row, commit any modified value on the current cell first!
+                  if (targetRow !== i && editAuthorized) {
+                    if (colIdx === 6) {
+                      const val = Number(el.value);
+                      const dbRate = Number(r.line?.ratePerKg);
+                      if (!isNaN(val) && val >= 0 && val !== dbRate) {
+                        commitCellEdit(r, { rate: val });
+                      }
+                    } else if (colIdx === 4) {
+                      const val = Math.floor(Number(el.value));
+                      const dbBags = Math.floor(Number(r.line?.bagCount));
+                      if (val > 0 && val !== dbBags) {
+                        commitCellEdit(r, { bags: val });
+                      }
+                    } else if (colIdx === 5) {
+                      const val = Number(el.value);
+                      const dbQty = Number(r.line?.totalKg);
+                      if (!isNaN(val) && val > 0 && val !== dbQty) {
+                        commitCellEdit(r, { qty: val });
+                      }
+                    } else if (colIdx === 2) {
+                      const val = el.value;
+                      const dbMatId = r.line?.material?._id || r.line?.material || r.materialId;
+                      if (val && val !== dbMatId) {
+                        commitCellEdit(r, { materialId: val });
+                      }
+                    } else if (colIdx === 3) {
+                      const val = el.value;
+                      const dbCustId = r.sale?.customer?._id || r.sale?.customer || r.customerId;
+                      if (val && val !== dbCustId) {
+                        commitCellEdit(r, { customerId: val });
+                      }
                     }
+
+                    const targetRowData = displayedRows[targetRow];
+                    if (targetRowData) {
+                      requestEditSale(targetRowData.sale, targetRowData.lineIndex);
+                    }
+                  }
+
+                  // For inputs, blur first to trigger any onBlur save handlers
+                  if (isInput || isSelect) {
+                    el.blur();
+                  }
+
+                  // Store the target cell so we can re-focus after React re-render
+                  pendingFocusCell.current = { row: targetRow, col: targetCol };
+
+                  const focusTarget = () => {
+                    const selector = `[data-table-row="${targetRow}"][data-table-col="${targetCol}"]`;
+                    const target = document.querySelector(selector);
+                    if (target) {
+                      target.focus();
+                      if (typeof target.select === 'function' && target.tagName === 'INPUT') {
+                        target.select();
+                      }
+                      return true;
+                    }
+                    return false;
+                  };
+
+                  if (targetRow === i) {
+                    if (focusTarget()) {
+                      pendingFocusCell.current = null;
+                    }
+                  } else {
+                    focusTarget();
+                    requestAnimationFrame(() => {
+                      if (pendingFocusCell.current) {
+                        if (focusTarget()) pendingFocusCell.current = null;
+                      }
+                    });
+                    setTimeout(() => {
+                      if (pendingFocusCell.current) {
+                        if (focusTarget()) pendingFocusCell.current = null;
+                      }
+                    }, 50);
                   }
                 };
 
@@ -1565,13 +1708,12 @@ export default function Sell({ path: windowPath }) {
                   <tr
                     key={`${r.saleId}-${r.lineIndex}`}
                     ref={r.saleId === focusSaleId ? focusRowRef : null}
-                    onClick={() => requestEditSale(r.sale, r.lineIndex)}
                     className={
                       r.saleId === focusSaleId || r.saleId === editingSaleId
-                        ? 'bg-amber-100/90 ring-2 ring-amber-400 font-bold shadow-md transition-all duration-300 cursor-pointer'
+                        ? 'bg-amber-100/90 font-bold border-l-4 border-l-amber-500 shadow-sm transition-all duration-300 ring-1 ring-amber-300'
                         : i % 2 === 0
-                          ? 'bg-surface cursor-pointer hover:bg-amber-50/60'
-                          : 'bg-primary-50/40 cursor-pointer hover:bg-amber-50/60'
+                          ? 'bg-surface hover:bg-primary-50/40'
+                          : 'bg-primary-50/30 hover:bg-primary-50/60'
                     }
                   >
                     <td
@@ -1579,7 +1721,7 @@ export default function Sell({ path: windowPath }) {
                       data-table-row={i}
                       data-table-col={0}
                       onKeyDown={(e) => handleGridKeyDown(e, 0)}
-                      className="px-3 py-1.5 text-primary-500 outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                      className="px-1.5 py-1 text-primary-500 outline-none cursor-pointer text-center"
                     >
                       {r.serial}
                     </td>
@@ -1588,26 +1730,82 @@ export default function Sell({ path: windowPath }) {
                       data-table-row={i}
                       data-table-col={1}
                       onKeyDown={(e) => handleGridKeyDown(e, 1)}
-                      className="px-3 py-1.5 text-primary-700 whitespace-nowrap font-medium outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                      className="px-1.5 py-1 text-primary-700 whitespace-nowrap font-medium outline-none cursor-pointer"
                     >
                       {r.vendor}
                     </td>
-                    <td className="px-2 py-1.5 min-w-[8rem]" onClick={() => requestEditSale(r.sale, r.lineIndex)}>
+                    <td className="px-1 py-0.5">
                       <select
                         data-table-row={i}
                         data-table-col={2}
-                        onFocus={() => requestEditSale(r.sale, r.lineIndex)}
-                        onKeyDown={(e) => handleGridKeyDown(e, 2)}
-                        className={`${cell} font-medium text-primary-700`}
+                        onMouseDown={(e) => {
+                          if (!editAuthorized) {
+                            e.preventDefault();
+                            requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 2 });
+                          }
+                        }}
+                        onFocus={() => {
+                          if (editAuthorized) {
+                            cancelEditRef.current = false;
+                            originalCellRef.current = {
+                              row: i,
+                              col: 2,
+                              val: r.line?.material?._id || r.line?.material || r.materialId
+                            };
+                            if (!r.isLiveEditing) requestEditSale(r.sale, r.lineIndex);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            e.preventDefault();
+                            cancelEditRef.current = true;
+                            const orig = originalCellRef.current?.val ?? (r.line?.material?._id || r.line?.material || r.materialId);
+                            e.currentTarget.value = orig;
+                            if (r.isLiveEditing) setMaterialId(orig);
+                            pendingFocusCell.current = { row: i, col: 2 };
+                            e.currentTarget.focus();
+                            return;
+                          }
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            cancelEditRef.current = false;
+                            const matId = e.currentTarget.value;
+                            const dbMatId = r.line?.material?._id || r.line?.material || r.materialId;
+                            if (matId && matId !== dbMatId) {
+                              commitCellEdit(r, { materialId: matId });
+                            }
+                            pendingFocusCell.current = { row: i, col: 2 };
+                            e.currentTarget.focus();
+                            return;
+                          }
+                          handleGridKeyDown(e, 2);
+                        }}
+                        onBlur={(e) => {
+                          if (!editAuthorized) return;
+                          if (cancelEditRef.current) {
+                            cancelEditRef.current = false;
+                            return;
+                          }
+                          const matId = e.target.value;
+                          const dbMatId = r.line?.material?._id || r.line?.material || r.materialId;
+                          if (matId && matId !== dbMatId) {
+                            commitCellEdit(r, { materialId: matId });
+                          }
+                        }}
+                        className={`${cell} font-medium text-primary-700 text-xs cursor-pointer`}
                         value={r.isLiveEditing ? materialId : r.materialId}
-                        disabled={busy}
                         onChange={(e) => {
                           const val = e.target.value;
+                          if (!editAuthorized) {
+                            e.target.value = r.materialId;
+                            requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 2 });
+                            return;
+                          }
                           if (r.isLiveEditing) {
                             setMaterialId(val);
                           } else {
                             if (val === r.materialId) return;
-                            persistTableRow(r, { materialId: val });
+                            commitCellEdit(r, { materialId: val });
                           }
                         }}
                       >
@@ -1621,24 +1819,84 @@ export default function Sell({ path: windowPath }) {
                         ))}
                       </select>
                     </td>
-                    <td className="px-2 py-1.5 min-w-[9rem]" onClick={() => requestEditSale(r.sale, r.lineIndex)}>
+                    <td className="px-1 py-0.5">
                       <select
                         data-table-row={i}
                         data-table-col={3}
-                        onFocus={() => requestEditSale(r.sale, r.lineIndex)}
-                        onKeyDown={(e) => handleGridKeyDown(e, 3)}
-                        className={`${cell} text-primary-700`}
+                        onMouseDown={(e) => {
+                          if (!editAuthorized) {
+                            e.preventDefault();
+                            requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 3 });
+                          }
+                        }}
+                        onFocus={() => {
+                          if (editAuthorized) {
+                            cancelEditRef.current = false;
+                            originalCellRef.current = {
+                              row: i,
+                              col: 3,
+                              val: r.sale?.customer?._id || r.sale?.customer || r.customerId
+                            };
+                            if (!r.isLiveEditing) requestEditSale(r.sale, r.lineIndex);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            e.preventDefault();
+                            cancelEditRef.current = true;
+                            const orig = originalCellRef.current?.val ?? (r.sale?.customer?._id || r.sale?.customer || r.customerId);
+                            e.currentTarget.value = orig;
+                            if (r.isLiveEditing) {
+                              setCustomerId(orig);
+                              const match = customers.find((c) => c._id === orig);
+                              if (match) setNameQuery(match.name);
+                            }
+                            pendingFocusCell.current = { row: i, col: 3 };
+                            e.currentTarget.focus();
+                            return;
+                          }
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            cancelEditRef.current = false;
+                            const custId = e.currentTarget.value;
+                            const dbCustId = r.sale?.customer?._id || r.sale?.customer || r.customerId;
+                            if (custId && custId !== dbCustId) {
+                              commitCellEdit(r, { customerId: custId });
+                            }
+                            pendingFocusCell.current = { row: i, col: 3 };
+                            e.currentTarget.focus();
+                            return;
+                          }
+                          handleGridKeyDown(e, 3);
+                        }}
+                        onBlur={(e) => {
+                          if (!editAuthorized) return;
+                          if (cancelEditRef.current) {
+                            cancelEditRef.current = false;
+                            return;
+                          }
+                          const custId = e.target.value;
+                          const dbCustId = r.sale?.customer?._id || r.sale?.customer || r.customerId;
+                          if (custId && custId !== dbCustId) {
+                            commitCellEdit(r, { customerId: custId });
+                          }
+                        }}
+                        className={`${cell} text-primary-700 text-xs cursor-pointer`}
                         value={r.isLiveEditing ? customerId : r.customerId}
-                        disabled={busy}
                         onChange={(e) => {
                           const val = e.target.value;
+                          if (!editAuthorized) {
+                            e.target.value = r.customerId;
+                            requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 3 });
+                            return;
+                          }
                           if (r.isLiveEditing) {
                             setCustomerId(val);
                             const match = customers.find((c) => c._id === val);
                             if (match) setNameQuery(match.name);
                           } else {
                             if (val === r.customerId) return;
-                            persistTableRow(r, { customerId: val });
+                            commitCellEdit(r, { customerId: val });
                           }
                         }}
                       >
@@ -1652,76 +1910,127 @@ export default function Sell({ path: windowPath }) {
                         ))}
                       </select>
                     </td>
-                    <td className="px-2 py-1.5 w-20" onClick={() => requestEditSale(r.sale, r.lineIndex)}>
-                      {r.isLiveEditing ? (
-                        r.isByBag ? (
-                          <input
-                            data-table-row={i}
-                            data-table-col={4}
-                            type="text"
-                            inputMode="numeric"
-                            autoComplete="off"
-                            disabled={busy}
-                            value={directBagCount}
-                            onChange={(e) => setDirectBagCount(e.target.value.replace(/[^\d]/g, ''))}
-                            className={`${cell} text-right tabular-nums`}
-                            onKeyDown={(e) => handleGridKeyDown(e, 4)}
-                          />
-                        ) : (
-                          <input
-                            data-table-row={i}
-                            data-table-col={4}
-                            type="text"
-                            readOnly
-                            value={bagCount || ''}
-                            className={`${cell} text-right tabular-nums font-semibold bg-primary-50/50`}
-                          />
-                        )
-                      ) : (
-                        <input
-                          data-table-row={i}
-                          data-table-col={4}
-                          type="text"
-                          inputMode="numeric"
-                          autoComplete="off"
-                          disabled={busy}
-                          defaultValue={r.bags}
-                          key={`${r.saleId}-${r.lineIndex}-bags-${r.bags}`}
-                          className={`${cell} text-right tabular-nums`}
-                          onFocus={() => requestEditSale(r.sale, r.lineIndex)}
-                          onBlur={(e) => {
-                            const bags = Math.floor(Number(e.target.value));
-                            if (bags === Number(r.bags)) return;
-                            persistTableRow(r, { bags }).catch((err) => toast.error(err.message));
-                          }}
-                          onKeyDown={(e) => {
-                            handleGridKeyDown(e, 4);
-                            if (e.key === 'Enter') e.currentTarget.blur();
-                          }}
-                        />
-                      )}
+                    <td className="px-1 py-0.5 w-12">
+                      <input
+                        data-table-row={i}
+                        data-table-col={4}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={
+                          r.isLiveEditing
+                            ? (r.isByBag ? directBagCount : (bagCount != null && bagCount !== '' ? String(bagCount) : ''))
+                            : (r.bags != null ? String(r.bags) : '')
+                        }
+                        className={`${cell} text-right`}
+                        onMouseDown={(e) => {
+                          if (!editAuthorized) {
+                            e.preventDefault();
+                            requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 4 });
+                          }
+                        }}
+                        onFocus={(e) => {
+                          if (!editAuthorized) {
+                            e.target.blur();
+                            requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 4 });
+                          } else {
+                            cancelEditRef.current = false;
+                            originalCellRef.current = {
+                              row: i,
+                              col: 4,
+                              val: r.line?.bagCount != null ? String(r.line.bagCount) : String(r.bags || '')
+                            };
+                            if (!r.isLiveEditing) requestEditSale(r.sale, r.lineIndex);
+                            if (typeof e.target.select === 'function') {
+                              setTimeout(() => {
+                                try { e.target.select(); } catch (_) {}
+                              }, 0);
+                            }
+                          }
+                        }}
+                        onChange={(e) => {
+                          if (!editAuthorized) return;
+                          const val = e.target.value.replace(/[^\d]/g, '');
+                          if (r.isLiveEditing) {
+                            if (r.isByBag) {
+                              setDirectBagCount(val);
+                            } else {
+                              const num = Math.floor(Number(val));
+                              if (num > 0) {
+                                setBagWeights((prev) => {
+                                  const arr = [...prev];
+                                  if (num > arr.length) {
+                                    while (arr.length < num) arr.push('');
+                                  } else if (num < arr.length) {
+                                    arr.length = num;
+                                  }
+                                  return arr;
+                                });
+                              }
+                            }
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            cancelEditRef.current = true;
+                            const orig = originalCellRef.current?.val ?? (r.line?.bagCount != null ? String(r.line.bagCount) : '');
+                            e.currentTarget.value = orig;
+                            if (r.isLiveEditing) {
+                              if (r.isByBag) setDirectBagCount(orig);
+                              else {
+                                const num = Math.floor(Number(orig));
+                                if (num > 0) setBagWeights(Array.from({ length: num }, () => ''));
+                              }
+                            }
+                            pendingFocusCell.current = { row: i, col: 4 };
+                            e.currentTarget.focus();
+                            if (typeof e.currentTarget.select === 'function') e.currentTarget.select();
+                            return;
+                          }
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            cancelEditRef.current = false;
+                            const bags = Math.floor(Number(e.currentTarget.value));
+                            const dbBags = Math.floor(Number(r.line?.bagCount));
+                            if (bags > 0 && bags !== dbBags) {
+                              commitCellEdit(r, { bags });
+                            }
+                            pendingFocusCell.current = { row: i, col: 4 };
+                            e.currentTarget.focus();
+                            if (typeof e.currentTarget.select === 'function') {
+                              e.currentTarget.select();
+                            }
+                            return;
+                          }
+                          handleGridKeyDown(e, 4);
+                        }}
+                        onBlur={(e) => {
+                          if (!editAuthorized) return;
+                          if (cancelEditRef.current) {
+                            cancelEditRef.current = false;
+                            return;
+                          }
+                          const bags = Math.floor(Number(e.target.value));
+                          const dbBags = Math.floor(Number(r.line?.bagCount));
+                          if (bags > 0 && bags !== dbBags) {
+                            commitCellEdit(r, { bags });
+                          }
+                        }}
+                      />
                     </td>
-                    <td className="px-2 py-1.5 w-24" onClick={() => requestEditSale(r.sale, r.lineIndex)}>
+                    <td className="px-1 py-0.5 w-14">
                       {r.isByBag ? (
                         <div
                           tabIndex={0}
                           data-table-row={i}
                           data-table-col={5}
-                          onFocus={() => requestEditSale(r.sale, r.lineIndex)}
                           onKeyDown={(e) => handleGridKeyDown(e, 5)}
-                          className="text-right text-primary-400 font-medium py-1 outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                          className="text-right text-primary-400 font-medium py-0.5 outline-none cursor-pointer"
                         >
                           —
                         </div>
-                      ) : r.isLiveEditing ? (
-                        <input
-                          data-table-row={i}
-                          data-table-col={5}
-                          type="text"
-                          readOnly
-                          value={qty ? qty.toFixed(1) : ''}
-                          className={`${cell} text-right tabular-nums font-semibold bg-primary-50/50`}
-                        />
                       ) : (
                         <input
                           data-table-row={i}
@@ -1729,61 +2038,190 @@ export default function Sell({ path: windowPath }) {
                           type="text"
                           inputMode="decimal"
                           autoComplete="off"
-                          disabled={busy}
-                          defaultValue={r.qty != null ? Number(r.qty).toFixed(1) : ''}
-                          key={`${r.saleId}-${r.lineIndex}-qty-${r.qty}`}
-                          className={`${cell} text-right tabular-nums`}
-                          onFocus={() => requestEditSale(r.sale, r.lineIndex)}
-                          onBlur={(e) => {
-                            const qtyVal = Number(e.target.value);
-                            if (qtyVal === Number(r.qty)) return;
-                            persistTableRow(r, { qty: qtyVal }).catch((err) => toast.error(err.message));
+                          value={
+                            r.isLiveEditing
+                              ? (qty ? Number(qty).toFixed(1) : '')
+                              : (r.qty != null ? Number(r.qty).toFixed(1) : '')
+                          }
+                          className={`${cell} text-right`}
+                          onMouseDown={(e) => {
+                            if (!editAuthorized) {
+                              e.preventDefault();
+                              requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 5 });
+                            }
+                          }}
+                          onFocus={(e) => {
+                            if (!editAuthorized) {
+                              e.target.blur();
+                              requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 5 });
+                            } else {
+                              cancelEditRef.current = false;
+                              originalCellRef.current = {
+                                row: i,
+                                col: 5,
+                                val: r.line?.totalKg != null ? Number(r.line.totalKg).toFixed(1) : (r.qty != null ? Number(r.qty).toFixed(1) : '')
+                              };
+                              if (!r.isLiveEditing) requestEditSale(r.sale, r.lineIndex);
+                              if (typeof e.target.select === 'function') {
+                                setTimeout(() => {
+                                  try { e.target.select(); } catch (_) {}
+                                }, 0);
+                              }
+                            }
+                          }}
+                          onChange={(e) => {
+                            if (!editAuthorized) return;
+                            const val = e.target.value.replace(/[^\d.]/g, '');
+                            if (r.isLiveEditing) {
+                              const total = Number(val);
+                              if (!isNaN(total) && total > 0) {
+                                const count = Math.max(1, bagCount || 1);
+                                const avg = Number((total / count).toFixed(1));
+                                const rem = Number((total - avg * (count - 1)).toFixed(1));
+                                setBagWeights(Array.from({ length: count }, (_, idx) => String(idx === count - 1 ? rem : avg)));
+                              }
+                            }
                           }}
                           onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              cancelEditRef.current = true;
+                              const orig = originalCellRef.current?.val ?? (r.line?.totalKg != null ? Number(r.line.totalKg).toFixed(1) : '');
+                              e.currentTarget.value = orig;
+                              if (r.isLiveEditing) {
+                                const total = Number(orig);
+                                if (!isNaN(total) && total > 0) {
+                                  const count = Math.max(1, bagCount || 1);
+                                  const avg = Number((total / count).toFixed(1));
+                                  const rem = Number((total - avg * (count - 1)).toFixed(1));
+                                  setBagWeights(Array.from({ length: count }, (_, idx) => String(idx === count - 1 ? rem : avg)));
+                                }
+                              }
+                              pendingFocusCell.current = { row: i, col: 5 };
+                              e.currentTarget.focus();
+                              if (typeof e.currentTarget.select === 'function') e.currentTarget.select();
+                              return;
+                            }
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              cancelEditRef.current = false;
+                              const qtyVal = Number(e.currentTarget.value);
+                              const dbQty = Number(r.line?.totalKg);
+                              if (!isNaN(qtyVal) && qtyVal > 0 && qtyVal !== dbQty) {
+                                commitCellEdit(r, { qty: qtyVal });
+                              }
+                              pendingFocusCell.current = { row: i, col: 5 };
+                              e.currentTarget.focus();
+                              if (typeof e.currentTarget.select === 'function') {
+                                e.currentTarget.select();
+                              }
+                              return;
+                            }
                             handleGridKeyDown(e, 5);
-                            if (e.key === 'Enter') e.currentTarget.blur();
+                          }}
+                          onBlur={(e) => {
+                            if (!editAuthorized) return;
+                            if (cancelEditRef.current) {
+                              cancelEditRef.current = false;
+                              return;
+                            }
+                            const qtyVal = Number(e.target.value);
+                            const dbQty = Number(r.line?.totalKg);
+                            if (!isNaN(qtyVal) && qtyVal > 0 && qtyVal !== dbQty) {
+                              commitCellEdit(r, { qty: qtyVal });
+                            }
                           }}
                         />
                       )}
                     </td>
-                    <td className="px-2 py-1.5 w-24" onClick={() => requestEditSale(r.sale, r.lineIndex)}>
+                    <td className="px-1 py-0.5 w-14">
                       <div className="flex flex-col items-end">
-                        {r.isLiveEditing ? (
-                          <input
-                            data-table-row={i}
-                            data-table-col={6}
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            disabled={busy}
-                            value={rate}
-                            onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ''))}
-                            className={`${cell} text-right tabular-nums font-semibold`}
-                            onKeyDown={(e) => handleGridKeyDown(e, 6)}
-                          />
-                        ) : (
-                          <input
-                            data-table-row={i}
-                            data-table-col={6}
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            disabled={busy}
-                            defaultValue={r.rate}
-                            key={`${r.saleId}-${r.lineIndex}-rate-${r.rate}`}
-                            className={`${cell} text-right tabular-nums`}
-                            onFocus={() => requestEditSale(r.sale, r.lineIndex)}
-                            onBlur={(e) => {
-                              const rateVal = Number(e.target.value);
-                              if (rateVal === Number(r.rate)) return;
-                              persistTableRow(r, { rate: rateVal }).catch((err) => toast.error(err.message));
-                            }}
-                            onKeyDown={(e) => {
-                              handleGridKeyDown(e, 6);
-                              if (e.key === 'Enter') e.currentTarget.blur();
-                            }}
-                          />
-                        )}
+                        <input
+                          data-table-row={i}
+                          data-table-col={6}
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          value={r.isLiveEditing ? rate : (r.rate != null ? String(r.rate) : '')}
+                          className={`${cell} text-right font-semibold`}
+                          onMouseDown={(e) => {
+                            if (!editAuthorized) {
+                              e.preventDefault();
+                              requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 6 });
+                            }
+                          }}
+                          onFocus={(e) => {
+                            if (!editAuthorized) {
+                              e.target.blur();
+                              requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 6 });
+                            } else {
+                              cancelEditRef.current = false;
+                              originalCellRef.current = {
+                                row: i,
+                                col: 6,
+                                val: r.line?.ratePerKg != null ? String(r.line.ratePerKg) : (r.rate != null ? String(r.rate) : '')
+                              };
+                              if (!r.isLiveEditing) requestEditSale(r.sale, r.lineIndex);
+                              if (typeof e.target.select === 'function') {
+                                setTimeout(() => {
+                                  try { e.target.select(); } catch (_) {}
+                                }, 0);
+                              }
+                            }
+                          }}
+                          onChange={(e) => {
+                            if (!editAuthorized) return;
+                            const val = e.target.value.replace(/[^\d.]/g, '');
+                            if (r.isLiveEditing) {
+                              setRate(val);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              cancelEditRef.current = true;
+                              const orig = originalCellRef.current?.val ?? (r.line?.ratePerKg != null ? String(r.line.ratePerKg) : (r.rate != null ? String(r.rate) : ''));
+                              e.currentTarget.value = orig;
+                              if (r.isLiveEditing) {
+                                setRate(orig);
+                              }
+                              pendingFocusCell.current = { row: i, col: 6 };
+                              e.currentTarget.focus();
+                              if (typeof e.currentTarget.select === 'function') e.currentTarget.select();
+                              return;
+                            }
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              cancelEditRef.current = false;
+                              const rateVal = Number(e.currentTarget.value);
+                              const dbRate = Number(r.line?.ratePerKg);
+                              if (!isNaN(rateVal) && rateVal >= 0 && rateVal !== dbRate) {
+                                commitCellEdit(r, { rate: rateVal });
+                              }
+                              pendingFocusCell.current = { row: i, col: 6 };
+                              e.currentTarget.focus();
+                              if (typeof e.currentTarget.select === 'function') {
+                                e.currentTarget.select();
+                              }
+                              return;
+                            }
+                            handleGridKeyDown(e, 6);
+                          }}
+                          onBlur={(e) => {
+                            if (!editAuthorized) return;
+                            if (cancelEditRef.current) {
+                              cancelEditRef.current = false;
+                              return;
+                            }
+                            const rateVal = Number(e.target.value);
+                            const dbRate = Number(r.line?.ratePerKg);
+                            if (!isNaN(rateVal) && rateVal >= 0 && rateVal !== dbRate) {
+                              commitCellEdit(r, { rate: rateVal });
+                            }
+                          }}
+                        />
                         {r.isByBag && (
                           <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-accent-100 text-accent-800 border border-accent-200/80 leading-none mt-0.5 whitespace-nowrap shadow-2xs">
                             per bag
@@ -1796,7 +2234,7 @@ export default function Sell({ path: windowPath }) {
                       data-table-row={i}
                       data-table-col={7}
                       onKeyDown={(e) => handleGridKeyDown(e, 7)}
-                      className="px-3 py-1.5 text-right tabular-nums font-medium text-primary-700 whitespace-nowrap outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                      className="px-1 py-1 text-right tabular-nums font-medium text-primary-700 whitespace-nowrap outline-none cursor-pointer w-14"
                     >
                       {r.cooly ? formatCurrency(r.cooly) : '—'}
                     </td>
@@ -1805,7 +2243,7 @@ export default function Sell({ path: windowPath }) {
                       data-table-row={i}
                       data-table-col={8}
                       onKeyDown={(e) => handleGridKeyDown(e, 8)}
-                      className="px-3 py-1.5 text-right tabular-nums font-medium text-primary-800 outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                      className="px-1.5 py-1 text-right tabular-nums font-medium text-primary-800 outline-none cursor-pointer w-18"
                     >
                       {formatCurrency(r.amount)}
                     </td>
@@ -1814,7 +2252,7 @@ export default function Sell({ path: windowPath }) {
                       data-table-row={i}
                       data-table-col={9}
                       onKeyDown={(e) => handleGridKeyDown(e, 9)}
-                      className="px-3 py-1.5 text-xs text-primary-500 whitespace-nowrap text-right tabular-nums leading-tight outline-none focus:ring-2 focus:ring-amber-500 rounded cursor-pointer"
+                      className="px-1.5 py-1 text-[10px] text-primary-500 whitespace-nowrap text-right tabular-nums leading-tight outline-none cursor-pointer w-28"
                     >
                       {(() => {
                         const { dateStr, timeStr } = formatDateTimeSplit(r.createdAt);
@@ -1826,18 +2264,7 @@ export default function Sell({ path: windowPath }) {
                         );
                       })()}
                     </td>
-                    <td className="px-2 py-1.5 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          requestEditSale(r.sale, r.lineIndex);
-                        }}
-                        title="Edit sale record in form"
-                        className="p-1.5 rounded-lg text-amber-600 hover:text-amber-800 hover:bg-amber-100 transition cursor-pointer mr-1"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
+                    <td className="px-1 py-0.5 text-center whitespace-nowrap w-10" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1845,9 +2272,9 @@ export default function Sell({ path: windowPath }) {
                           handleDeleteSale(r);
                         }}
                         title="Delete sales entry"
-                        className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
+                        className="p-1 rounded text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </td>
                   </tr>
@@ -1855,23 +2282,34 @@ export default function Sell({ path: windowPath }) {
               })
             )}
           </tbody>
+          <tfoot className="sticky bottom-0 z-20 bg-accent-200">
+            <tr className="bg-accent-200 text-accent-900 font-bold">
+              <td colSpan={4} className="bg-accent-200 px-2 py-1.5 text-right font-bold text-accent-900 uppercase tracking-wide">
+                Total
+              </td>
+              <td className="bg-accent-200 px-1 py-1.5 text-right tabular-nums font-bold text-accent-900 w-12">
+                {totals.bags}
+              </td>
+              <td className="bg-accent-200 px-1 py-1.5 text-right tabular-nums font-bold text-accent-900 w-14">
+                {totals.qty.toFixed(1)}
+              </td>
+              <td className="bg-accent-200 px-1 py-1.5 text-right text-accent-600 font-medium w-14">—</td>
+              <td className="bg-accent-200 px-1 py-1.5 text-right text-accent-600 font-medium w-14">—</td>
+              <td className="bg-accent-200 px-1.5 py-1.5 text-right tabular-nums font-bold text-accent-900 w-18">
+                {formatCurrency(totals.amount)}
+              </td>
+              <td className="bg-accent-200 px-1.5 py-1.5 w-28"></td>
+              <td className="bg-accent-200 px-1 py-1.5 w-10"></td>
+            </tr>
+          </tfoot>
         </table>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-primary-100 px-3 py-3 bg-accent-50 shrink-0">
-          <p className="text-xs text-primary-400">
-            Edit item, name, bags, qty, rate or cooly in the table — Enter or click away to save.
-            Cooly is per bag or overall.
-          </p>
-          <span className="text-sm font-semibold text-primary-600">Total</span>
-          <span className="rounded-lg bg-accent-200 px-3 py-1.5 text-sm font-semibold tabular-nums">
-            Bags {totals.bags}
-          </span>
-          <span className="rounded-lg bg-accent-200 px-3 py-1.5 text-sm font-semibold tabular-nums">
-            Qty {totals.qty.toFixed(1)}
-          </span>
-          <span className="rounded-lg bg-accent-200 px-3 py-1.5 text-sm font-semibold tabular-nums">
-            {formatCurrency(totals.amount)}
+        {/* Lightweight status strip matching table */}
+        <div className="flex items-center justify-between px-3 py-1 bg-surface border-t border-primary-100 text-[11px] text-primary-400 shrink-0">
+          <span>Enter to save • Esc to cancel • Arrow keys to navigate</span>
+          <span className="font-medium text-primary-500">
+            {displayedRows.length} {displayedRows.length === 1 ? 'sale' : 'sales'}
           </span>
         </div>
       </div>
@@ -1895,6 +2333,7 @@ export default function Sell({ path: windowPath }) {
                 onClick={() => {
                   setShowAuthModal(false);
                   setPendingEditSale(null);
+                  setAuthError('');
                 }}
                 className="p-1.5 rounded-lg hover:bg-primary-50 text-primary-400 hover:text-primary-600 transition"
               >
@@ -1908,10 +2347,14 @@ export default function Sell({ path: windowPath }) {
                 <div className="relative">
                   <input
                     type={showAdminPassword ? 'text' : 'password'}
-                    className="w-full rounded-xl border border-primary-200 bg-surface px-3 py-2 pr-10 text-sm text-primary-800 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100 transition"
+                    className={`w-full rounded-xl border bg-surface px-3 py-2 pr-10 text-sm text-primary-800 focus:outline-none focus:ring-2 transition ${
+                      authError
+                        ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
+                        : 'border-primary-200 focus:border-primary-400 focus:ring-primary-100'
+                    }`}
                     placeholder="Enter admin password..."
                     value={adminPasswordInput}
-                    onChange={(e) => setAdminPasswordInput(e.target.value)}
+                    onChange={(e) => { setAdminPasswordInput(e.target.value); if (authError) setAuthError(''); }}
                     autoFocus
                     required
                   />
@@ -1923,6 +2366,12 @@ export default function Sell({ path: windowPath }) {
                     {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {authError && (
+                  <p className="mt-1.5 text-xs font-medium text-red-600 flex items-center gap-1">
+                    <X className="w-3.5 h-3.5 shrink-0" />
+                    {authError}
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-2 pt-1">
@@ -1931,6 +2380,7 @@ export default function Sell({ path: windowPath }) {
                   onClick={() => {
                     setShowAuthModal(false);
                     setPendingEditSale(null);
+                    setAuthError('');
                   }}
                   className="btn-secondary flex-1 !py-2 !text-sm"
                 >

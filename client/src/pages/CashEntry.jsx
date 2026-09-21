@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Banknote } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Banknote, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDate } from '../utils/format';
@@ -24,6 +24,7 @@ export default function CashEntry() {
   const [paymentType, setPaymentType] = useState('Cash');
   const [saving, setSaving] = useState(false);
   const [savingRowId, setSavingRowId] = useState('');
+  const [deletingRowId, setDeletingRowId] = useState('');
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
   const listRef = useRef(null);
@@ -33,6 +34,40 @@ export default function CashEntry() {
   const amountRef = useRef(null);
   const lessRef = useRef(null);
   const saveRef = useRef(null);
+
+  const pendingFocusCell = useRef(null);
+  const originalCellRef = useRef(null);
+  const cancelEditRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (pendingFocusCell.current) {
+      const { row, col } = pendingFocusCell.current;
+      const selector = `[data-table-row="${row}"][data-table-col="${col}"]`;
+      const target = document.querySelector(selector);
+      if (target) {
+        target.focus();
+        if (typeof target.select === 'function' && target.tagName === 'INPUT') {
+          target.select();
+        }
+        pendingFocusCell.current = null;
+      }
+    }
+  });
+
+  useEffect(() => {
+    if (pendingFocusCell.current) {
+      const { row, col } = pendingFocusCell.current;
+      const selector = `[data-table-row="${row}"][data-table-col="${col}"]`;
+      const target = document.querySelector(selector);
+      if (target) {
+        target.focus();
+        if (typeof target.select === 'function' && target.tagName === 'INPUT') {
+          target.select();
+        }
+        pendingFocusCell.current = null;
+      }
+    }
+  });
 
   const selectedParty = useMemo(() => {
     if (!partyId || !partyType) return null;
@@ -319,33 +354,180 @@ export default function CashEntry() {
     }
   };
 
+  const handleDeleteEntry = async (tx) => {
+    const partyName = tx.customer?.name || tx.vendor?.name || 'this party';
+    const cur = rowAmounts(tx);
+    const amountVal = cur.isCredit ? cur.credit : cur.debit;
+    const side = tx.cashSide === 'debit' ? 'Debit' : 'Credit';
+    const confirmMsg = `Are you sure you want to delete this ${side} entry of ₹${amountVal} for "${partyName}"? This will reverse their balance.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setDeletingRowId(tx._id);
+    try {
+      await api.delete(`/transactions/cash-entry/${tx._id}`);
+      toast.success('Cash entry deleted · Balance updated');
+      await refresh();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to delete cash entry');
+    } finally {
+      setDeletingRowId('');
+    }
+  };
+
+  const commitIfDirty = (rowIdx, colIdx, el) => {
+    if (cancelEditRef.current) return;
+    const tx = entries[rowIdx];
+    if (!tx) return;
+    const cur = rowAmounts(tx);
+
+    if (colIdx === 0) {
+      const val = el.value;
+      if (val && val !== cur.partyKey) {
+        const [kind, id] = val.split(':');
+        persistRow(tx, {
+          partyType: kind,
+          customerId: kind === 'customer' ? id : undefined,
+          vendorId: kind === 'vendor' ? id : undefined,
+        }).catch(() => {});
+      }
+    } else if (colIdx === 1) {
+      const val = el.value;
+      if (val && val !== (tx.paymentType || 'Cash')) {
+        persistRow(tx, { paymentType: val }).catch(() => {});
+      }
+    } else if (colIdx === 2) {
+      const n = Number(String(el.value).replace(/[^\d.]/g, '')) || 0;
+      if (n !== cur.credit) {
+        persistRow(tx, { cashSide: 'credit', amount: n }).catch(() => {});
+      }
+    } else if (colIdx === 3) {
+      const n = Number(String(el.value).replace(/[^\d.]/g, '')) || 0;
+      if (n !== cur.debit) {
+        persistRow(tx, { cashSide: 'debit', amount: n }).catch(() => {});
+      }
+    } else if (colIdx === 4) {
+      const n = Number(String(el.value).replace(/[^\d.]/g, '')) || 0;
+      if (n !== cur.lessAmt) {
+        persistRow(tx, { less: n }).catch(() => {});
+      }
+    }
+  };
+
+  const handleGridKeyDown = (e, rowIdx, colIdx) => {
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      return;
+    }
+
+    const el = e.currentTarget || e.target;
+    const isInput = el.tagName === 'INPUT' && !el.readOnly;
+
+    // For text inputs, ArrowLeft/Right should move cursor within the
+    // text unless the caret is already at the boundary (start/end).
+    if (isInput && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      const pos = el.selectionStart;
+      const len = (el.value || '').length;
+      const hasSelection = el.selectionStart !== el.selectionEnd;
+      if (hasSelection) return; // let browser collapse selection first
+      if (e.key === 'ArrowLeft' && pos > 0) return; // cursor not at start
+      if (e.key === 'ArrowRight' && pos < len) return; // cursor not at end
+    }
+
+    let targetRow = rowIdx;
+    let targetCol = colIdx;
+
+    if (e.key === 'ArrowUp') {
+      targetRow = Math.max(0, rowIdx - 1);
+    } else if (e.key === 'ArrowDown') {
+      targetRow = Math.min(entries.length - 1, rowIdx + 1);
+    } else if (e.key === 'ArrowLeft') {
+      targetCol = Math.max(0, colIdx - 1);
+    } else if (e.key === 'ArrowRight') {
+      targetCol = Math.min(5, colIdx + 1);
+    }
+
+    if (targetRow === rowIdx && targetCol === colIdx) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    commitIfDirty(rowIdx, colIdx, el);
+
+    pendingFocusCell.current = { row: targetRow, col: targetCol };
+
+    const focusTarget = () => {
+      const selector = `[data-table-row="${targetRow}"][data-table-col="${targetCol}"]`;
+      const target = document.querySelector(selector);
+      if (target) {
+        target.focus();
+        if (typeof target.select === 'function' && target.tagName === 'INPUT') {
+          target.select();
+        }
+        return true;
+      }
+      return false;
+    };
+
+    if (focusTarget()) {
+      pendingFocusCell.current = null;
+    } else {
+      requestAnimationFrame(() => {
+        if (pendingFocusCell.current) {
+          if (focusTarget()) pendingFocusCell.current = null;
+        }
+      });
+      setTimeout(() => {
+        if (pendingFocusCell.current) {
+          if (focusTarget()) pendingFocusCell.current = null;
+        }
+      }, 50);
+    }
+  };
+
+  const totals = useMemo(() => {
+    return entries.reduce(
+      (acc, tx) => {
+        const cur = rowAmounts(tx);
+        return {
+          credit: acc.credit + (cur.credit || 0),
+          debit: acc.debit + (cur.debit || 0),
+          less: acc.less + (cur.lessAmt || 0),
+        };
+      },
+      { credit: 0, debit: 0, less: 0 }
+    );
+  }, [entries]);
+
   return (
-    <div className="space-y-4 max-w-4xl">
+    <div className="space-y-3 max-w-4xl">
       <div>
-        <h1 className="page-title">Cash Entry</h1>
-        <p className="text-primary-400 text-sm mt-0.5">
+        <h1 className="text-sm font-bold text-primary-800">Cash Entry</h1>
+        <p className="text-primary-400 text-[11px] mt-0.5">
           Customer receipts (Credit) or vendor payments (Debit) — type can still be changed manually
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="card space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="card !p-3 space-y-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           <div>
-            <label className="label">Date *</label>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Date *
+            </label>
             <input
               ref={dateRef}
               type="date"
-              className="input-field"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={entryDate}
               onChange={(e) => setEntryDate(e.target.value)}
               required
             />
           </div>
           <div>
-            <label className="label">Type *</label>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Type *
+            </label>
             <select
               ref={typeRef}
-              className="input-field"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={cashSide}
               onChange={(e) => setCashSide(e.target.value)}
             >
@@ -354,9 +536,11 @@ export default function CashEntry() {
             </select>
           </div>
           <div>
-            <label className="label">Type of Payment *</label>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Type of Payment *
+            </label>
             <select
-              className="input-field"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={paymentType}
               onChange={(e) => setPaymentType(e.target.value)}
             >
@@ -371,10 +555,12 @@ export default function CashEntry() {
         </div>
 
         <div className="relative">
-          <label className="label">Name *</label>
+          <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            Name *
+          </label>
           <input
             ref={nameRef}
-            className="input-field"
+            className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
             value={nameQuery}
             placeholder="Type customer or vendor name…"
             autoComplete="off"
@@ -394,14 +580,14 @@ export default function CashEntry() {
           {suggestOpen && suggestions.length > 0 && (
             <ul
               ref={listRef}
-              className="absolute z-20 left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+              className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-primary-200 bg-surface shadow-card"
             >
               {suggestions.map((item, idx) => (
                 <li key={`${item.kind}-${item.id}`}>
                   <button
                     type="button"
                     data-idx={idx}
-                    className={`w-full text-left px-4 py-2.5 text-sm ${
+                    className={`w-full text-left px-3 py-1.5 text-xs ${
                       idx === highlight
                         ? 'bg-primary-100 text-primary-900 font-medium'
                         : 'text-primary-700 hover:bg-primary-50'
@@ -410,18 +596,18 @@ export default function CashEntry() {
                     onMouseEnter={() => setHighlight(idx)}
                     onClick={() => pickParty(item)}
                   >
-                    <span className="font-medium">{item.name}</span>
+                    <span className="font-semibold">{item.name}</span>
                     <span
-                      className={`ml-2 text-[11px] font-semibold uppercase tracking-wide ${
+                      className={`ml-2 text-[10px] font-semibold uppercase tracking-wide ${
                         item.kind === 'vendor' ? 'text-accent-600' : 'text-primary-500'
                       }`}
                     >
                       {item.label}
                     </span>
                     {item.nameTelugu ? (
-                      <span className="text-primary-400 ml-2 text-xs">{item.nameTelugu}</span>
+                      <span className="text-primary-400 ml-2 text-[11px]">{item.nameTelugu}</span>
                     ) : null}
-                    <span className="block text-xs text-primary-400 mt-0.5">
+                    <span className="block text-[11px] text-primary-400 mt-0.5">
                       Balance {formatCurrency(item.creditBalance || 0)}
                     </span>
                   </button>
@@ -432,10 +618,10 @@ export default function CashEntry() {
         </div>
 
         {selectedParty && (
-          <div className="rounded-xl bg-primary-50 border border-primary-100 px-4 py-3 text-sm text-primary-700 flex flex-wrap items-center justify-between gap-2">
+          <div className="rounded-lg bg-primary-50/90 border border-primary-100 px-3 py-1.5 text-xs text-primary-700 flex flex-wrap items-center justify-between gap-2">
             <span>
               Selected:{' '}
-              <strong>
+              <strong className="text-primary-900">
                 {selectedParty.name}
               </strong>
               <span className="text-primary-400">
@@ -443,12 +629,12 @@ export default function CashEntry() {
                 ({partyType === 'vendor' ? 'Vendor' : 'Customer'})
               </span>
               {' · '}
-              Balance <strong>{formatCurrency(selectedParty.creditBalance || 0)}</strong>
+              Balance <strong className="text-primary-900">{formatCurrency(selectedParty.creditBalance || 0)}</strong>
             </span>
             {lessEnabled && remainingAfterAmount > 0 && (
               <button
                 type="button"
-                className="text-xs font-semibold text-primary-600 hover:text-primary-800"
+                className="text-[11px] font-semibold text-primary-600 hover:text-primary-800 underline underline-offset-2"
                 onClick={fillLessWithRemaining}
               >
                 Fill Less with remaining ({formatCurrency(remainingAfterAmount)})
@@ -457,12 +643,14 @@ export default function CashEntry() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div>
-            <label className="label">Amount *</label>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Amount *
+            </label>
             <input
               ref={amountRef}
-              className="input-field"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs font-semibold text-primary-800 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition"
               type="text"
               inputMode="decimal"
               autoComplete="off"
@@ -472,10 +660,12 @@ export default function CashEntry() {
             />
           </div>
           <div>
-            <label className="label">Less</label>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Less
+            </label>
             <input
               ref={lessRef}
-              className="input-field"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs font-semibold text-red-600 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition disabled:opacity-50"
               type="text"
               inputMode="decimal"
               autoComplete="off"
@@ -484,178 +674,460 @@ export default function CashEntry() {
               onChange={(e) => setLess(e.target.value.replace(/[^\d.]/g, ''))}
               disabled={!lessEnabled}
             />
-            <p className="text-xs text-primary-400 mt-1">
+            <p className="text-[10px] text-primary-400 mt-0.5">
               Optional. Remaining balance also marked as paid (added with amount).
             </p>
           </div>
         </div>
 
         {lessEnabled && (Number(amount) > 0 || Number(less) > 0) && (
-          <div className="flex items-center gap-2 rounded-lg bg-accent-100/80 text-accent-700 px-3 py-2 text-sm">
-            <Banknote className="w-4 h-4 shrink-0" />
+          <div className="inline-flex items-center gap-1.5 rounded-md bg-accent-100/80 text-accent-800 px-2.5 py-1 text-xs font-medium">
+            <Banknote className="w-3.5 h-3.5 shrink-0" />
             Total paid:{' '}
-            <strong>
+            <strong className="font-bold">
               {formatCurrency((Number(amount) || 0) + (Number(less) || 0))}
             </strong>
           </div>
         )}
 
-        <button ref={saveRef} type="submit" className="btn-primary w-full sm:w-auto sm:px-10" disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
+        <div>
+          <button
+            ref={saveRef}
+            type="submit"
+            className="btn-primary !py-1.5 !px-6 !text-xs font-semibold shadow-xs"
+            disabled={saving}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
       </form>
 
-      <div className="card !p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-primary-100 font-semibold text-primary-700">
-          Entries for {formatDate(entryDate)}
+      <div className="card !p-0 overflow-hidden border border-primary-200">
+        <div className="px-3 py-2 border-b border-primary-200 bg-surface flex items-center justify-between">
+          <span className="font-semibold text-xs text-primary-800">
+            Entries for {formatDate(entryDate)}
+          </span>
+          <span className="text-[11px] text-primary-400 font-medium">
+            {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+          </span>
         </div>
         {entries.length === 0 ? (
-          <p className="text-center py-10 text-primary-400 text-sm">No cash entries for this date</p>
+          <p className="text-center py-8 text-primary-400 text-xs">No cash entries for this date</p>
         ) : (
           <>
-            <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-primary-100 bg-primary-50/50">
-                  <th className="text-left px-4 py-2.5 font-semibold text-primary-500">Name</th>
-                  <th className="text-left px-4 py-2.5 font-semibold text-primary-500">Type of Payment</th>
-                  <th className="text-right px-4 py-2.5 font-semibold text-primary-500">Credit</th>
-                  <th className="text-right px-4 py-2.5 font-semibold text-primary-500">Debit</th>
-                  <th className="text-right px-4 py-2.5 font-semibold text-primary-500">Less</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((tx) => {
-                  const cur = rowAmounts(tx);
-                  const busy = savingRowId === tx._id;
-                  const lessAllowed =
-                    (!cur.isVendor && cur.isCredit) || (cur.isVendor && !cur.isCredit);
-                  const cell =
-                    'w-full bg-transparent rounded-lg border border-transparent hover:border-primary-200 focus:border-primary-400 focus:bg-surface outline-none px-1.5 py-1 disabled:opacity-60';
-                  return (
-                    <tr key={tx._id} className="border-b border-primary-50">
-                      <td className="px-2 py-1.5 min-w-[10rem]">
-                        <select
-                          className={`${cell} font-medium text-primary-800`}
-                          value={cur.partyKey}
-                          disabled={busy}
-                          onChange={(e) => {
-                            const [kind, id] = e.target.value.split(':');
-                            if (e.target.value === cur.partyKey) return;
-                            persistRow(tx, {
-                              partyType: kind,
-                              customerId: kind === 'customer' ? id : undefined,
-                              vendorId: kind === 'vendor' ? id : undefined,
-                            }).catch(() => {});
-                          }}
-                        >
-                          {cur.partyKey &&
-                          !customers.some((c) => `customer:${c._id}` === cur.partyKey) &&
-                          !vendors.some((v) => `vendor:${v._id}` === cur.partyKey) ? (
-                            <option value={cur.partyKey}>
-                              {tx.customer?.name || tx.vendor?.name || '—'}
-                            </option>
-                          ) : null}
-                          <optgroup label="Customers">
-                            {customers.map((c) => (
-                              <option key={c._id} value={`customer:${c._id}`}>
-                                {c.name}
+            <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+              <table className="w-full text-xs excel-grid">
+                <thead className="sticky top-0 z-20 bg-accent-200">
+                  <tr className="bg-accent-200 text-accent-800 text-left">
+                    <th className="bg-accent-200 px-2 py-1.5 font-semibold text-left whitespace-nowrap sticky top-0 z-20">
+                      Name
+                    </th>
+                    <th className="bg-accent-200 px-2 py-1.5 font-semibold text-left whitespace-nowrap sticky top-0 z-20 w-36">
+                      Type of Payment
+                    </th>
+                    <th className="bg-accent-200 px-2 py-1.5 font-semibold text-right whitespace-nowrap sticky top-0 z-20 w-28">
+                      Credit
+                    </th>
+                    <th className="bg-accent-200 px-2 py-1.5 font-semibold text-right whitespace-nowrap sticky top-0 z-20 w-28">
+                      Debit
+                    </th>
+                    <th className="bg-accent-200 px-2 py-1.5 font-semibold text-right whitespace-nowrap sticky top-0 z-20 w-28">
+                      Less
+                    </th>
+                    <th className="bg-accent-200 px-1 py-1.5 font-semibold text-center whitespace-nowrap sticky top-0 z-20 w-12">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-surface">
+                  {entries.map((tx, i) => {
+                    const cur = rowAmounts(tx);
+                    const busy = savingRowId === tx._id || deletingRowId === tx._id;
+                    const lessAllowed =
+                      (!cur.isVendor && cur.isCredit) || (cur.isVendor && !cur.isCredit);
+
+                    return (
+                      <tr key={tx._id} className="hover:bg-primary-50/40">
+                        <td className="px-1.5 py-1 min-w-[10rem]">
+                          <select
+                            data-table-row={i}
+                            data-table-col={0}
+                            className="grid-input font-medium text-primary-800 text-xs cursor-pointer"
+                            value={cur.partyKey}
+                            disabled={busy}
+                            onFocus={() => {
+                              cancelEditRef.current = false;
+                              originalCellRef.current = { row: i, col: 0, val: cur.partyKey };
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                e.preventDefault();
+                                cancelEditRef.current = true;
+                                const orig = originalCellRef.current?.val ?? cur.partyKey;
+                                e.currentTarget.value = orig;
+                                pendingFocusCell.current = { row: i, col: 0 };
+                                e.currentTarget.focus();
+                                return;
+                              }
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                cancelEditRef.current = false;
+                                const val = e.currentTarget.value;
+                                if (val && val !== cur.partyKey) {
+                                  const [kind, id] = val.split(':');
+                                  persistRow(tx, {
+                                    partyType: kind,
+                                    customerId: kind === 'customer' ? id : undefined,
+                                    vendorId: kind === 'vendor' ? id : undefined,
+                                  }).catch(() => {});
+                                }
+                                pendingFocusCell.current = { row: i, col: 0 };
+                                e.currentTarget.focus();
+                                return;
+                              }
+                              handleGridKeyDown(e, i, 0);
+                            }}
+                            onBlur={(e) => {
+                              if (cancelEditRef.current) {
+                                cancelEditRef.current = false;
+                                return;
+                              }
+                              const val = e.target.value;
+                              if (val && val !== cur.partyKey) {
+                                const [kind, id] = val.split(':');
+                                persistRow(tx, {
+                                  partyType: kind,
+                                  customerId: kind === 'customer' ? id : undefined,
+                                  vendorId: kind === 'vendor' ? id : undefined,
+                                }).catch(() => {});
+                              }
+                            }}
+                            onChange={(e) => {
+                              const [kind, id] = e.target.value.split(':');
+                              if (e.target.value === cur.partyKey) return;
+                              persistRow(tx, {
+                                partyType: kind,
+                                customerId: kind === 'customer' ? id : undefined,
+                                vendorId: kind === 'vendor' ? id : undefined,
+                              }).catch(() => {});
+                            }}
+                          >
+                            {cur.partyKey &&
+                            !customers.some((c) => `customer:${c._id}` === cur.partyKey) &&
+                            !vendors.some((v) => `vendor:${v._id}` === cur.partyKey) ? (
+                              <option value={cur.partyKey}>
+                                {tx.customer?.name || (tx.vendor ? `${tx.vendor.name} (Vendor)` : '—')}
                               </option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="Vendors">
-                            {vendors.map((v) => (
-                              <option key={v._id} value={`vendor:${v._id}`}>
-                                {v.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        </select>
-                        <span className="block text-[11px] font-normal text-primary-400 px-1.5">
-                          {cur.isVendor ? 'Vendor' : 'Customer'}
-                        </span>
-                      </td>
-                      <td className="px-2 py-1.5 min-w-[8rem]">
-                        <select
-                          className={`${cell} font-medium text-primary-700`}
-                          value={tx.paymentType || 'Cash'}
-                          disabled={busy}
-                          onChange={(e) => {
-                            persistRow(tx, { paymentType: e.target.value }).catch(() => {});
-                          }}
-                        >
-                          <option value="Cash">Cash</option>
-                          <option value="PhonePe">PhonePe</option>
-                          <option value="Google Pay">Google Pay</option>
-                          <option value="Card">Card</option>
-                          <option value="Bank Transfer">Bank Transfer</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </td>
-                      <td className="px-2 py-1.5 w-28">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          disabled={busy}
-                          defaultValue={cur.credit || ''}
-                          key={`${tx._id}-credit-${cur.credit}`}
-                          className={`${cell} text-right tabular-nums text-primary-700`}
-                          onBlur={(e) => {
-                            const n = Number(String(e.target.value).replace(/[^\d.]/g, '')) || 0;
-                            if (n === cur.credit) return;
-                            persistRow(tx, { cashSide: 'credit', amount: n }).catch(() => {});
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') e.currentTarget.blur();
-                          }}
-                        />
-                      </td>
-                      <td className="px-2 py-1.5 w-28">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          disabled={busy}
-                          defaultValue={cur.debit || ''}
-                          key={`${tx._id}-debit-${cur.debit}`}
-                          className={`${cell} text-right tabular-nums text-primary-700`}
-                          onBlur={(e) => {
-                            const n = Number(String(e.target.value).replace(/[^\d.]/g, '')) || 0;
-                            if (n === cur.debit) return;
-                            persistRow(tx, { cashSide: 'debit', amount: n }).catch(() => {});
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') e.currentTarget.blur();
-                          }}
-                        />
-                      </td>
-                      <td className="px-2 py-1.5 w-28">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          disabled={busy || !lessAllowed}
-                          defaultValue={cur.lessAmt || ''}
-                          key={`${tx._id}-less-${cur.lessAmt}`}
-                          className={`${cell} text-right tabular-nums text-red-600 font-medium`}
-                          onBlur={(e) => {
-                            const n = Number(String(e.target.value).replace(/[^\d.]/g, '')) || 0;
-                            if (n === cur.lessAmt) return;
-                            persistRow(tx, { less: n }).catch(() => {});
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') e.currentTarget.blur();
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                            ) : null}
+                            <optgroup label="Customers">
+                              {customers.map((c) => (
+                                <option key={c._id} value={`customer:${c._id}`}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="Vendors">
+                              {vendors.map((v) => (
+                                <option key={v._id} value={`vendor:${v._id}`}>
+                                  {v.name} (Vendor)
+                                </option>
+                              ))}
+                            </optgroup>
+                          </select>
+                        </td>
+
+                        <td className="px-1.5 py-1 min-w-[7.5rem]">
+                          <select
+                            data-table-row={i}
+                            data-table-col={1}
+                            className="grid-input font-medium text-primary-700 text-xs cursor-pointer"
+                            value={tx.paymentType || 'Cash'}
+                            disabled={busy}
+                            onFocus={() => {
+                              cancelEditRef.current = false;
+                              originalCellRef.current = { row: i, col: 1, val: tx.paymentType || 'Cash' };
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                e.preventDefault();
+                                cancelEditRef.current = true;
+                                const orig = originalCellRef.current?.val ?? (tx.paymentType || 'Cash');
+                                e.currentTarget.value = orig;
+                                pendingFocusCell.current = { row: i, col: 1 };
+                                e.currentTarget.focus();
+                                return;
+                              }
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                cancelEditRef.current = false;
+                                const val = e.currentTarget.value;
+                                if (val && val !== (tx.paymentType || 'Cash')) {
+                                  persistRow(tx, { paymentType: val }).catch(() => {});
+                                }
+                                pendingFocusCell.current = { row: i, col: 1 };
+                                e.currentTarget.focus();
+                                return;
+                              }
+                              handleGridKeyDown(e, i, 1);
+                            }}
+                            onBlur={(e) => {
+                              if (cancelEditRef.current) {
+                                cancelEditRef.current = false;
+                                return;
+                              }
+                              const val = e.target.value;
+                              if (val && val !== (tx.paymentType || 'Cash')) {
+                                persistRow(tx, { paymentType: val }).catch(() => {});
+                              }
+                            }}
+                            onChange={(e) => {
+                              persistRow(tx, { paymentType: e.target.value }).catch(() => {});
+                            }}
+                          >
+                            <option value="Cash">Cash</option>
+                            <option value="PhonePe">PhonePe</option>
+                            <option value="Google Pay">Google Pay</option>
+                            <option value="Card">Card</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </td>
+
+                        <td className="px-1.5 py-1 w-28">
+                          <input
+                            data-table-row={i}
+                            data-table-col={2}
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            disabled={busy}
+                            defaultValue={cur.credit || ''}
+                            key={`${tx._id}-credit-${cur.credit}`}
+                            className="grid-input text-right tabular-nums text-primary-800 text-xs font-medium"
+                            onFocus={(e) => {
+                              cancelEditRef.current = false;
+                              originalCellRef.current = { row: i, col: 2, val: cur.credit || '' };
+                              if (typeof e.target.select === 'function') {
+                                setTimeout(() => {
+                                  try { e.target.select(); } catch (_) {}
+                                }, 0);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                cancelEditRef.current = true;
+                                const orig = originalCellRef.current?.val ?? (cur.credit || '');
+                                e.currentTarget.value = orig;
+                                pendingFocusCell.current = { row: i, col: 2 };
+                                e.currentTarget.focus();
+                                if (typeof e.currentTarget.select === 'function') e.currentTarget.select();
+                                return;
+                              }
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                cancelEditRef.current = false;
+                                const n = Number(String(e.currentTarget.value).replace(/[^\d.]/g, '')) || 0;
+                                if (n !== cur.credit) {
+                                  persistRow(tx, { cashSide: 'credit', amount: n }).catch(() => {});
+                                }
+                                pendingFocusCell.current = { row: i, col: 2 };
+                                e.currentTarget.focus();
+                                if (typeof e.currentTarget.select === 'function') e.currentTarget.select();
+                                return;
+                              }
+                              handleGridKeyDown(e, i, 2);
+                            }}
+                            onBlur={(e) => {
+                              if (cancelEditRef.current) {
+                                cancelEditRef.current = false;
+                                return;
+                              }
+                              const n = Number(String(e.target.value).replace(/[^\d.]/g, '')) || 0;
+                              if (n !== cur.credit) {
+                                persistRow(tx, { cashSide: 'credit', amount: n }).catch(() => {});
+                              }
+                            }}
+                          />
+                        </td>
+
+                        <td className="px-1.5 py-1 w-28">
+                          <input
+                            data-table-row={i}
+                            data-table-col={3}
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            disabled={busy}
+                            defaultValue={cur.debit || ''}
+                            key={`${tx._id}-debit-${cur.debit}`}
+                            className="grid-input text-right tabular-nums text-primary-800 text-xs font-medium"
+                            onFocus={(e) => {
+                              cancelEditRef.current = false;
+                              originalCellRef.current = { row: i, col: 3, val: cur.debit || '' };
+                              if (typeof e.target.select === 'function') {
+                                setTimeout(() => {
+                                  try { e.target.select(); } catch (_) {}
+                                }, 0);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                cancelEditRef.current = true;
+                                const orig = originalCellRef.current?.val ?? (cur.debit || '');
+                                e.currentTarget.value = orig;
+                                pendingFocusCell.current = { row: i, col: 3 };
+                                e.currentTarget.focus();
+                                if (typeof e.currentTarget.select === 'function') e.currentTarget.select();
+                                return;
+                              }
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                cancelEditRef.current = false;
+                                const n = Number(String(e.currentTarget.value).replace(/[^\d.]/g, '')) || 0;
+                                if (n !== cur.debit) {
+                                  persistRow(tx, { cashSide: 'debit', amount: n }).catch(() => {});
+                                }
+                                pendingFocusCell.current = { row: i, col: 3 };
+                                e.currentTarget.focus();
+                                if (typeof e.currentTarget.select === 'function') e.currentTarget.select();
+                                return;
+                              }
+                              handleGridKeyDown(e, i, 3);
+                            }}
+                            onBlur={(e) => {
+                              if (cancelEditRef.current) {
+                                cancelEditRef.current = false;
+                                return;
+                              }
+                              const n = Number(String(e.target.value).replace(/[^\d.]/g, '')) || 0;
+                              if (n !== cur.debit) {
+                                persistRow(tx, { cashSide: 'debit', amount: n }).catch(() => {});
+                              }
+                            }}
+                          />
+                        </td>
+
+                        <td className="px-1.5 py-1 w-28">
+                          {lessAllowed ? (
+                            <input
+                              data-table-row={i}
+                              data-table-col={4}
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              disabled={busy}
+                              defaultValue={cur.lessAmt || ''}
+                              key={`${tx._id}-less-${cur.lessAmt}`}
+                              className="grid-input text-right tabular-nums text-red-600 font-semibold text-xs"
+                              onFocus={(e) => {
+                                cancelEditRef.current = false;
+                                originalCellRef.current = { row: i, col: 4, val: cur.lessAmt || '' };
+                                if (typeof e.target.select === 'function') {
+                                  setTimeout(() => {
+                                    try { e.target.select(); } catch (_) {}
+                                  }, 0);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  cancelEditRef.current = true;
+                                  const orig = originalCellRef.current?.val ?? (cur.lessAmt || '');
+                                  e.currentTarget.value = orig;
+                                  pendingFocusCell.current = { row: i, col: 4 };
+                                  e.currentTarget.focus();
+                                  if (typeof e.currentTarget.select === 'function') e.currentTarget.select();
+                                  return;
+                                }
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  cancelEditRef.current = false;
+                                  const n = Number(String(e.currentTarget.value).replace(/[^\d.]/g, '')) || 0;
+                                  if (n !== cur.lessAmt) {
+                                    persistRow(tx, { less: n }).catch(() => {});
+                                  }
+                                  pendingFocusCell.current = { row: i, col: 4 };
+                                  e.currentTarget.focus();
+                                  if (typeof e.currentTarget.select === 'function') e.currentTarget.select();
+                                  return;
+                                }
+                                handleGridKeyDown(e, i, 4);
+                              }}
+                              onBlur={(e) => {
+                                if (cancelEditRef.current) {
+                                  cancelEditRef.current = false;
+                                  return;
+                                }
+                                const n = Number(String(e.target.value).replace(/[^\d.]/g, '')) || 0;
+                                if (n !== cur.lessAmt) {
+                                  persistRow(tx, { less: n }).catch(() => {});
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div
+                              tabIndex={0}
+                              data-table-row={i}
+                              data-table-col={4}
+                              onKeyDown={(e) => handleGridKeyDown(e, i, 4)}
+                              className="w-full text-right text-primary-300 outline-none cursor-default font-medium text-xs"
+                            >
+                              —
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-1 py-1 text-center w-12">
+                          <button
+                            type="button"
+                            tabIndex={0}
+                            data-table-row={i}
+                            data-table-col={5}
+                            disabled={busy}
+                            onClick={() => handleDeleteEntry(tx)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleDeleteEntry(tx);
+                                return;
+                              }
+                              handleGridKeyDown(e, i, 5);
+                            }}
+                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition cursor-pointer disabled:opacity-40 outline-none"
+                            title="Delete cash entry"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="sticky bottom-0 z-20 bg-accent-200 text-accent-900 font-semibold text-xs">
+                  <tr className="bg-accent-200 text-accent-900">
+                    <td colSpan={2} className="px-2 py-1.5 text-right font-bold uppercase text-[10px] tracking-wider">
+                      Total
+                    </td>
+                    <td className="px-2 py-1.5 text-right tabular-nums font-bold">
+                      {formatCurrency(totals.credit)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right tabular-nums font-bold">
+                      {formatCurrency(totals.debit)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right tabular-nums font-bold text-red-600">
+                      {formatCurrency(totals.less)}
+                    </td>
+                    <td className="px-1 py-1.5"></td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-            <p className="text-xs text-primary-400 px-4 py-2 border-t border-primary-50">
+            <p className="text-[11px] text-primary-400 px-3 py-1.5 border-t border-primary-100 bg-surface">
               Edit name, credit, debit or less in the table — Enter or click away to save.
             </p>
           </>

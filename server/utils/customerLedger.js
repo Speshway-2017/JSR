@@ -1,6 +1,9 @@
-/** When a customer transaction actually occurred (cash entries use entryDate). */
+/** When a customer transaction actually occurred (sales use sale.createdAt, cash entries use entryDate). */
 export function txWhen(tx) {
-  const d = tx.entryDate || tx.createdAt;
+  if (tx?.sale && typeof tx.sale === 'object' && tx.sale.createdAt) {
+    return new Date(tx.sale.createdAt);
+  }
+  const d = tx?.entryDate || tx?.createdAt;
   return d ? new Date(d) : new Date(0);
 }
 

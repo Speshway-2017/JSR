@@ -3,6 +3,7 @@ import { Plus, Package, X, Trash2, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { useDataRestored } from '../utils/useDataRestored';
+import MDIModalWindow from '../components/mdi/MDIModalWindow';
 
 export default function SalesMaterials() {
   const [materials, setMaterials] = useState([]);
@@ -105,45 +106,34 @@ export default function SalesMaterials() {
         </button>
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="card w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-primary-800">
-                {editing ? 'Edit Material' : 'Add Material'}
-              </h2>
-              <button
-                type="button"
-                onClick={closeForm}
-                className="p-2 hover:bg-primary-50 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="label">Material Name *</label>
-                <input
-                  className="input-field"
-                  placeholder="e.g. Mirchi"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={closeForm} className="btn-secondary flex-1">
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary flex-1" disabled={saving}>
-                  {saving ? 'Saving...' : editing ? 'Update' : 'Save'}
-                </button>
-              </div>
-            </form>
+      <MDIModalWindow
+        open={showForm}
+        title={editing ? 'Edit Material' : 'Add Material'}
+        iconName="Package"
+        onClose={closeForm}
+      >
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="label">Material Name *</label>
+            <input
+              className="input-field"
+              placeholder="e.g. Mirchi"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              required
+              autoFocus
+            />
           </div>
-        </div>
-      )}
+          <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex gap-3 mt-2 z-10">
+            <button type="button" onClick={closeForm} className="btn-secondary flex-1">
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary flex-1" disabled={saving}>
+              {saving ? 'Saving...' : editing ? 'Update' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </MDIModalWindow>
 
       {loading ? (
         <div className="text-center py-20 text-primary-400">Loading materials...</div>

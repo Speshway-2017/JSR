@@ -19,15 +19,14 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { name, nameTelugu, mobile, schedule, address, handlingCharges, credit, debit, creditBalance } = req.body;
+    const { name, nameTelugu, mobile, schedule, address, handlingCharges, credit, debit } = req.body;
     if (!name?.trim() || !schedule) {
       return res.status(400).json({ message: 'Name and schedule are required' });
     }
 
-    const creditVal = Math.max(0, Number(credit !== undefined ? credit : creditBalance) || 0);
     const debitVal = Math.max(0, Number(debit) || 0);
-
-    const startingBalance = debitVal > 0 ? debitVal : creditVal;
+    const creditVal = Math.max(0, Number(credit) || 0);
+    const startingBalance = debitVal > 0 ? debitVal : (creditVal > 0 ? -creditVal : 0);
 
     const customer = await Customer.create({
       name: name.trim(),
@@ -36,14 +35,16 @@ router.post('/', async (req, res) => {
       schedule,
       address: address || '',
       handlingCharges: !!handlingCharges,
+      openingDebit: debitVal,
+      openingCredit: creditVal,
       creditBalance: startingBalance,
     });
 
-    if (startingBalance > 0) {
+    if (debitVal > 0 || creditVal > 0) {
       await Transaction.create({
         customer: customer._id,
-        type: 'customer_credit',
-        amount: startingBalance,
+        type: debitVal > 0 ? 'customer_credit' : 'customer_payment',
+        amount: debitVal > 0 ? debitVal : creditVal,
         description: debitVal > 0 ? `Opening debit — ${customer.name}` : `Opening credit — ${customer.name}`,
         balanceAfter: startingBalance,
       });
@@ -75,31 +76,64 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const { name, nameTelugu, mobile, schedule, address, handlingCharges, credit, debit, creditBalance } = req.body;
-    const updates = {};
-    if (name !== undefined) updates.name = name;
-    if (nameTelugu !== undefined) updates.nameTelugu = String(nameTelugu || '').trim();
-    if (mobile !== undefined) updates.mobile = mobile;
-    if (schedule !== undefined) updates.schedule = schedule;
-    if (address !== undefined) updates.address = address;
-    if (handlingCharges !== undefined) updates.handlingCharges = !!handlingCharges;
+    const { name, nameTelugu, mobile, schedule, address, handlingCharges, credit, debit } = req.body;
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
-    const creditVal = credit !== undefined && credit !== '' ? Number(credit) : undefined;
-    const debitVal = debit !== undefined && debit !== '' ? Number(debit) : undefined;
+    if (name !== undefined) customer.name = name.trim();
+    if (nameTelugu !== undefined) customer.nameTelugu = String(nameTelugu || '').trim();
+    if (mobile !== undefined) customer.mobile = mobile || '';
+    if (schedule !== undefined) customer.schedule = schedule;
+    if (address !== undefined) customer.address = address || '';
+    if (handlingCharges !== undefined) customer.handlingCharges = !!handlingCharges;
 
-    if (debitVal !== undefined && !Number.isNaN(debitVal) && debitVal > 0) {
-      updates.creditBalance = debitVal;
-    } else if (creditVal !== undefined && !Number.isNaN(creditVal)) {
-      updates.creditBalance = creditVal;
-    } else if (creditBalance !== undefined) {
-      updates.creditBalance = Number(creditBalance) || 0;
+    if (debit !== undefined || credit !== undefined) {
+      const newDebit = debit !== undefined && debit !== '' ? Math.max(0, Number(debit) || 0) : (customer.openingDebit || 0);
+      const newCredit = credit !== undefined && credit !== '' ? Math.max(0, Number(credit) || 0) : (customer.openingCredit || 0);
+
+      const oldNet = (customer.openingDebit || 0) - (customer.openingCredit || 0);
+      const newNet = newDebit - newCredit;
+      const diff = newNet - oldNet;
+
+      customer.openingDebit = newDebit;
+      customer.openingCredit = newCredit;
+      customer.creditBalance = Number(((customer.creditBalance || 0) + diff).toFixed(2));
+
+      let openTx = await Transaction.findOne({
+        customer: customer._id,
+        description: /^Opening (debit|credit)/i,
+      });
+
+      const newAmount = newDebit > 0 ? newDebit : newCredit;
+      if (newAmount > 0) {
+        const newType = newDebit > 0 ? 'customer_credit' : 'customer_payment';
+        const newDesc = newDebit > 0 ? `Opening debit — ${customer.name}` : `Opening credit — ${customer.name}`;
+        if (openTx) {
+          openTx.amount = newAmount;
+          openTx.type = newType;
+          openTx.description = newDesc;
+          await openTx.save();
+        } else {
+          await Transaction.create({
+            customer: customer._id,
+            type: newType,
+            amount: newAmount,
+            description: newDesc,
+            balanceAfter: customer.creditBalance,
+          });
+        }
+      } else if (openTx) {
+        await Transaction.findByIdAndDelete(openTx._id);
+      }
+    } else if (name !== undefined) {
+      await Transaction.updateMany(
+        { customer: customer._id, description: /^Opening (debit|credit)/i },
+        { description: (customer.openingDebit || 0) > 0 ? `Opening debit — ${customer.name}` : `Opening credit — ${customer.name}` }
+      );
     }
 
-    const customer = await Customer.findByIdAndUpdate(req.params.id, updates, {
-      new: true,
-      runValidators: true,
-    }).populate('schedule', 'name');
-    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    await customer.save();
+    await customer.populate('schedule', 'name');
     res.json(customer);
   } catch (error) {
     res.status(500).json({ message: error.message });

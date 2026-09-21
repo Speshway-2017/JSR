@@ -38,9 +38,10 @@ function chunkArray(arr, size) {
 
 export function buildNUpCellContent(summaryRow, teluguMap) {
   if (!summaryRow) return '';
-  const c = summaryRow.customer || {};
-  const nameEn = summaryRow.name || c.name || '—';
+  const c = summaryRow.customer || summaryRow.vendor || {};
+  const nameEn = summaryRow.name || c.name || (summaryRow.isPurchase ? 'Vendor' : '—');
   const nameTe = summaryRow.nameTelugu || c.nameTelugu || '';
+  const isPurchase = !!summaryRow.isPurchase;
 
   const opening = Number(
     summaryRow.opening != null
@@ -50,11 +51,13 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
       : 0
   );
 
-  const sales = summaryRow.sales || [];
+  const sales = summaryRow.sales || summaryRow.lines || [];
   const calculatedSalesSum = sales.reduce((sum, s) => sum + (Number(s.amount) || 0) + (Number(s.cooly) || 0), 0);
   const total = Number(
     summaryRow.totalSale != null
       ? summaryRow.totalSale
+      : summaryRow.totalAmount != null
+      ? summaryRow.totalAmount
       : summaryRow.salesTotal != null
       ? summaryRow.salesTotal
       : calculatedSalesSum
@@ -134,6 +137,7 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
   <div class="party">
     ${esc(nameEn)}
     ${nameTe ? `<span class="te">${esc(nameTe)}</span>` : ''}
+    ${isPurchase ? `<span style="display:block;font-size:10px;font-weight:normal;color:#333;">Purchase Bill · ${esc(formatDateShort(summaryRow.purchaseDate || summaryRow.date))}</span>` : ''}
   </div>
   <table class="lines">
     <thead>

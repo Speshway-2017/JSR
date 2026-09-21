@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Scale, Send } from 'lucide-react';
+import { ChevronDown, ChevronRight, Scale, Send, Printer } from 'lucide-react';
+import { openOutstandingPreview } from '../utils/reportPrint';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
@@ -120,6 +121,12 @@ export default function Outstanding({ path: windowPath }) {
     setCollapsedSchedules(nextMap);
   };
 
+  const handlePrint = () => {
+    if (!data) return;
+    const scheduleObj = schedules.find((s) => s._id === scheduleId);
+    openOutstandingPreview(data, groupedSchedules, date, scheduleObj ? scheduleObj.name : '');
+  };
+
   const handleSendWhatsAppRow = async (row) => {
     if (!row.mobile) {
       toast.error(`No mobile number registered for ${row.name}`);
@@ -201,6 +208,14 @@ export default function Outstanding({ path: windowPath }) {
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Print
+              </button>
               {groupedSchedules.length > 1 && (
                 <div className="flex items-center gap-2 text-xs font-medium">
                   <button

@@ -110,7 +110,7 @@ export default function Schedules() {
         iconName="Calendar"
         onClose={closeForm}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="label">Schedule Name *</label>
             <input
@@ -122,7 +122,7 @@ export default function Schedules() {
               autoFocus
             />
           </div>
-          <div className="flex gap-3 pt-1">
+          <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex gap-3 mt-2 z-10">
             <button type="button" onClick={closeForm} className="btn-secondary flex-1">
               Cancel
             </button>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Printer, Send, FileText, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Search } from 'lucide-react';
+import { Printer, Send, FileText, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Search, Eye } from 'lucide-react';
+import { openPurchaseBillPreview } from '../utils/reportPrint';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
@@ -33,6 +34,7 @@ export default function BillPrint({ path: windowPath }) {
 
   const [startDate, setStartDate] = useState(dateParam);
   const [endDate, setEndDate] = useState(dateParam);
+  const [billType, setBillType] = useState(() => effectiveSearchParams.get('type') === 'purchase' ? 'purchase' : 'customer');
 
   /* Track whether the windowPath change was triggered internally by our own
      updateWindowPath call (i.e. the user changed the From date), vs externally
@@ -42,9 +44,9 @@ export default function BillPrint({ path: windowPath }) {
   useEffect(() => {
     if (startDate && typeof updateWindowPath === 'function') {
       isInternalPathUpdate.current = true;
-      updateWindowPath('/bill-print', `/bill-print?date=${startDate}`);
+      updateWindowPath('/bill-print', `/bill-print?date=${startDate}&type=${billType}`);
     }
-  }, [startDate, updateWindowPath]);
+  }, [startDate, billType, updateWindowPath]);
 
   const [filterCustomer, setFilterCustomer] = useState(effectiveSearchParams.get('customer') || '');
   const [filterVendor, setFilterVendor] = useState(effectiveSearchParams.get('vendor') || '');
@@ -61,6 +63,7 @@ export default function BillPrint({ path: windowPath }) {
     }
 
     const pDate = effectiveSearchParams.get('date');
+    const pType = effectiveSearchParams.get('type');
     const pCust = effectiveSearchParams.get('customer');
     const pVend = effectiveSearchParams.get('vendor');
     const pItem = effectiveSearchParams.get('item');
@@ -69,6 +72,7 @@ export default function BillPrint({ path: windowPath }) {
       setStartDate(pDate);
       setEndDate(pDate);
     }
+    if (pType === 'purchase' || pType === 'customer') setBillType(pType);
     if (pCust !== null && pCust !== undefined) setFilterCustomer(pCust);
     if (pVend !== null && pVend !== undefined) setFilterVendor(pVend);
     if (pItem !== null && pItem !== undefined) setFilterItem(pItem);
@@ -107,12 +111,62 @@ export default function BillPrint({ path: windowPath }) {
     }
     setLoading(true);
     try {
-      const res = await api.get('/reports/bills', {
-        params: { startDate, endDate },
-      });
-      setData(res.data);
-      if (res.data?.statements) {
-        setSelectedCids(new Set(res.data.statements.map((s) => String(s.customerId))));
+      if (billType === 'purchase') {
+        const res = await api.get('/purchases', {
+          params: { startDate, endDate, sort: 'desc' },
+        });
+        const purchaseStatements = (res.data || []).map((p) => {
+          const v = p.vendor && typeof p.vendor === 'object' ? p.vendor : {};
+          const totalAmount = Number(p.totalAmount || 0);
+          const opening = Number(v.creditBalance != null ? v.creditBalance - totalAmount : 0);
+          const closing = Number(v.creditBalance != null ? v.creditBalance : totalAmount);
+
+          return {
+            _id: String(p._id),
+            customerId: String(p._id),
+            purchaseId: String(p._id),
+            isPurchase: true,
+            partyType: 'vendor',
+            name: v.name || 'Vendor',
+            nameTelugu: v.nameTelugu || '',
+            mobile: v.mobile || '',
+            city: v.city || '',
+            vendor: v,
+            vendorId: v._id ? String(v._id) : '',
+            date: p.purchaseDate || p.createdAt,
+            purchaseDate: p.purchaseDate || p.createdAt,
+            lines: p.lines || [],
+            sales: (p.lines || []).map((l) => ({
+              date: p.purchaseDate || p.createdAt,
+              material: l.materialName || 'Item',
+              materialId: l.material ? String(l.material) : '',
+              bags: l.purchaseType === 'by_box' ? (l.boxes || l.bags || 0) : (l.bags || 0),
+              weight: Number(l.totalKg || 0),
+              rate: Number(l.ratePerKg || 0),
+              ratePerKg: Number(l.ratePerKg || 0),
+              amount: Number(l.amount || 0),
+              purchaseType: l.purchaseType,
+            })),
+            totalBags: p.totalBags || 0,
+            totalWeight: p.totalWeight || 0,
+            totalSale: totalAmount,
+            totalAmount,
+            opening,
+            closing,
+            notes: p.notes || '',
+            rawPurchase: p,
+          };
+        });
+        setData({ startDate, endDate, statements: purchaseStatements });
+        setSelectedCids(new Set(purchaseStatements.map((s) => String(s.customerId))));
+      } else {
+        const res = await api.get('/reports/bills', {
+          params: { startDate, endDate },
+        });
+        setData(res.data);
+        if (res.data?.statements) {
+          setSelectedCids(new Set(res.data.statements.map((s) => String(s.customerId))));
+        }
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to load bills');
@@ -120,7 +174,7 @@ export default function BillPrint({ path: windowPath }) {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, billType]);
 
   useEffect(() => {
     fetchBills();
@@ -157,14 +211,25 @@ export default function BillPrint({ path: windowPath }) {
     if (!data?.statements) return [];
     const map = new Map();
     for (const st of data.statements) {
-      for (const s of st.sales || []) {
-        const vId = s.vendorId ? String(s.vendorId) : '';
-        const vName = s.vendorName || '';
+      if (st.isPurchase) {
+        const vId = st.vendor?._id ? String(st.vendor._id) : String(st.vendorId || '');
+        const vName = st.vendor?.name || st.name || '';
         if (vId && !map.has(vId)) {
           map.set(vId, {
             _id: vId,
             name: vName || 'Vendor',
           });
+        }
+      } else {
+        for (const s of st.sales || []) {
+          const vId = s.vendorId ? String(s.vendorId) : '';
+          const vName = s.vendorName || '';
+          if (vId && !map.has(vId)) {
+            map.set(vId, {
+              _id: vId,
+              name: vName || 'Vendor',
+            });
+          }
         }
       }
     }
@@ -237,15 +302,20 @@ export default function BillPrint({ path: windowPath }) {
     if (!data?.statements) return [];
 
     let list = data.statements.filter((st) => {
-      if (filterCustomer) {
+      if (filterCustomer && !st.isPurchase) {
         const scid = String(st.customerId || '');
         if (scid !== filterCustomer && st.name !== filterCustomer) return false;
       }
       if (filterVendor) {
-        const hasVendor = (st.sales || []).some(
-          (s) => String(s.vendorId || '') === filterVendor || s.vendorName === filterVendor
-        );
-        if (!hasVendor) return false;
+        if (st.isPurchase) {
+          const vId = String(st.vendor?._id || st.vendorId || '');
+          if (vId !== filterVendor && st.name !== filterVendor) return false;
+        } else {
+          const hasVendor = (st.sales || []).some(
+            (s) => String(s.vendorId || '') === filterVendor || s.vendorName === filterVendor
+          );
+          if (!hasVendor) return false;
+        }
       }
       if (filterItem) {
         const hasItem = (st.sales || []).some(
@@ -255,7 +325,7 @@ export default function BillPrint({ path: windowPath }) {
         );
         if (!hasItem) return false;
       }
-      if (filterSchedule) {
+      if (filterSchedule && !st.isPurchase) {
         const stSchedId = String(st.scheduleId || '');
         const stSchedName = String(st.scheduleName || '').trim().toLowerCase();
         const target = String(filterSchedule || '').trim().toLowerCase();
@@ -272,7 +342,9 @@ export default function BillPrint({ path: windowPath }) {
         const custMatch =
           matchesPrefix(st.name, q) ||
           matchesPrefix(st.nameTelugu, q) ||
-          matchesPrefix(st.scheduleName, q);
+          matchesPrefix(st.scheduleName, q) ||
+          matchesPrefix(st.city, q) ||
+          matchesPrefix(st.mobile, q);
         const salesMatch = (st.sales || []).some(
           (s) =>
             matchesPrefix(s.material, q) ||
@@ -367,11 +439,23 @@ export default function BillPrint({ path: windowPath }) {
     setPrinting(true);
     try {
       for (const st of selectedStatements) {
+        if (st.isPurchase) {
+          let phone = st.mobile || st.vendor?.mobile || '';
+          if (!phone) {
+            phone = window.prompt(`Please enter 10-digit WhatsApp phone number for vendor "${st.name}":`, '');
+            if (!phone) {
+              toast.error(`Skipped ${st.name} (no phone number provided)`);
+              continue;
+            }
+          }
+          const cleanPhone = phone.replace(/\D/g, '');
+          const text = `*JSR AGRI TRADES - Purchase Bill*\nVendor: ${st.name}\nDate: ${formatDateOnly(st.date)}\nTotal Bags: ${st.totalBags}\nTotal Weight: ${Number(st.totalWeight).toFixed(1)} kg\n*Total Payable: ${formatCurrency(st.totalAmount)}*\nThank you! 🙏`;
+          window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`, '_blank');
+          continue;
+        }
+
         const cid = String(st.customerId);
-        const matchedCust = customers.find(
-          (c) => String(c._id) === cid || c.name.toLowerCase() === String(st.name || '').trim().toLowerCase()
-        );
-        let phone = matchedCust?.mobile || st.mobile || '';
+        let phone = st.mobile || '';
 
         if (!phone) {
           phone = window.prompt(`Please enter 10-digit WhatsApp phone number for customer "${st.name}":`, '');
@@ -432,11 +516,53 @@ export default function BillPrint({ path: windowPath }) {
         <div>
           <h1 className="page-title">Bill Print</h1>
           <p className="text-primary-400 text-sm mt-0.5">
-            Filter, preview, and print full customer ledger statements in 2, 4, or 6 per page layout
+            {billType === 'purchase'
+              ? 'Filter, preview, and print vendor purchase bills in 2, 4, or 6 per page layout'
+              : 'Filter, preview, and print full customer ledger statements in 2, 4, or 6 per page layout'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Bill Type Switcher */}
+          <div className="flex items-center gap-1 bg-primary-100/80 p-1 rounded-xl border border-primary-200 shadow-inner">
+            <button
+              type="button"
+              onClick={() => {
+                setBillType('customer');
+                setFilterCustomer('');
+                setFilterVendor('');
+                setFilterItem('');
+                setFilterSchedule('');
+                setSearchQuery('');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                billType === 'customer'
+                  ? 'bg-primary-800 text-white shadow-sm'
+                  : 'text-primary-600 hover:text-primary-900 hover:bg-primary-200/50'
+              }`}
+            >
+              Customer Bills
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBillType('purchase');
+                setFilterCustomer('');
+                setFilterVendor('');
+                setFilterItem('');
+                setFilterSchedule('');
+                setSearchQuery('');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                billType === 'purchase'
+                  ? 'bg-primary-800 text-white shadow-sm'
+                  : 'text-primary-600 hover:text-primary-900 hover:bg-primary-200/50'
+              }`}
+            >
+              Purchase Bills
+            </button>
+          </div>
+
           {isOnline && (
             <button
               type="button"
@@ -480,18 +606,20 @@ export default function BillPrint({ path: windowPath }) {
             />
           </div>
 
-          <select
-            className="input-field !h-10 !py-0 w-full sm:w-auto min-w-[140px] text-sm flex-1 sm:flex-initial"
-            value={filterCustomer}
-            onChange={(e) => setFilterCustomer(e.target.value)}
-          >
-            <option value="">All customers ({availableCustomers.length})</option>
-            {availableCustomers.map((c) => (
-              <option key={c._id} value={c._id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          {billType === 'customer' && (
+            <select
+              className="input-field !h-10 !py-0 w-full sm:w-auto min-w-[140px] text-sm flex-1 sm:flex-initial"
+              value={filterCustomer}
+              onChange={(e) => setFilterCustomer(e.target.value)}
+            >
+              <option value="">All customers ({availableCustomers.length})</option>
+              {availableCustomers.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           <select
             className="input-field !h-10 !py-0 w-full sm:w-auto min-w-[130px] text-sm flex-1 sm:flex-initial"
@@ -519,24 +647,26 @@ export default function BillPrint({ path: windowPath }) {
             ))}
           </select>
 
-          <select
-            className="input-field !h-10 !py-0 w-full sm:w-44 text-sm"
-            value={filterSchedule}
-            onChange={(e) => setFilterSchedule(e.target.value)}
-          >
-            <option value="">All schedules ({availableSchedules.length})</option>
-            {availableSchedules.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          {billType === 'customer' && (
+            <select
+              className="input-field !h-10 !py-0 w-full sm:w-44 text-sm"
+              value={filterSchedule}
+              onChange={(e) => setFilterSchedule(e.target.value)}
+            >
+              <option value="">All schedules ({availableSchedules.length})</option>
+              {availableSchedules.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="w-4 h-4 text-primary-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search customer, vendor, item, schedule..."
+              placeholder={billType === 'purchase' ? "Search vendor, item..." : "Search customer, vendor, item, schedule..."}
               className="input-field !h-10 !py-1 pl-9 pr-7 text-sm w-full"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -609,13 +739,13 @@ export default function BillPrint({ path: windowPath }) {
                   <tr className="text-left text-primary-600">
                     <th className="w-7 px-2 py-2"></th>
                     <th className="px-2 py-2 font-semibold">
-                      <SortHeader column="name" label="Customer" />
+                      <SortHeader column="name" label={billType === 'purchase' ? 'Vendor' : 'Customer'} />
                     </th>
                     <th className="px-2 py-2 font-semibold text-right">
-                      <SortHeader column="totalSale" label="Sale" />
+                      <SortHeader column="totalSale" label={billType === 'purchase' ? 'Amount' : 'Sale'} />
                     </th>
                     <th className="px-2 py-2 font-semibold text-right">
-                      <SortHeader column="closing" label="Closing" />
+                      <SortHeader column="closing" label={billType === 'purchase' ? 'Balance' : 'Closing'} />
                     </th>
                   </tr>
                 </thead>
@@ -642,11 +772,15 @@ export default function BillPrint({ path: windowPath }) {
                         </td>
                         <td className="px-2 py-1.5 text-primary-800">
                           <div className="font-semibold text-xs leading-snug truncate max-w-[110px]">{st.name}</div>
-                          {st.nameTelugu || st.scheduleName ? (
+                          {st.isPurchase ? (
+                            <span className="text-[11px] text-primary-400 truncate block">
+                              {formatDateOnly(st.date)}{st.totalBags ? ` · ${st.totalBags} bags` : ''}
+                            </span>
+                          ) : (st.nameTelugu || st.scheduleName ? (
                             <span className="text-[11px] text-primary-400 truncate block">
                               {[st.nameTelugu, st.scheduleName ? `(${st.scheduleName})` : ''].filter(Boolean).join(' ')}
                             </span>
-                          ) : null}
+                          ) : null)}
                         </td>
                         <td className="px-2 py-1.5 text-right text-primary-700 font-semibold tabular-nums text-xs">
                           {formatCurrency(st.totalSale)}
@@ -667,7 +801,7 @@ export default function BillPrint({ path: windowPath }) {
         <div className="xl:col-span-9 flex flex-col card !p-0 overflow-hidden min-h-[300px] flex-1">
           <div className="px-4 py-2.5 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between flex-wrap gap-2">
             <span className="font-bold text-primary-800 text-sm">
-              Live Preview ({selectedStatements.length} Bills · {perPage} per page layout)
+              Live Preview ({selectedStatements.length} {billType === 'purchase' ? 'Purchase Bills' : 'Bills'} · {perPage} per page layout)
             </span>
 
             {/* Prominent Layout Toggle Buttons */}
@@ -695,7 +829,9 @@ export default function BillPrint({ path: windowPath }) {
               <div className="text-center py-24 text-primary-400">
                 <FileText className="w-12 h-12 text-primary-300 mx-auto mb-2" />
                 <p className="font-medium text-primary-600">No bills selected for preview</p>
-                <p className="text-xs mt-1 text-primary-400">Select customers on the left to see live preview</p>
+                <p className="text-xs mt-1 text-primary-400">
+                  Select {billType === 'purchase' ? 'purchases' : 'customers'} on the left to see live preview
+                </p>
               </div>
             ) : (
               <div className="grid gap-4 grid-cols-1 xl:grid-cols-2">
@@ -704,13 +840,29 @@ export default function BillPrint({ path: windowPath }) {
                     key={st.customerId}
                     className="card !p-3.5 border border-primary-200 shadow-sm bg-white text-xs space-y-2.5 overflow-hidden"
                   >
-                    <div className="text-center border-b border-primary-100 pb-2">
-                      <p className="font-bold text-primary-900 text-base">{st.name}</p>
-                      {st.nameTelugu || st.scheduleName ? (
-                        <p className="text-xs text-primary-500 font-medium">
-                          {[st.nameTelugu, st.scheduleName ? `· ${st.scheduleName}` : ''].filter(Boolean).join(' ')}
-                        </p>
-                      ) : null}
+                    <div className="text-center border-b border-primary-100 pb-2 flex items-center justify-between gap-2">
+                      <div className="flex-1 text-center">
+                        <p className="font-bold text-primary-900 text-base">{st.name}</p>
+                        {st.isPurchase ? (
+                          <p className="text-xs text-primary-500 font-medium">
+                            {[st.nameTelugu, `Purchase Bill · ${formatDateOnly(st.date)}`].filter(Boolean).join(' · ')}
+                          </p>
+                        ) : (st.nameTelugu || st.scheduleName ? (
+                          <p className="text-xs text-primary-500 font-medium">
+                            {[st.nameTelugu, st.scheduleName ? `· ${st.scheduleName}` : ''].filter(Boolean).join(' ')}
+                          </p>
+                        ) : null)}
+                      </div>
+                      {st.isPurchase && (
+                        <button
+                          type="button"
+                          onClick={() => openPurchaseBillPreview(st.rawPurchase || st)}
+                          className="btn-secondary !py-1 !px-2.5 !text-xs flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
+                          title="Open full page purchase bill"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Full View
+                        </button>
+                      )}
                     </div>
 
                     <div className="overflow-x-auto">

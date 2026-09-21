@@ -75,7 +75,7 @@ export default function Vendors() {
         onClose={() => setShowForm(false)}
         maxWidth="max-w-lg"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="label">Vendor Name *</label>
             <input
@@ -86,38 +86,40 @@ export default function Vendors() {
               required
             />
           </div>
-          <div>
-            <label className="label">Mobile Number *</label>
-            <input
-              className="input-field"
-              placeholder="e.g. 9876543210"
-              type="tel"
-              value={form.mobile}
-              onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <label className="label">City *</label>
-            <input
-              className="input-field"
-              placeholder="e.g. Hyderabad"
-              value={form.city}
-              onChange={(e) => setForm({ ...form, city: e.target.value })}
-              required
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="label">Mobile Number *</label>
+              <input
+                className="input-field"
+                placeholder="e.g. 9876543210"
+                type="tel"
+                value={form.mobile}
+                onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="label">City *</label>
+              <input
+                className="input-field"
+                placeholder="e.g. Hyderabad"
+                value={form.city}
+                onChange={(e) => setForm({ ...form, city: e.target.value })}
+                required
+              />
+            </div>
           </div>
           <div>
             <label className="label">Address *</label>
             <textarea
-              className="input-field min-h-[80px] resize-none"
+              className="input-field min-h-[50px] sm:min-h-[64px] resize-none"
               placeholder="Full address"
               value={form.address}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
               required
             />
           </div>
-          <div className="flex gap-3 pt-2">
+          <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex gap-3 mt-2 z-10">
             <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">
               Cancel
             </button>

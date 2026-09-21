@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Send } from 'lucide-react';
+import { BookOpen, Send, Printer } from 'lucide-react';
+import { openLedgerPreview } from '../utils/reportPrint';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
@@ -147,15 +148,25 @@ export default function Ledger() {
 
   const openEntry = (row) => {
     const d = new Date(row.date).toISOString().slice(0, 10);
-    const params = new URLSearchParams({ date: d });
-    if (partyType === 'vendor') params.set('vendorId', partyId);
-    else params.set('customerId', partyId);
-
     if (row.saleId) {
-      params.set('saleId', row.saleId);
-      params.set('highlightSaleId', row.saleId);
+      const params = new URLSearchParams({
+        date: d,
+        saleId: row.saleId,
+        highlightSaleId: row.saleId,
+        t: Date.now().toString(),
+      });
+      openWindow({ path: `/sell?${params.toString()}`, title: 'Sales Entry' });
+    } else if (row.kind === 'payment' || row.paid > 0 || row.less > 0) {
+      const params = new URLSearchParams({
+        date: d,
+      });
+      openWindow({ path: `/cash-entry?${params.toString()}`, title: 'Cash Entry' });
     }
-    openWindow({ path: `/sell?${params.toString()}`, title: 'Sales Entry' });
+  };
+
+  const handlePrint = () => {
+    if (!data) return;
+    openLedgerPreview(data, selected?.mobile);
   };
 
   const handleSendWhatsApp = async () => {
@@ -324,17 +335,27 @@ export default function Ledger() {
                 {formatDateOnly(data.startDate)} — {formatDateOnly(data.endDate)}
               </p>
             </div>
-            {isOnline && (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={handleSendWhatsApp}
-                disabled={sendingWa}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                onClick={handlePrint}
+                className="btn-primary !py-2 !px-3.5 !text-xs flex items-center gap-1.5 cursor-pointer shrink-0"
               >
-                <Send className="w-4 h-4" />
-                {sendingWa ? 'Sending...' : 'Send to WhatsApp'}
+                <Printer className="w-4 h-4" />
+                Print
               </button>
-            )}
+              {isOnline && (
+                <button
+                  type="button"
+                  onClick={handleSendWhatsApp}
+                  disabled={sendingWa}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  <Send className="w-4 h-4" />
+                  {sendingWa ? 'Sending...' : 'Send to WhatsApp'}
+                </button>
+              )}
+            </div>
           </div>
           <div className="px-4 py-2.5 bg-primary-50/80 border-b border-primary-100 flex items-center justify-between gap-3 text-sm">
             <span className="text-primary-500">Opening</span>

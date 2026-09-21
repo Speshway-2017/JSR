@@ -293,21 +293,27 @@ router.get('/report-2', async (req, res) => {
       }
     }
 
-    const columns = [...vendorsMap.values()].map((vend) => ({
-      vendorId: vend.vendorId,
-      vendorName: vend.vendorName,
-      vendorNameTelugu: vend.vendorNameTelugu,
-      bagCount: vend.bagCount,
-      totalKg: Number(vend.totalKg.toFixed(1)),
-      materials: [...vend.materialsMap.values()].map((mat) => ({
-        materialId: mat.materialId,
-        materialName: mat.materialName,
-        materialNameTelugu: mat.materialNameTelugu,
-        bagCount: mat.bagCount,
-        totalKg: Number(mat.totalKg.toFixed(1)),
-        entries: mat.entries,
-      })),
-    }));
+    const columns = [...vendorsMap.values()]
+      .sort((a, b) => String(a.vendorName || '').localeCompare(String(b.vendorName || ''), 'en', { sensitivity: 'base', numeric: true }))
+      .map((vend) => ({
+        vendorId: vend.vendorId,
+        vendorName: vend.vendorName,
+        vendorNameTelugu: vend.vendorNameTelugu,
+        bagCount: vend.bagCount,
+        totalKg: Number(vend.totalKg.toFixed(1)),
+        materials: [...vend.materialsMap.values()]
+          .sort((a, b) => String(a.materialName || '').localeCompare(String(b.materialName || ''), 'en', { sensitivity: 'base', numeric: true }))
+          .map((mat) => ({
+            materialId: mat.materialId,
+            materialName: mat.materialName,
+            materialNameTelugu: mat.materialNameTelugu,
+            bagCount: mat.bagCount,
+            totalKg: Number(mat.totalKg.toFixed(1)),
+            entries: mat.entries
+              .slice()
+              .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base', numeric: true })),
+          })),
+      }));
 
     const totalBags = columns.reduce((acc, c) => acc + (c.bagCount || 0), 0);
     const totalWeight = Number(columns.reduce((acc, c) => acc + (c.totalKg || 0), 0).toFixed(1));
@@ -502,6 +508,7 @@ router.post('/', async (req, res) => {
       amount: saleTotal,
       description: `Sale${isPaidBool ? ' (Paid Direct)' : ''} - ${processedLines.map((l) => l.materialName).join(', ')}`,
       sale: sale._id,
+      entryDate: when,
       balanceAfter: customer.creditBalance,
     });
 
@@ -513,6 +520,7 @@ router.post('/', async (req, res) => {
         paymentType: paymentTypeVal,
         description: `Direct Payment for Sale - ${processedLines.map((l) => l.materialName).join(', ')}`,
         sale: sale._id,
+        entryDate: when,
         source: 'Direct Sale Payment',
         balanceAfter: customer.creditBalance,
       });
@@ -524,6 +532,7 @@ router.post('/', async (req, res) => {
       amount: materialsTotal,
       description: `Sale to ${customer.name} - ${processedLines.map((l) => l.materialName).join(', ')}`,
       sale: sale._id,
+      entryDate: when,
       balanceAfter: vendor.creditBalance,
     });
 
@@ -633,6 +642,12 @@ router.put('/:id', async (req, res) => {
     existing.isPaid = nowPaid;
     existing.paymentType = paymentTypeVal;
     existing.paidAmount = nowPaid ? saleTotal : 0;
+    if (date) {
+      const parsedDate = new Date(date);
+      if (!isNaN(parsedDate.getTime())) {
+        existing.createdAt = parsedDate;
+      }
+    }
     await existing.save();
 
     if (oldCustomer) {
@@ -683,6 +698,7 @@ router.put('/:id', async (req, res) => {
           customer: customer._id,
           amount: saleTotal,
           description: desc,
+          entryDate: existing.createdAt,
           balanceAfter: refreshedCustomer?.creditBalance || 0,
         },
       }
@@ -694,6 +710,7 @@ router.put('/:id', async (req, res) => {
         existingPayTx.customer = customer._id;
         existingPayTx.amount = saleTotal;
         existingPayTx.paymentType = paymentTypeVal;
+        existingPayTx.entryDate = existing.createdAt;
         existingPayTx.balanceAfter = refreshedCustomer?.creditBalance || 0;
         await existingPayTx.save();
       } else {
@@ -704,6 +721,7 @@ router.put('/:id', async (req, res) => {
           paymentType: paymentTypeVal,
           description: `Direct Payment for Sale - ${processedLines.map((l) => l.materialName).join(', ')}`,
           sale: existing._id,
+          entryDate: existing.createdAt,
           source: 'Direct Sale Payment',
           balanceAfter: refreshedCustomer?.creditBalance || 0,
         });
@@ -720,6 +738,7 @@ router.put('/:id', async (req, res) => {
           vendor: vendor._id,
           amount: materialsTotal,
           description: `Sale to ${customer.name} - ${processedLines.map((l) => l.materialName).join(', ')}`,
+          entryDate: existing.createdAt,
           balanceAfter: vendorNow?.creditBalance || 0,
         },
       }
@@ -769,6 +788,7 @@ router.patch('/:id/toggle-paid', async (req, res) => {
         paymentType: paymentTypeVal,
         description: `Direct Payment for Sale #${sale.serialNo || ''}`,
         sale: sale._id,
+        entryDate: sale.createdAt,
         source: 'Direct Sale Payment',
         balanceAfter: customer.creditBalance,
       });

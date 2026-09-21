@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { FileBarChart, Download, Eye, X, Scale } from 'lucide-react';
+import { FileBarChart, Download, Eye, X, Scale, Printer } from 'lucide-react';
+import { openSalesChecklistPreview } from '../utils/reportPrint';
 import * as XLSX from 'xlsx';
 import api from '../api';
 import { formatCurrency, formatDate } from '../utils/format';
 import { useDataRestored } from '../utils/useDataRestored';
+import MDIModalWindow from '../components/mdi/MDIModalWindow';
 
 function formatWeight(kg) {
   return `${Number(kg).toFixed(1)} kg`;
@@ -128,6 +130,21 @@ export default function SalesReport() {
     XLSX.writeFile(wb, `sales_checklist_${startDate}_to_${endDate}.xlsx`);
   };
 
+  const handlePrint = () => {
+    if (!rows.length) return;
+    const custObj = customers.find((c) => c._id === customerId);
+    const matObj = materials.find((m) => m._id === materialId);
+    openSalesChecklistPreview({
+      rows,
+      totals: summary,
+      startDate,
+      endDate,
+      filterCustomer: custObj?.name || '',
+      filterItem: matObj?.name || '',
+      filterRate: rate || '',
+    });
+  };
+
   const dateError = startDate > endDate;
   const hasRows = !loading && !dateError && rows.length > 0;
 
@@ -140,14 +157,24 @@ export default function SalesReport() {
             Filter by name, item, or rate
           </p>
         </div>
-        <button
-          type="button"
-          onClick={exportExcel}
-          disabled={!rows.length}
-          className="btn-primary !py-2 !px-4 !text-sm disabled:opacity-50"
-        >
-          <Download className="w-4 h-4" /> Export Excel
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handlePrint}
+            disabled={!rows.length}
+            className="btn-primary !py-2 !px-4 !text-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+          >
+            <Printer className="w-4 h-4" /> Print
+          </button>
+          <button
+            type="button"
+            onClick={exportExcel}
+            disabled={!rows.length}
+            className="btn-primary !py-2 !px-4 !text-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+          >
+            <Download className="w-4 h-4" /> Export Excel
+          </button>
+        </div>
       </div>
 
       <div className="card !p-3 sm:!p-4">
@@ -344,77 +371,62 @@ export default function SalesReport() {
         )}
       </div>
 
-      {selectedBagRecord && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200"
-          onClick={() => setSelectedBagRecord(null)}
-        >
-          <div
-            className="bg-surface rounded-2xl border border-primary-200 shadow-card max-w-md w-full p-5 space-y-4 animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-primary-100 pb-3">
-              <div>
-                <h3 className="font-bold text-primary-800 text-base flex items-center gap-2">
-                  <Scale className="w-5 h-5 text-primary-600" /> Individual Bag Weights
-                </h3>
-                <p className="text-xs text-primary-500 mt-0.5">
-                  {selectedBagRecord.customerName} · <span className="font-semibold text-primary-700">{selectedBagRecord.materialName}</span>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedBagRecord(null)}
-                className="p-1 text-primary-400 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <MDIModalWindow
+        open={!!selectedBagRecord}
+        title="Individual Bag Weights"
+        iconName="Scale"
+        onClose={() => setSelectedBagRecord(null)}
+      >
+        {selectedBagRecord && (
+          <div className="space-y-3">
+            <p className="text-xs text-primary-500">
+              {selectedBagRecord.customerName} · <span className="font-semibold text-primary-700">{selectedBagRecord.materialName}</span>
+            </p>
 
-            <div className="grid grid-cols-3 gap-2 bg-primary-50/70 p-3 rounded-xl border border-primary-100 text-center text-xs">
+            <div className="grid grid-cols-3 gap-2 bg-primary-50/70 p-2.5 rounded-xl border border-primary-100 text-center text-xs">
               <div>
-                <span className="block text-primary-400 text-[11px]">Bags</span>
+                <span className="block text-primary-400 text-[10px]">Bags</span>
                 <span className="font-semibold text-primary-700 text-sm">{selectedBagRecord.bagCount}</span>
               </div>
               <div>
-                <span className="block text-primary-400 text-[11px]">Total Weight</span>
+                <span className="block text-primary-400 text-[10px]">Total Weight</span>
                 <span className="font-semibold text-primary-700 text-sm">{formatWeight(selectedBagRecord.totalWeight)}</span>
               </div>
               <div>
-                <span className="block text-primary-400 text-[11px]">Rate</span>
+                <span className="block text-primary-400 text-[10px]">Rate</span>
                 <span className="font-semibold text-primary-700 text-sm">₹{selectedBagRecord.ratePerKg}</span>
               </div>
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-primary-600 mb-2">
+              <p className="text-xs font-semibold text-primary-600 mb-1.5">
                 Bag Weight Breakdown ({selectedBagRecord.bags?.length || 0} bags)
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto p-1 bg-primary-50/30 rounded-xl border border-primary-100">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto p-1 bg-primary-50/30 rounded-xl border border-primary-100">
                 {selectedBagRecord.bags?.map((w, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between px-3 py-2 bg-surface border border-primary-100 rounded-lg shadow-xs text-xs"
+                    className="flex items-center justify-between px-2.5 py-1.5 bg-surface border border-primary-100 rounded-lg shadow-xs text-xs"
                   >
-                    <span className="text-primary-400 font-medium">Bag #{idx + 1}</span>
+                    <span className="text-primary-400 font-medium text-[11px]">Bag #{idx + 1}</span>
                     <span className="font-bold text-primary-800 tabular-nums">{w} kg</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex justify-end mt-2 z-10">
               <button
                 type="button"
                 onClick={() => setSelectedBagRecord(null)}
-                className="btn-secondary !py-1.5 !px-4 text-xs font-semibold"
+                className="btn-secondary !py-1.5 !px-5 text-xs font-semibold"
               >
                 Close
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </MDIModalWindow>
     </div>
   );
 }

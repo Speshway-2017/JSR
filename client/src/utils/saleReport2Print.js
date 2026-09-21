@@ -31,7 +31,9 @@ function fmtRate(n) {
 }
 
 export function saleReport2InnerHtml(data) {
-  const columns = data?.columns || [];
+  const columns = (data?.columns || [])
+    .slice()
+    .sort((a, b) => String(a.vendorName || '').localeCompare(String(b.vendorName || ''), 'en', { sensitivity: 'base', numeric: true }));
   if (!columns.length) {
     return `<div class="sheet"><p class="empty">No sales for this date</p></div>`;
   }
@@ -79,7 +81,11 @@ export function saleReport2InnerHtml(data) {
           const vendTitle = esc(vend.vendorName);
           const vendTe = vend.vendorNameTelugu ? `<div class="te">${esc(vend.vendorNameTelugu)}</div>` : '';
 
-          const matBlocks = (vend.materials || [])
+          const sortedMaterials = (vend.materials || [])
+            .slice()
+            .sort((a, b) => String(a.materialName || '').localeCompare(String(b.materialName || ''), 'en', { sensitivity: 'base', numeric: true }));
+
+          const matBlocks = sortedMaterials
             .map((mat) => {
               const matTitle = esc(mat.materialName);
               const matTe = mat.materialNameTelugu ? `<span class="mat-te"> (${esc(mat.materialNameTelugu)})</span>` : '';

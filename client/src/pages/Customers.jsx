@@ -65,8 +65,8 @@ export default function Customers() {
       nameTelugu: c.nameTelugu || '',
       mobile: c.mobile || '',
       schedule: c.schedule?._id || c.schedule || '',
-      credit: c.creditBalance > 0 ? String(c.creditBalance) : (c.creditBalance === 0 ? '0' : ''),
-      debit: c.creditBalance < 0 ? String(Math.abs(c.creditBalance)) : '',
+      debit: c.openingDebit != null && c.openingDebit > 0 ? String(c.openingDebit) : (c.openingDebit === 0 && !c.openingCredit ? '0' : ''),
+      credit: c.openingCredit != null && c.openingCredit > 0 ? String(c.openingCredit) : '',
       handlingCharges: !!c.handlingCharges,
     });
     setShowForm(true);
@@ -174,26 +174,29 @@ export default function Customers() {
         title={editing ? 'Edit Customer' : 'Add Customer'}
         iconName="Users"
         onClose={closeForm}
+        maxWidth="max-w-lg"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="label">Name *</label>
-            <input
-              className="input-field"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              required
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="label">Phone</label>
-            <input
-              className="input-field"
-              type="tel"
-              value={form.mobile}
-              onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-            />
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="label">Name *</label>
+              <input
+                className="input-field"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="label">Phone</label>
+              <input
+                className="input-field"
+                type="tel"
+                value={form.mobile}
+                onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+              />
+            </div>
           </div>
           <div>
             <label className="label">Schedule *</label>
@@ -216,26 +219,9 @@ export default function Customers() {
               </p>
             )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="label">Credit</label>
-              <input
-                className="input-field"
-                type="text"
-                inputMode="decimal"
-                placeholder="0"
-                value={form.credit}
-                onChange={(e) => {
-                  const raw = e.target.value.replace(/[^\d.]/g, '');
-                  setForm({ ...form, credit: raw, debit: raw ? '' : form.debit });
-                }}
-              />
-              <p className="text-xs text-primary-400 mt-1">
-                If entered, this becomes the customer’s credit balance.
-              </p>
-            </div>
-            <div>
-              <label className="label">Debit</label>
+              <label className="label">Debit (Opening)</label>
               <input
                 className="input-field"
                 type="text"
@@ -247,8 +233,25 @@ export default function Customers() {
                   setForm({ ...form, debit: raw, credit: raw ? '' : form.credit });
                 }}
               />
-              <p className="text-xs text-primary-400 mt-1">
-                If entered, this becomes the customer’s debit balance.
+              <p className="text-[10px] text-primary-400 mt-0.5">
+                Customer owes (Dr)
+              </p>
+            </div>
+            <div>
+              <label className="label">Credit (Opening)</label>
+              <input
+                className="input-field"
+                type="text"
+                inputMode="decimal"
+                placeholder="0"
+                value={form.credit}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^\d.]/g, '');
+                  setForm({ ...form, credit: raw, debit: raw ? '' : form.debit });
+                }}
+              />
+              <p className="text-[10px] text-primary-400 mt-0.5">
+                Advance balance (Cr)
               </p>
             </div>
           </div>
@@ -257,7 +260,7 @@ export default function Customers() {
             onChange={(v) => setForm({ ...form, handlingCharges: v })}
             label="Cooly"
           />
-          <div className="flex gap-3 pt-1">
+          <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex gap-3 mt-2 z-10">
             <button type="button" onClick={closeForm} className="btn-secondary flex-1">
               Cancel
             </button>
@@ -324,7 +327,8 @@ export default function Customers() {
                   <th className="text-left px-4 py-3 font-semibold text-primary-500">Name</th>
                   <th className="text-left px-4 py-3 font-semibold text-primary-500">Schedule</th>
                   <th className="text-left px-4 py-3 font-semibold text-primary-500">Mobile</th>
-                  <th className="text-left px-4 py-3 font-semibold text-primary-500">Credit</th>
+                  <th className="text-right px-4 py-3 font-semibold text-primary-500">Opening (Dr)</th>
+                  <th className="text-right px-4 py-3 font-semibold text-primary-500">Closing Balance</th>
                   <th className="text-right px-4 py-3 font-semibold text-primary-500">Actions</th>
                 </tr>
               </thead>
@@ -342,8 +346,11 @@ export default function Customers() {
                     </td>
                     <td className="px-4 py-3 text-primary-600">{scheduleName(c)}</td>
                     <td className="px-4 py-3 text-primary-500">{c.mobile || '—'}</td>
-                    <td className="px-4 py-3 font-semibold text-accent-600">
-                      {formatCurrency(c.creditBalance)}
+                    <td className="px-4 py-3 text-right tabular-nums text-primary-600">
+                      {formatCurrency(c.openingDebit || 0)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-accent-600">
+                      {formatCurrency(c.creditBalance || 0)}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1.5">

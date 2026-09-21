@@ -99,27 +99,34 @@ function cashHttpError(status, message) {
 
 async function reverseCashBalance(tx) {
   const applied = Number(tx.amount) || 0;
-  if (tx.customer) {
-    const customer = await Customer.findById(tx.customer);
-    if (!customer) return;
+  const custId = tx.customer?._id || tx.customer;
+  const vendId = tx.vendor?._id || tx.vendor;
+
+  if (custId) {
+    const customer = await Customer.findById(custId);
+    if (!customer) return null;
     if (tx.cashSide === 'credit' || tx.type === 'customer_payment') {
       customer.creditBalance += applied;
     } else {
       customer.creditBalance = Math.max(0, customer.creditBalance - applied);
     }
+    customer.creditBalance = Number(customer.creditBalance.toFixed(2));
     await customer.save();
-    return;
+    return { partyType: 'customer', party: customer };
   }
-  if (tx.vendor) {
-    const vendor = await Vendor.findById(tx.vendor);
-    if (!vendor) return;
+  if (vendId) {
+    const vendor = await Vendor.findById(vendId);
+    if (!vendor) return null;
     if (tx.cashSide === 'debit' || tx.type === 'vendor_payment') {
       vendor.creditBalance += applied;
     } else {
       vendor.creditBalance = Math.max(0, vendor.creditBalance - applied);
     }
+    vendor.creditBalance = Number(vendor.creditBalance.toFixed(2));
     await vendor.save();
+    return { partyType: 'vendor', party: vendor };
   }
+  return null;
 }
 
 /** Applies cash entry to party balance and returns fields to store on the transaction. */
@@ -353,6 +360,53 @@ router.get('/cash-entries', async (req, res) => {
       .populate('vendor', 'name nameTelugu creditBalance')
       .sort({ entryDate: 1, createdAt: 1 });
     res.json(transactions);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.delete('/cash-entry/:id', async (req, res) => {
+  try {
+    const tx = await Transaction.findById(req.params.id);
+    if (!tx || tx.source !== 'cash_entry') {
+      return res.status(404).json({ message: 'Cash entry not found' });
+    }
+
+    const partyResult = await reverseCashBalance(tx);
+    await Transaction.findByIdAndDelete(req.params.id);
+
+    res.json({
+      message: 'Cash entry deleted successfully',
+      deletedId: tx._id,
+      partyType: partyResult?.partyType,
+      party: partyResult?.party,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  try {
+    const tx = await Transaction.findById(req.params.id);
+    if (!tx) {
+      return res.status(404).json({ message: 'Transaction not found' });
+    }
+    if (tx.sale || tx.load) {
+      return res.status(400).json({
+        message: 'Cannot delete transaction linked directly to a sale or load. Please delete the sale or load instead.',
+      });
+    }
+
+    const partyResult = await reverseCashBalance(tx);
+    await Transaction.findByIdAndDelete(req.params.id);
+
+    res.json({
+      message: 'Transaction deleted successfully',
+      deletedId: tx._id,
+      partyType: partyResult?.partyType,
+      party: partyResult?.party,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

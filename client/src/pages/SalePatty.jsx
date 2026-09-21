@@ -141,20 +141,22 @@ export default function SalePatty({ path: windowPath }) {
   const d = preview?.summary?.deductions;
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-3 max-w-3xl">
       <div>
-        <h1 className="page-title">Sale Patty</h1>
-        <p className="text-primary-400 text-sm mt-0.5">
+        <h1 className="text-sm font-bold text-primary-800">Sale Patty</h1>
+        <p className="text-primary-400 text-[11px] mt-0.5">
           Pick a date, then a vendor who has sales that day — bill shows that day’s sales
         </p>
       </div>
 
-      <div className="card space-y-4">
+      <div className="card !p-3 space-y-2.5">
         <div>
-          <label className="label">Date *</label>
+          <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            Date *
+          </label>
           <input
             type="date"
-            className="input-field"
+            className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
@@ -162,9 +164,11 @@ export default function SalePatty({ path: windowPath }) {
         </div>
 
         <div className="relative">
-          <label className="label">Vendor *</label>
+          <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            Vendor *
+          </label>
           <input
-            className="input-field"
+            className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
             value={vendorQuery}
             placeholder={
               vendors.length ? 'Type vendor name…' : 'No sales for any vendor on this date'
@@ -176,7 +180,9 @@ export default function SalePatty({ path: windowPath }) {
               setVendorId('');
               setSuggestOpen(true);
             }}
-            onFocus={() => setSuggestOpen(true)}
+            onFocus={() => {
+              if (vendors.length > 0) setSuggestOpen(true);
+            }}
             onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown' && suggestions.length) {
@@ -199,14 +205,14 @@ export default function SalePatty({ path: windowPath }) {
           {suggestOpen && suggestions.length > 0 && (
             <ul
               ref={vendorListRef}
-              className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+              className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-primary-200 bg-surface shadow-lg text-xs"
             >
               {suggestions.map((v, idx) => (
                 <li key={v._id}>
                   <button
                     type="button"
                     data-idx={idx}
-                    className={`w-full text-left px-4 py-2.5 text-sm ${
+                    className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between ${
                       idx === highlight
                         ? 'bg-primary-100 text-primary-900 font-medium'
                         : 'text-primary-700 hover:bg-primary-50'
@@ -215,61 +221,66 @@ export default function SalePatty({ path: windowPath }) {
                     onMouseEnter={() => setHighlight(idx)}
                     onClick={() => pickVendor(v)}
                   >
-                    {v.name}
-                    {v.city ? <span className="text-primary-400 ml-2 text-xs">{v.city}</span> : null}
+                    <span>
+                      <span className="font-medium">{v.name}</span>
+                      {v.nameTelugu ? <span className="text-primary-400 ml-1.5 text-[11px]">({v.nameTelugu})</span> : null}
+                    </span>
+                    {v.city ? <span className="text-primary-400 ml-2 text-[10px] uppercase font-normal">{v.city}</span> : null}
                   </button>
                 </li>
               ))}
             </ul>
           )}
-          <p className="text-xs text-primary-400 mt-1">
+          <p className="text-[11px] text-primary-400 mt-1">
             Only vendors with a load on this date ({vendors.length})
           </p>
         </div>
       </div>
 
       {loadingPreview && (
-        <div className="text-center py-10 text-primary-400 text-sm">Loading sales…</div>
+        <div className="text-center py-6 text-primary-400 text-xs">Loading sales…</div>
       )}
 
       {preview && !loadingPreview && (
-        <form onSubmit={handleGenerate} className="space-y-4">
-          <div className="card space-y-3">
-            <div className="flex justify-between gap-3 items-start">
+        <form onSubmit={handleGenerate} className="space-y-3">
+          <div className="card !p-3 space-y-2.5">
+            <div className="flex justify-between gap-3 items-start border-b border-primary-100 pb-2">
               <div>
-                <h2 className="font-bold text-primary-800 text-lg">
+                <h2 className="font-bold text-primary-800 text-xs sm:text-sm">
                   {selected?.name || preview.vendor?.name}
                 </h2>
-                <p className="text-sm text-primary-500">
+                <p className="text-[11px] text-primary-400 mt-0.5">
                   Sales on {date} · {preview.saleCount || 0} sale(s) ·{' '}
                   {preview.summary?.totalBags || 0} bags
                 </p>
               </div>
               {preview.load?.billGenerated && (
-                <span className="text-xs font-semibold text-accent-600">Bill generated</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wide">
+                  Bill generated
+                </span>
               )}
             </div>
 
             {preview.materials?.length === 0 ? (
-              <p className="text-primary-400 text-sm py-4 text-center">
+              <p className="text-primary-400 text-xs py-3 text-center">
                 No sales for this vendor on this date yet
               </p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {preview.materials.map((mat) => (
-                  <div key={mat.materialName}>
-                    <h3 className="font-semibold text-primary-700 mb-1.5">{mat.materialName}</h3>
+                  <div key={mat.materialName} className="rounded-lg border border-primary-100 bg-surface/50 p-2 space-y-1">
+                    <h3 className="text-xs font-bold text-primary-700 uppercase tracking-wide">{mat.materialName}</h3>
                     <div className="space-y-1">
                       {mat.lines.map((line, i) => (
                         <div
                           key={i}
-                          className="flex justify-between gap-3 text-sm text-primary-600 border-b border-primary-50 pb-1"
+                          className="flex justify-between gap-3 text-xs text-primary-600 border-b border-primary-50 last:border-b-0 pb-0.5"
                         >
                           <span>
                             {line.bagCount} bags — {formatKg(line.totalKg)} —{' '}
                             {formatCurrency(line.ratePerKg)}/kg
                           </span>
-                          <span className="font-semibold text-primary-800">
+                          <span className="font-semibold text-primary-800 tabular-nums">
                             {formatCurrency(line.totalAmount)}
                           </span>
                         </div>
@@ -281,14 +292,14 @@ export default function SalePatty({ path: windowPath }) {
             )}
           </div>
 
-          <div className="card space-y-3">
+          <div className="card !p-3 space-y-2.5">
             <div>
-              <h3 className="font-semibold text-primary-800">Bill deductions</h3>
-              <p className="text-xs text-primary-400 mt-0.5">
+              <h3 className="text-xs font-bold text-primary-800 uppercase tracking-wide">Bill deductions</h3>
+              <p className="text-[11px] text-primary-400 mt-0.5">
                 Confirm rates before generate — toggle Per bag for each field
               </p>
             </div>
-            <div className="hidden sm:grid grid-cols-[1fr_100px_88px] gap-2 text-xs font-semibold text-primary-400 uppercase">
+            <div className="hidden sm:grid grid-cols-[1fr_110px_70px] gap-2 text-[10px] font-semibold text-primary-400 uppercase tracking-wide border-b border-primary-100 pb-1">
               <span>Field</span>
               <span>Amount</span>
               <span className="text-center">Per bag</span>
@@ -299,15 +310,15 @@ export default function SalePatty({ path: windowPath }) {
               return (
                 <div
                   key={field.key}
-                  className="grid grid-cols-[1fr_100px_88px] gap-2 items-center"
+                  className="grid grid-cols-[1fr_110px_70px] gap-2 items-center py-0.5 border-b border-primary-50 last:border-0"
                 >
                   <div>
-                    <p className="text-sm font-medium text-primary-800">{field.telugu}</p>
-                    <p className="text-xs text-primary-400">{field.label}</p>
+                    <p className="text-xs font-semibold text-primary-800">{field.telugu}</p>
+                    <p className="text-[10px] text-primary-400 leading-tight">{field.label}</p>
                   </div>
                   <div className="relative">
                     <input
-                      className="input-field !py-2"
+                      className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 pr-6 text-xs text-primary-700 tabular-nums focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                       type="text"
                       inputMode="decimal"
                       value={rates[field.key]}
@@ -318,14 +329,14 @@ export default function SalePatty({ path: windowPath }) {
                         })
                       }
                     />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-primary-400">
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-primary-400">
                       {isPct ? '%' : '₹'}
                     </span>
                   </div>
-                  <label className="flex justify-center">
+                  <label className="flex justify-center items-center cursor-pointer">
                     <input
                       type="checkbox"
-                      className="w-4 h-4 accent-primary-600"
+                      className="w-3.5 h-3.5 accent-primary-600 rounded cursor-pointer"
                       checked={perBag}
                       onChange={(e) =>
                         setRates({ ...rates, [`${field.key}PerBag`]: e.target.checked })
@@ -336,14 +347,18 @@ export default function SalePatty({ path: windowPath }) {
               );
             })}
 
-            <div className="pt-3 border-t border-primary-100 space-y-2">
-              <h4 className="font-semibold text-primary-800 text-sm">Bag less (తగ్గింపు / Bag tare weight deduction)</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="pt-2.5 border-t border-primary-100 space-y-2">
+              <h4 className="text-[11px] font-bold text-primary-700 uppercase tracking-wide">
+                Bag less (తగ్గింపు / Bag tare weight deduction)
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className="label text-xs">Below 50 kgs (kg/bag)</label>
+                  <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+                    Below 50 kgs (kg/bag)
+                  </label>
                   <div className="relative">
                     <input
-                      className="input-field !py-2 pr-10"
+                      className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 pr-7 text-xs text-primary-700 tabular-nums focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                       type="text"
                       inputMode="decimal"
                       value={rates.bagLessUnder50 ?? '1'}
@@ -354,16 +369,18 @@ export default function SalePatty({ path: windowPath }) {
                         })
                       }
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-primary-400 font-medium">
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-primary-400 font-medium">
                       kg
                     </span>
                   </div>
                 </div>
                 <div>
-                  <label className="label text-xs">Equal to or above 50 kgs (kg/bag)</label>
+                  <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+                    Equal to or above 50 kgs (kg/bag)
+                  </label>
                   <div className="relative">
                     <input
-                      className="input-field !py-2 pr-10"
+                      className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 pr-7 text-xs text-primary-700 tabular-nums focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                       type="text"
                       inputMode="decimal"
                       value={rates.bagLessOver50 ?? '2'}
@@ -374,7 +391,7 @@ export default function SalePatty({ path: windowPath }) {
                         })
                       }
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-primary-400 font-medium">
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-primary-400 font-medium">
                       kg
                     </span>
                   </div>
@@ -384,31 +401,35 @@ export default function SalePatty({ path: windowPath }) {
           </div>
 
           {d && (
-            <div className="card space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-primary-500">Gross</span>
-                <span className="font-semibold">{formatCurrency(preview.summary.grossTotal)}</span>
+            <div className="card !p-3 space-y-1.5 text-xs">
+              <div className="flex justify-between text-primary-600">
+                <span className="font-medium">Gross Total</span>
+                <span className="font-semibold tabular-nums text-primary-800">{formatCurrency(preview.summary.grossTotal)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-primary-500">Deductions</span>
-                <span>{formatCurrency(d.total)}</span>
+              <div className="flex justify-between text-primary-600">
+                <span className="font-medium">Total Deductions</span>
+                <span className="tabular-nums text-red-600">-{formatCurrency(d.total)}</span>
               </div>
-              <div className="flex justify-between text-base font-bold text-primary-800 pt-2 border-t border-primary-100">
-                <span>Net Total</span>
-                <span>{formatCurrency(preview.summary.receivable)}</span>
+              <div className="flex justify-between text-xs font-bold text-primary-900 pt-1.5 border-t border-primary-200">
+                <span>Net Receivable</span>
+                <span className="text-sm font-bold text-primary-800 tabular-nums">{formatCurrency(preview.summary.receivable)}</span>
               </div>
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2">
-            <button type="submit" className="btn-primary" disabled={saving}>
-              <FileText className="w-4 h-4" />
+          <div className="flex flex-wrap gap-2 pt-0.5">
+            <button
+              type="submit"
+              className="btn-primary !py-1.5 !px-3.5 !text-xs font-semibold flex items-center gap-1.5 shadow-xs"
+              disabled={saving}
+            >
+              <FileText className="w-3.5 h-3.5" />
               {saving ? 'Saving…' : 'Generate / Print'}
             </button>
             {isOnline && (
               <button
                 type="button"
-                className="btn-secondary flex items-center gap-1.5 !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200"
+                className="btn-secondary !py-1.5 !px-3.5 !text-xs font-semibold flex items-center gap-1.5 !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200 shadow-xs"
                 onClick={async () => {
                   const vendorObj = preview.vendor || selected || {};
                   try {
@@ -425,14 +446,14 @@ export default function SalePatty({ path: windowPath }) {
                   }
                 }}
               >
-                <Send className="w-4 h-4 text-emerald-600" />
+                <Send className="w-3.5 h-3.5 text-emerald-600" />
                 Send WhatsApp Patti
               </button>
             )}
             {preview.load?.billGenerated && (
               <button
                 type="button"
-                className="btn-secondary"
+                className="btn-secondary !py-1.5 !px-3.5 !text-xs font-semibold flex items-center gap-1.5 shadow-xs"
                 onClick={() =>
                   openVendorBillPdf(preview).catch(() =>
                     toast.error('Failed to open Telugu bill PDF')

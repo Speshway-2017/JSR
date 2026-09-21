@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Trash2, Save, Package } from 'lucide-react';
+import { Plus, Trash2, Save, Package, Eye, Printer } from 'lucide-react';
+import { openPurchaseBillPreview } from '../utils/reportPrint';
 import toast from 'react-hot-toast';
 import api from '../api';
 import MaterialAutocomplete from '../components/MaterialAutocomplete';
@@ -26,7 +27,7 @@ const emptyLine = (type = 'by_weight') => ({
 });
 
 export default function Purchase({ path: windowPath }) {
-  const { updateWindowPath } = useMDI();
+  const { updateWindowPath, openWindow } = useMDI();
   const [searchParams] = useSearchParams();
   const effectiveSearchParams = useMemo(() => {
     if (windowPath && windowPath.includes('?')) {
@@ -208,13 +209,31 @@ export default function Purchase({ path: windowPath }) {
 
     setSaving(true);
     try {
-      await api.post('/purchases', {
+      const res = await api.post('/purchases', {
         vendorId,
         purchaseDate,
         lines: payloadLines,
         notes,
       });
-      toast.success('Purchase saved');
+      const savedPurchase = res.data;
+      toast.success(
+        (t) => (
+          <div className="flex items-center gap-2">
+            <span>Purchase saved</span>
+            <button
+              type="button"
+              onClick={() => {
+                toast.dismiss(t.id);
+                openPurchaseBillPreview(savedPurchase);
+              }}
+              className="px-2 py-0.5 bg-primary-700 text-white rounded text-xs font-semibold hover:bg-primary-800 transition cursor-pointer"
+            >
+              View Bill
+            </button>
+          </div>
+        ),
+        { duration: 4500 }
+      );
       setVendorId('');
       setVendorQuery('');
       setLines([emptyLine(globalPurchaseType)]);
@@ -229,18 +248,18 @@ export default function Purchase({ path: windowPath }) {
   };
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-3 max-w-3xl">
       <div>
-        <h1 className="page-title">Purchase</h1>
-        <p className="text-primary-400 text-sm mt-0.5">
+        <h1 className="text-sm font-bold text-primary-800">Purchase</h1>
+        <p className="text-primary-400 text-[11px] mt-0.5">
           Buy products from a vendor
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="card space-y-4">
-          <div className="flex items-center gap-3 bg-primary-50/70 px-3 py-2 rounded-xl border border-primary-100 flex-wrap">
-            <span className="text-xs font-semibold text-primary-600 shrink-0">Purchase Type:</span>
+      <form onSubmit={handleSubmit} className="space-y-2.5">
+        <div className="card !p-3 space-y-2.5">
+          <div className="flex items-center gap-2.5 bg-primary-50/70 px-2.5 py-1.5 rounded-lg border border-primary-100 flex-wrap text-xs">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-600 shrink-0">Purchase Type:</span>
             <label className="inline-flex items-center gap-1.5 text-xs text-primary-700 font-medium cursor-pointer">
               <input
                 type="radio"
@@ -282,21 +301,21 @@ export default function Purchase({ path: windowPath }) {
             </label>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
-              <label className="label">Date *</label>
+              <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Date *</label>
               <input
                 type="date"
-                className="input-field"
+                className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
                 required
               />
             </div>
             <div className="relative">
-              <label className="label">Vendor *</label>
+              <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Vendor *</label>
               <input
-                className="input-field"
+                className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                 value={vendorQuery}
                 placeholder="Type vendor name…"
                 autoComplete="off"
@@ -331,14 +350,14 @@ export default function Purchase({ path: windowPath }) {
               {suggestOpen && suggestions.length > 0 && (
                 <ul
                   ref={vendorListRef}
-                  className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+                  className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-primary-200 bg-surface shadow-card"
                 >
                   {suggestions.map((v, idx) => (
                     <li key={v._id}>
                       <button
                         type="button"
                         data-idx={idx}
-                        className={`w-full text-left px-4 py-2.5 text-sm ${
+                        className={`w-full text-left px-3 py-1.5 text-xs ${
                           idx === highlight
                             ? 'bg-primary-100 text-primary-900 font-medium'
                             : 'text-primary-700 hover:bg-primary-50'
@@ -347,9 +366,9 @@ export default function Purchase({ path: windowPath }) {
                         onMouseEnter={() => setHighlight(idx)}
                         onClick={() => pickVendor(v)}
                       >
-                        {v.name}
+                        <span className="font-semibold">{v.name}</span>
                         {v.city ? (
-                          <span className="text-primary-400 ml-2 text-xs">{v.city}</span>
+                          <span className="text-primary-400 ml-1.5 text-[11px]">({v.city})</span>
                         ) : null}
                       </button>
                     </li>
@@ -357,7 +376,7 @@ export default function Purchase({ path: windowPath }) {
                 </ul>
               )}
               {selected && (
-                <p className="text-xs text-primary-500 mt-1">Selected: {selected.name}</p>
+                <p className="text-[11px] text-primary-500 mt-1 font-medium">Selected: <strong className="text-primary-800">{selected.name}</strong></p>
               )}
             </div>
           </div>
@@ -380,12 +399,12 @@ export default function Purchase({ path: windowPath }) {
               : weightKg * rate;
 
           return (
-            <div key={idx} className="card space-y-3">
+            <div key={idx} className="card !p-3 space-y-2">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <h3 className="font-semibold text-primary-700 flex items-center gap-2 text-sm">
-                  <Package className="w-4 h-4" /> Product {idx + 1}
+                <h3 className="font-semibold text-primary-800 flex items-center gap-1.5 text-xs">
+                  <Package className="w-3.5 h-3.5 text-primary-600" /> Product {idx + 1}
                 </h3>
-                <div className="flex items-center gap-2 bg-primary-50/70 px-2 py-1 rounded-lg border border-primary-100 text-xs flex-wrap">
+                <div className="flex items-center gap-2 bg-primary-50/70 px-2 py-0.5 rounded-md border border-primary-100 text-[11px] flex-wrap">
                   <label className="inline-flex items-center gap-1 font-medium cursor-pointer text-primary-700">
                     <input
                       type="radio"
@@ -421,9 +440,10 @@ export default function Purchase({ path: windowPath }) {
                   <button
                     type="button"
                     onClick={() => setLines(lines.filter((_, i) => i !== idx))}
-                    className="text-red-400 p-1.5 hover:bg-red-50 rounded-lg ml-auto"
+                    className="text-red-400 p-1 hover:bg-red-50 rounded ml-auto transition cursor-pointer"
+                    title="Remove product"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
@@ -432,6 +452,7 @@ export default function Purchase({ path: windowPath }) {
                 onMaterialsChange={setMaterials}
                 value={line.materialName}
                 materialId={line.materialId}
+                compact={true}
                 onChange={(sel) =>
                   updateLine(idx, {
                     materialId: sel.materialId,
@@ -446,11 +467,11 @@ export default function Purchase({ path: windowPath }) {
               />
 
               {type === 'by_bag' && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-end">
                   <div>
-                    <label className="label">No. of Bags *</label>
+                    <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">No. of Bags *</label>
                     <input
-                      className="input-field"
+                      className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition"
                       type="text"
                       inputMode="numeric"
                       placeholder="0"
@@ -462,9 +483,9 @@ export default function Purchase({ path: windowPath }) {
                     />
                   </div>
                   <div>
-                    <label className="label">Rate / Bag *</label>
+                    <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Rate / Bag *</label>
                     <input
-                      className="input-field"
+                      className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition"
                       type="text"
                       inputMode="decimal"
                       value={line.ratePerKg}
@@ -474,20 +495,20 @@ export default function Purchase({ path: windowPath }) {
                       required
                     />
                   </div>
-                  <div className="pb-2">
-                    <p className="text-sm text-primary-600">
-                      Amount: <strong>{formatCurrency(lineAmount)}</strong>
-                    </p>
+                  <div className="pb-0.5">
+                    <div className="inline-flex items-center gap-1.5 rounded-md bg-accent-100/80 text-accent-800 px-2.5 py-1 text-xs font-medium">
+                      Amount: <strong className="font-bold">{formatCurrency(lineAmount)}</strong>
+                    </div>
                   </div>
                 </div>
               )}
 
               {type === 'by_box' && (
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-end">
                   <div>
-                    <label className="label">No. of Boxes *</label>
+                    <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">No. of Boxes *</label>
                     <input
-                      className="input-field"
+                      className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition"
                       type="text"
                       inputMode="numeric"
                       placeholder="0"
@@ -499,9 +520,9 @@ export default function Purchase({ path: windowPath }) {
                     />
                   </div>
                   <div>
-                    <label className="label">Weight / Box (kg) *</label>
+                    <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Weight / Box (kg) *</label>
                     <input
-                      className="input-field"
+                      className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition"
                       type="text"
                       inputMode="decimal"
                       placeholder="0.0"
@@ -513,9 +534,9 @@ export default function Purchase({ path: windowPath }) {
                     />
                   </div>
                   <div>
-                    <label className="label">Rate / Kg *</label>
+                    <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Rate / Kg *</label>
                     <input
-                      className="input-field"
+                      className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition"
                       type="text"
                       inputMode="decimal"
                       value={line.ratePerKg}
@@ -525,21 +546,21 @@ export default function Purchase({ path: windowPath }) {
                       required
                     />
                   </div>
-                  <div className="pb-1">
-                    <p className="text-xs text-primary-400">Total Wt: {boxTotalKg.toFixed(1)} kg</p>
-                    <p className="text-sm text-primary-600">
-                      Amount: <strong>{formatCurrency(lineAmount)}</strong>
-                    </p>
+                  <div className="pb-0.5">
+                    <p className="text-[10px] text-primary-400 mb-0.5">Total Wt: {boxTotalKg.toFixed(1)} kg</p>
+                    <div className="inline-flex items-center gap-1.5 rounded-md bg-accent-100/80 text-accent-800 px-2.5 py-1 text-xs font-medium">
+                      Amount: <strong className="font-bold">{formatCurrency(lineAmount)}</strong>
+                    </div>
                   </div>
                 </div>
               )}
 
               {type === 'by_weight' && (
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-end">
                   <div>
-                    <label className="label">No. of Bags</label>
+                    <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">No. of Bags</label>
                     <input
-                      className="input-field"
+                      className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition"
                       type="text"
                       inputMode="numeric"
                       placeholder="0 (optional)"
@@ -550,9 +571,9 @@ export default function Purchase({ path: windowPath }) {
                     />
                   </div>
                   <div>
-                    <label className="label">Weight (kg) *</label>
+                    <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Weight (kg) *</label>
                     <input
-                      className="input-field"
+                      className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition"
                       type="text"
                       inputMode="decimal"
                       placeholder="0.0"
@@ -564,9 +585,9 @@ export default function Purchase({ path: windowPath }) {
                     />
                   </div>
                   <div>
-                    <label className="label">Rate / Kg *</label>
+                    <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Rate / Kg *</label>
                     <input
-                      className="input-field"
+                      className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition"
                       type="text"
                       inputMode="decimal"
                       value={line.ratePerKg}
@@ -576,10 +597,10 @@ export default function Purchase({ path: windowPath }) {
                       required
                     />
                   </div>
-                  <div className="pb-2">
-                    <p className="text-sm text-primary-600">
-                      Amount: <strong>{formatCurrency(lineAmount)}</strong>
-                    </p>
+                  <div className="pb-0.5">
+                    <div className="inline-flex items-center gap-1.5 rounded-md bg-accent-100/80 text-accent-800 px-2.5 py-1 text-xs font-medium">
+                      Amount: <strong className="font-bold">{formatCurrency(lineAmount)}</strong>
+                    </div>
                   </div>
                 </div>
               )}
@@ -590,60 +611,86 @@ export default function Purchase({ path: windowPath }) {
         <button
           type="button"
           onClick={() => setLines([...lines, emptyLine(globalPurchaseType)])}
-          className="btn-secondary w-full !py-2.5"
+          className="btn-secondary w-full !py-1.5 !text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs"
         >
-          <Plus className="w-4 h-4" /> Add Product
+          <Plus className="w-3.5 h-3.5" /> Add Product
         </button>
 
-        <div className="card space-y-3">
+        <div className="card !p-3 space-y-2">
           <div>
-            <label className="label">Notes</label>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Notes</label>
             <input
-              className="input-field"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional"
             />
           </div>
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between text-xs py-0.5">
             <span className="text-primary-500">Total bags</span>
-            <span className="font-semibold">{totals.bags}</span>
+            <span className="font-semibold text-primary-800 tabular-nums">{totals.bags}</span>
           </div>
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between text-xs py-0.5">
             <span className="text-primary-500">Total weight</span>
-            <span className="font-semibold">{formatKg(totals.weight)}</span>
+            <span className="font-semibold text-primary-800 tabular-nums">{formatKg(totals.weight)}</span>
           </div>
-          <div className="flex justify-between items-center border-t border-primary-100 pt-3">
-            <span className="font-semibold text-primary-700">Vendor payable</span>
-            <span className="text-2xl font-bold text-primary-700">
+          <div className="flex justify-between items-center border-t border-primary-100 pt-2">
+            <span className="font-semibold text-primary-700 text-xs">Vendor payable</span>
+            <span className="text-base font-bold text-primary-800 tabular-nums">
               {formatCurrency(totals.amount)}
             </span>
           </div>
-          <button type="submit" className="btn-primary w-full" disabled={saving}>
-            <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save Purchase'}
+          <button type="submit" className="btn-primary w-full !py-1.5 !text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5" disabled={saving}>
+            <Save className="w-3.5 h-3.5" /> {saving ? 'Saving…' : 'Save Purchase'}
           </button>
         </div>
       </form>
 
-      <div className="card !p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-primary-100 font-semibold text-primary-700">
-          Recent purchases
+      <div className="card !p-0 overflow-hidden border border-primary-200">
+        <div className="px-3 py-2 border-b border-primary-200 bg-surface font-semibold text-xs text-primary-800 flex items-center justify-between">
+          <span>Recent purchases</span>
+          <button
+            type="button"
+            onClick={() => openWindow?.('/bill-print?type=purchase', 'Bill Print')}
+            className="text-[11px] font-semibold text-primary-600 hover:text-primary-800 flex items-center gap-1 hover:underline cursor-pointer"
+            title="Open all purchase bills in Bill Print"
+          >
+            <Printer className="w-3 h-3" /> Open in Bill Print
+          </button>
         </div>
         {recent.length === 0 ? (
-          <p className="text-center py-8 text-primary-400 text-sm">No purchases yet</p>
+          <p className="text-center py-6 text-primary-400 text-xs">No purchases yet</p>
         ) : (
-          <ul className="divide-y divide-primary-50">
+          <ul className="divide-y divide-primary-100">
             {recent.map((p) => (
-              <li key={p._id} className="px-4 py-3 text-sm flex justify-between gap-3">
-                <span>
-                  <span className="font-medium text-primary-800">{p.vendor?.name || '—'}</span>
-                  <span className="text-primary-400 ml-2">
+              <li
+                key={p._id}
+                className="px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-2 hover:bg-primary-50/40 transition"
+              >
+                <div className="min-w-[160px]">
+                  <span className="font-semibold text-primary-800">{p.vendor?.name || '—'}</span>
+                  {p.vendor?.nameTelugu ? (
+                    <span className="text-[11px] text-primary-400 ml-1.5">({p.vendor.nameTelugu})</span>
+                  ) : null}
+                  <div className="text-[11px] text-primary-500 mt-0.5">
                     {p.totalBags ? `${p.totalBags} bags · ` : ''}{formatKg(p.totalWeight)}
-                  </span>
-                </span>
-                <span className="text-primary-600">
-                  {formatCurrency(p.totalAmount)} · {formatDate(p.purchaseDate)}
-                </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="text-right">
+                    <div className="font-bold text-primary-800 tabular-nums text-xs">{formatCurrency(p.totalAmount)}</div>
+                    <div className="text-[11px] text-primary-400">{formatDate(p.purchaseDate)}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openPurchaseBillPreview(p)}
+                    className="btn-primary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs"
+                    title="View & Print Purchase Bill"
+                  >
+                    <Eye className="w-3 h-3" />
+                    <span>View Bill</span>
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

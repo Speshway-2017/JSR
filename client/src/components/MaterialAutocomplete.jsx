@@ -11,6 +11,9 @@ export default function MaterialAutocomplete({
   materialId,
   onChange,
   required,
+  labelClassName,
+  inputClassName,
+  compact = false,
 }) {
   const [query, setQuery] = useState(value || '');
   const [open, setOpen] = useState(false);
@@ -123,9 +126,11 @@ export default function MaterialAutocomplete({
 
   return (
     <div ref={wrapperRef} className="relative">
-      <label className="label">Material Name *</label>
+      <label className={labelClassName || (compact ? "text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block" : "label")}>
+        Material Name *
+      </label>
       <input
-        className="input-field"
+        className={inputClassName || (compact ? "h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition" : "input-field")}
         placeholder="Type material name..."
         value={query}
         onChange={handleInputChange}
@@ -136,15 +141,15 @@ export default function MaterialAutocomplete({
       />
 
       {materialId && (
-        <span className="absolute right-3 top-[38px] text-primary-500">
-          <Check className="w-5 h-5" />
+        <span className={`absolute right-2.5 ${compact ? 'top-[24px]' : 'top-[38px]'} text-emerald-600`}>
+          <Check className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
         </span>
       )}
 
       {open && (suggestions.length > 0 || showAddOption) && (
         <div
           ref={listRef}
-          className="absolute z-20 left-0 right-0 mt-1 bg-surface border border-primary-200 rounded-xl shadow-card max-h-56 overflow-y-auto"
+          className="absolute z-20 left-0 right-0 mt-1 bg-surface border border-primary-200 rounded-lg shadow-card max-h-48 overflow-y-auto"
         >
           {suggestions.map((mat, idx) => (
             <button
@@ -153,13 +158,14 @@ export default function MaterialAutocomplete({
               data-idx={idx}
               onClick={() => selectMaterial(mat)}
               onMouseEnter={() => setHighlight(idx)}
-              className={`w-full text-left px-4 py-3 transition text-primary-800 ${
+              className={`w-full text-left px-3 py-1.5 transition text-xs text-primary-800 ${
                 idx === highlight || (highlight < 0 && materialId === mat._id)
                   ? 'bg-primary-100 font-semibold text-primary-900'
                   : 'hover:bg-primary-50'
               }`}
             >
               {mat.name}
+              {mat.nameTelugu ? <span className="text-primary-400 ml-1.5 text-[11px]">({mat.nameTelugu})</span> : null}
             </button>
           ))}
 
@@ -170,13 +176,13 @@ export default function MaterialAutocomplete({
               onClick={handleAddNew}
               onMouseEnter={() => setHighlight(suggestions.length)}
               disabled={adding}
-              className={`w-full text-left px-4 py-3 border-t border-primary-100 font-medium flex items-center gap-2 ${
+              className={`w-full text-left px-3 py-1.5 border-t border-primary-100 font-medium text-xs flex items-center gap-1.5 ${
                 highlight === suggestions.length
                   ? 'bg-accent-100 text-primary-900'
                   : 'hover:bg-accent-50 text-primary-700'
               }`}
             >
-              <Plus className="w-4 h-4 text-accent-400" />
+              <Plus className="w-3.5 h-3.5 text-accent-500" />
               {adding ? 'Adding...' : `Add "${trimmed}"`}
             </button>
           )}

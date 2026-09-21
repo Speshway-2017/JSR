@@ -338,7 +338,7 @@ export default function VendorDetail({ path: windowPath }) {
         iconName="CreditCard"
         onClose={() => setShowPayment(false)}
       >
-        <form onSubmit={handlePayment} className="space-y-4">
+        <form onSubmit={handlePayment} className="space-y-3">
           <p className="text-xs text-primary-400">Pay the receivable amount from the vendor bill after deductions.</p>
           <div>
             <label className="label">Amount (₹) *</label>
@@ -348,7 +348,7 @@ export default function VendorDetail({ path: windowPath }) {
             <label className="label">Description</label>
             <input className="input-field" value={paymentDesc} onChange={(e) => setPaymentDesc(e.target.value)} />
           </div>
-          <div className="flex gap-3 pt-1">
+          <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex gap-3 mt-2 z-10">
             <button type="button" onClick={() => setShowPayment(false)} className="btn-secondary flex-1">Cancel</button>
             <button type="submit" className="btn-primary flex-1" disabled={paying}>{paying ? 'Saving...' : 'Save'}</button>
           </div>
@@ -360,8 +360,9 @@ export default function VendorDetail({ path: windowPath }) {
         title={billModal?.regenerating ? 'Update Load Bill' : 'Generate Load Bill'}
         iconName="FileText"
         onClose={() => setBillModal(null)}
+        maxWidth="max-w-lg"
       >
-        <form onSubmit={handleGenerateBill} className="space-y-4">
+        <form onSubmit={handleGenerateBill} className="space-y-3">
           <p className="text-xs text-primary-400">
             {billModal?.regenerating
               ? 'Adjust deduction rates and regenerate the bill PDF for this load.'
@@ -408,7 +409,7 @@ export default function VendorDetail({ path: windowPath }) {
               </div>
             );
           })}
-          <div className="flex gap-3 pt-1">
+          <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex gap-3 mt-2 z-10">
             <button type="button" onClick={() => setBillModal(null)} className="btn-secondary flex-1">
               Cancel
             </button>

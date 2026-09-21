@@ -303,7 +303,7 @@ export default function CustomerDetail({ path: windowPath }) {
         iconName="CreditCard"
         onClose={() => setShowPayment(false)}
       >
-        <form onSubmit={handlePayment} className="space-y-4">
+        <form onSubmit={handlePayment} className="space-y-3">
           <div>
             <label className="label">Amount (₹) *</label>
             <input type="number" className="input-field" min="1" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required />
@@ -312,7 +312,7 @@ export default function CustomerDetail({ path: windowPath }) {
             <label className="label">Description</label>
             <input className="input-field" value={paymentDesc} onChange={(e) => setPaymentDesc(e.target.value)} placeholder="Optional" />
           </div>
-          <div className="flex gap-3 pt-1">
+          <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex gap-3 mt-2 z-10">
             <button type="button" onClick={() => setShowPayment(false)} className="btn-secondary flex-1">Cancel</button>
             <button type="submit" className="btn-primary flex-1" disabled={paying}>{paying ? 'Saving...' : 'Save'}</button>
           </div>
