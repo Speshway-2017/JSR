@@ -18,6 +18,10 @@ if (!app) {
   process.exit(1);
 }
 
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.jsr.app');
+}
+
 const path = require('path');
 const fs = require('fs');
 const { spawn, execFileSync } = require('child_process');
@@ -124,7 +128,9 @@ function createWindow() {
     titleBarStyle: isMac ? 'hiddenInset' : undefined,
     trafficLightPosition: isMac ? { x: 14, y: 11 } : undefined,
     title: 'JSR',
-    icon: path.join(__dirname, '..', 'build', 'icon.png'),
+    icon: process.platform === 'win32'
+      ? path.join(__dirname, '..', 'build', 'icon.ico')
+      : path.join(__dirname, '..', 'build', 'icon.png'),
     backgroundColor: '#F8F9F4',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),

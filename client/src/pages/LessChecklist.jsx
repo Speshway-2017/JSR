@@ -192,186 +192,210 @@ export default function LessChecklist() {
   const hasRows = !loading && !dateError && filteredEntries.length > 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-2.5 max-w-4xl">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="page-title">Less Checklist</h1>
-          <p className="text-primary-400 text-sm mt-0.5">
-            Filter by name, date range or side
+          <h1 className="text-sm font-bold text-primary-800">Less Checklist</h1>
+          <p className="text-primary-400 text-[11px] mt-0.5">
+            Filter discount & less entries by party, date range or side
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={handlePrint}
             disabled={!filteredEntries.length}
-            className="btn-secondary !py-2 !px-4 !text-sm disabled:opacity-50 flex items-center gap-1.5"
+            className="btn-primary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
           >
-            <Printer className="w-4 h-4" /> Print
+            <Printer className="w-3 h-3" /> Print
           </button>
           <button
             type="button"
             onClick={exportExcel}
             disabled={!filteredEntries.length}
-            className="btn-primary !py-2 !px-4 !text-sm disabled:opacity-50 flex items-center gap-1.5"
+            className="btn-secondary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
           >
-            <Download className="w-4 h-4" /> Export Excel
+            <Download className="w-3 h-3 text-primary-600" /> Export Excel
           </button>
         </div>
       </div>
 
-      <div className="card !p-3 sm:!p-4">
-        <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-primary-400 w-9">From</label>
+      {/* Filter Card */}
+      <div className="card !p-2.5 space-y-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              From *
+            </label>
             <input
               type="date"
-              className="input-field !py-2 !text-sm"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-primary-400 w-9">To</label>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              To *
+            </label>
             <input
               type="date"
-              className="input-field !py-2 !text-sm"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={endDate}
               min={startDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
-          <select
-            className="input-field !py-2 !text-sm min-w-[140px] flex-1 sm:flex-none sm:w-48"
-            value={partyId}
-            onChange={(e) => setPartyId(e.target.value)}
-            title="Name wise"
-          >
-            <option value="">All names</option>
-            {partiesOptions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.type})
-              </option>
-            ))}
-          </select>
-          <select
-            className="input-field !py-2 !text-sm min-w-[120px] flex-1 sm:flex-none sm:w-36"
-            value={cashSideFilter}
-            onChange={(e) => setCashSideFilter(e.target.value)}
-            title="Side wise"
-          >
-            <option value="">All sides</option>
-            <option value="credit">Credit</option>
-            <option value="debit">Debit</option>
-          </select>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Party
+            </label>
+            <select
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              value={partyId}
+              onChange={(e) => setPartyId(e.target.value)}
+              title="Name wise"
+            >
+              <option value="">All names ({partiesOptions.length})</option>
+              {partiesOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.type})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Side
+            </label>
+            <select
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              value={cashSideFilter}
+              onChange={(e) => setCashSideFilter(e.target.value)}
+              title="Side wise"
+            >
+              <option value="">All sides</option>
+              <option value="credit">Credit</option>
+              <option value="debit">Debit</option>
+            </select>
+          </div>
         </div>
         {dateError && (
-          <p className="text-xs text-red-500 mt-2">From date must be on or before To date</p>
+          <p className="text-xs text-red-500 mt-1">From date must be on or before To date</p>
         )}
       </div>
 
+      {/* Summary KPI Strip */}
       {hasRows && (
-        <div className="grid grid-cols-2 gap-2 sm:gap-3">
-          <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between">
-            <span className="text-xs text-primary-400">Total Entries</span>
-            <span className="font-semibold text-primary-700">{summary.count}</span>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="card !py-2 !px-3 flex items-center justify-between border border-primary-200">
+            <span className="text-[11px] font-medium text-primary-500">Total Entries</span>
+            <span className="font-bold text-primary-800 text-xs tabular-nums">{summary.count}</span>
           </div>
-          <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between">
-            <span className="text-xs text-primary-400">Total Less Amount</span>
-            <span className="font-semibold text-amber-600">{formatCurrency(summary.totalLess)}</span>
+          <div className="card !py-2 !px-3 flex items-center justify-between border border-primary-200">
+            <span className="text-[11px] font-medium text-primary-500">Total Less Amount</span>
+            <span className="font-bold text-amber-700 text-xs tabular-nums">
+              {formatCurrency(summary.totalLess)}
+            </span>
           </div>
         </div>
       )}
 
-      <div className="card !p-0 overflow-hidden">
+      {/* Main Table */}
+      <div className="card !p-0 overflow-hidden border border-primary-200">
         {loading ? (
-          <div className="text-center py-12 text-primary-400 text-sm">Loading less entries...</div>
+          <div className="text-center py-12 text-primary-400 text-xs">Loading less entries...</div>
         ) : dateError ? (
-          <div className="text-center py-12 text-red-500 text-sm">Fix the date range</div>
+          <div className="text-center py-12 text-red-500 text-xs">Fix the date range</div>
         ) : !filteredEntries.length ? (
           <div className="text-center py-12">
-            <FileBarChart className="w-10 h-10 text-primary-300 mx-auto mb-2" />
-            <p className="text-primary-400 text-sm">No less entries for this filter</p>
+            <FileBarChart className="w-8 h-8 text-primary-300 mx-auto mb-1.5" />
+            <p className="text-primary-400 text-xs">No less entries for this filter</p>
           </div>
         ) : (
           <>
-            <div className="md:hidden divide-y divide-primary-100">
+            {/* Mobile Cards */}
+            <div className="md:hidden divide-y divide-primary-100 text-xs">
               {filteredEntries.map((row) => (
-                <div key={row.id} className="px-4 py-3">
+                <div key={row.id} className="px-3 py-2.5 hover:bg-primary-50/40 transition">
                   <div className="flex justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-primary-700">
+                      <p className="font-semibold text-primary-800 text-xs">
                         {row.partyName}
                         {row.partyNameTelugu && (
-                          <span className="text-xs text-primary-400 font-normal ml-1">
+                          <span className="text-[10.5px] text-primary-400 font-normal ml-1">
                             ({row.partyNameTelugu})
                           </span>
                         )}
                       </p>
-                      <p className="text-xs text-primary-400">{formatDate(row.date)}</p>
-                      <p className="text-xs text-primary-500 mt-1">
+                      <p className="text-[10.5px] text-primary-400 mt-0.5">{formatDate(row.date)}</p>
+                      <p className="text-[11px] text-primary-500 mt-1">
                         {row.partyType} · {row.cashSide === 'credit' ? 'Credit' : 'Debit'}
                       </p>
                     </div>
-                    <p className="font-semibold text-amber-700 shrink-0">
+                    <p className="font-bold text-amber-700 text-xs shrink-0 tabular-nums">
                       {formatCurrency(row.lessAmount)}
                     </p>
                   </div>
                 </div>
               ))}
-              <div className="px-4 py-3 bg-primary-50 flex justify-between text-sm font-semibold text-primary-700">
+              <div className="px-3 py-2 bg-accent-50 border-t border-primary-200 flex justify-between text-xs font-semibold text-primary-800">
                 <span>Total</span>
-                <span>{formatCurrency(summary.totalLess)}</span>
+                <span className="font-bold tabular-nums text-amber-700">
+                  {formatCurrency(summary.totalLess)}
+                </span>
               </div>
             </div>
 
+            {/* Desktop Table */}
             <div className="overflow-x-auto hidden md:block">
-              <table className="w-full text-left">
+              <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-primary-50/80 border-b border-primary-100">
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">
+                  <tr className="bg-primary-50/80 text-left border-b border-primary-200">
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide whitespace-nowrap">
                       Date & Time
                     </th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
                       Name
                     </th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-36">
                       Type / Side
                     </th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-28">
                       Less Amount
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredEntries.map((row) => (
-                    <tr key={row.id} className="border-b border-primary-50 hover:bg-primary-50/40">
-                      <td className="py-2.5 px-4 text-sm text-primary-600 whitespace-nowrap">
+                    <tr key={row.id} className="border-b border-primary-100 hover:bg-primary-50/40 transition">
+                      <td className="px-3 py-2 text-primary-600 whitespace-nowrap text-xs">
                         {formatDate(row.date)}
                       </td>
-                      <td className="py-2.5 px-4 text-sm font-medium text-primary-700">
+                      <td className="px-3 py-2 font-semibold text-primary-800 text-xs">
                         {row.partyName}
                         {row.partyNameTelugu && (
-                          <span className="text-xs text-primary-400 font-normal ml-1">
+                          <span className="text-[10px] text-primary-400 font-normal ml-1">
                             ({row.partyNameTelugu})
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-4 text-sm text-primary-600">
+                      <td className="px-3 py-2 text-primary-600 text-xs">
                         {row.partyType} · {row.cashSide === 'credit' ? 'Credit' : 'Debit'}
                       </td>
-                      <td className="py-2.5 px-4 text-sm font-semibold text-amber-700 text-right tabular-nums">
+                      <td className="px-3 py-2 text-right tabular-nums text-amber-700 font-bold text-xs">
                         {formatCurrency(row.lessAmount)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-primary-50 border-t border-primary-200">
-                    <td colSpan={3} className="py-2.5 px-4 text-sm font-semibold text-primary-700">
+                  <tr className="bg-accent-50 border-t border-primary-200 font-semibold text-xs">
+                    <td colSpan={3} className="px-3 py-2 text-primary-800 font-bold">
                       Total ({summary.count} records)
                     </td>
-                    <td className="py-2.5 px-4 text-sm font-semibold text-amber-600 text-right">
+                    <td className="px-3 py-2 text-right tabular-nums font-bold text-amber-700">
                       {formatCurrency(summary.totalLess)}
                     </td>
                   </tr>

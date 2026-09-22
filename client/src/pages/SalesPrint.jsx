@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Printer, Send, FileText, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Edit2, Calendar, CheckCircle2, DollarSign } from 'lucide-react';
+import { Printer, Send, FileText, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Edit2, Calendar, CheckCircle2, DollarSign, Users, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
@@ -13,7 +13,21 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useMDI } from '../context/MDIContext';
 
 function todayInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatShortDate(date) {
+  if (!date) return '—';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '—';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = String(d.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
 }
 
 export default function SalesPrint({ path: windowPath }) {
@@ -66,13 +80,14 @@ export default function SalesPrint({ path: windowPath }) {
   const [loading, setLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [perPage, setPerPage] = useState(6);
+  const [viewColumns, setViewColumns] = useState(1);
+  const [showCustomerList, setShowCustomerList] = useState(true);
 
   const [selectedCids, setSelectedCids] = useState(new Set());
   const [sortKey, setSortKey] = useState('');
   const [sortDir, setSortDir] = useState('asc');
 
-  const cellStyle =
-    'w-full bg-transparent rounded border border-transparent hover:border-primary-200 focus:border-primary-400 focus:bg-white outline-none px-1 py-0.5 text-xs transition-all';
+  const cellStyle = 'grid-input text-[11px] leading-tight w-full';
 
   useEffect(() => {
     Promise.all([
@@ -421,6 +436,20 @@ export default function SalesPrint({ path: windowPath }) {
     const { key } = e;
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) return;
 
+    const el = e.currentTarget || e.target;
+    const isInput = el.tagName === 'INPUT' && !el.readOnly;
+
+    // For text inputs, ArrowLeft/Right should move cursor within the
+    // text unless the caret is already at the boundary (start/end).
+    if (isInput && (key === 'ArrowLeft' || key === 'ArrowRight')) {
+      const pos = el.selectionStart;
+      const len = (el.value || '').length;
+      const hasSelection = el.selectionStart !== el.selectionEnd;
+      if (hasSelection) return; // let browser collapse selection first
+      if (key === 'ArrowLeft' && pos > 0) return;   // cursor not at start
+      if (key === 'ArrowRight' && pos < len) return; // cursor not at end
+    }
+
     let targetRow = rowIdx;
     let targetCol = colIdx;
 
@@ -466,17 +495,19 @@ export default function SalesPrint({ path: windowPath }) {
   };
 
 
-  const SortHeader = ({ column, label }) => {
+  const SortHeader = ({ column, label, align = 'left' }) => {
     const active = sortKey === column;
     const Icon = active ? (sortDir === 'desc' ? ArrowDown : ArrowUp) : ArrowUpDown;
     return (
       <button
         type="button"
-        className="inline-flex items-center gap-1 font-semibold hover:text-primary-800"
+        className={`inline-flex items-center gap-0.5 font-semibold text-[10px] uppercase tracking-tight hover:text-primary-800 cursor-pointer ${
+          align === 'right' ? 'w-full justify-end text-right' : 'text-left'
+        }`}
         onClick={() => toggleSort(column)}
       >
-        {label}
-        <Icon className={`w-3.5 h-3.5 ${active ? 'text-primary-800' : 'text-primary-400'}`} />
+        <span>{label}</span>
+        <Icon className={`w-2.5 h-2.5 shrink-0 ${active ? 'text-primary-800' : 'text-primary-400'}`} />
       </button>
     );
   };
@@ -484,11 +515,11 @@ export default function SalesPrint({ path: windowPath }) {
   const hasFilters = !!(filterCustomer || filterVendor || filterItem);
 
   return (
-    <div className="space-y-4 flex flex-col h-full overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
+    <div className="space-y-2.5 flex flex-col h-full overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 shrink-0">
         <div>
-          <h1 className="page-title">Sales Print</h1>
-          <p className="text-primary-400 text-sm mt-0.5">
+          <h1 className="text-sm font-bold text-primary-800">Sales Print</h1>
+          <p className="text-primary-400 text-[11px] mt-0.5">
             Filter, preview, and print customer sales bills for active sales entries
           </p>
         </div>
@@ -497,34 +528,34 @@ export default function SalesPrint({ path: windowPath }) {
           {isOnline && (
             <button
               type="button"
-              className="btn-secondary !py-2 !px-3 text-xs"
+              className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
               onClick={handleSendWhatsApp}
               disabled={!selectedStatements.length}
             >
-              <Send className="w-4 h-4 text-emerald-600" /> Send WhatsApp
+              <Send className="w-3.5 h-3.5 text-emerald-600" /> Send WhatsApp
             </button>
           )}
           <button
             type="button"
-            className="btn-primary !py-2 !px-4 text-xs"
+            className="btn-primary !py-1.5 !px-3 !text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
             onClick={handlePrintPDF}
             disabled={!selectedStatements.length || printing}
           >
-            <Printer className="w-4 h-4" /> {printing ? 'Opening PDF...' : 'Print / Save PDF'}
+            <Printer className="w-3.5 h-3.5" /> {printing ? 'Opening PDF...' : 'Print / Save PDF'}
           </button>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="card !p-3 sm:!p-4 shrink-0 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-100/70 border border-primary-200 text-xs font-bold text-primary-800">
-            <Calendar className="w-3.5 h-3.5 text-primary-600" />
+      <div className="card !p-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap">
+          <div className="flex items-center gap-1 h-7 px-2 rounded-lg bg-primary-100/70 border border-primary-200 text-[11px] font-bold text-primary-800 shrink-0">
+            <Calendar className="w-3 h-3 text-primary-600" />
             <span>Date: {formatDateOnly(startDate)}</span>
           </div>
 
           <select
-            className="input-field !h-10 !py-0 w-full sm:w-auto min-w-[140px] text-sm flex-1 sm:flex-initial"
+            className="h-7 min-w-[110px] max-w-[140px] rounded-lg border border-primary-200 bg-surface px-2 py-0.5 text-[11px] text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate shrink-0"
             value={filterCustomer}
             onChange={(e) => setFilterCustomer(e.target.value)}
           >
@@ -537,7 +568,7 @@ export default function SalesPrint({ path: windowPath }) {
           </select>
 
           <select
-            className="input-field !h-10 !py-0 w-full sm:w-auto min-w-[130px] text-sm flex-1 sm:flex-initial"
+            className="h-7 min-w-[105px] max-w-[130px] rounded-lg border border-primary-200 bg-surface px-2 py-0.5 text-[11px] text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate shrink-0"
             value={filterVendor}
             onChange={(e) => setFilterVendor(e.target.value)}
           >
@@ -550,7 +581,7 @@ export default function SalesPrint({ path: windowPath }) {
           </select>
 
           <select
-            className="input-field !h-10 !py-0 w-full sm:w-auto min-w-[130px] text-sm flex-1 sm:flex-initial"
+            className="h-7 min-w-[105px] max-w-[130px] rounded-lg border border-primary-200 bg-surface px-2 py-0.5 text-[11px] text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate shrink-0"
             value={filterItem}
             onChange={(e) => setFilterItem(e.target.value)}
           >
@@ -565,182 +596,242 @@ export default function SalesPrint({ path: windowPath }) {
           {hasFilters && (
             <button
               type="button"
-              className="text-xs font-medium text-amber-700 hover:text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2"
+              className="text-[11px] font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg px-2 h-7 flex items-center gap-1 transition cursor-pointer shrink-0"
               onClick={() => {
                 setFilterCustomer('');
                 setFilterVendor('');
                 setFilterItem('');
               }}
+              title="Clear active filters"
             >
-              Clear filters
+              <X className="w-3 h-3" /> Clear
             </button>
           )}
 
           <button
             type="button"
-            className="btn-secondary !h-10 !py-1 !px-3 text-xs ml-auto"
+            className="btn-secondary !h-7 !py-0.5 !px-2 !text-[11px] font-semibold rounded-lg flex items-center gap-1 ml-auto shrink-0 cursor-pointer"
             onClick={fetchSalesBills}
             disabled={loading}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
         </div>
       </div>
 
       {/* Main Workspace (Split View) */}
-      <div className="flex flex-col xl:grid xl:grid-cols-12 gap-4 flex-1 min-h-0 overflow-y-auto xl:overflow-hidden">
-        {/* Left Column: Records Table */}
-        <div className="xl:col-span-3 flex flex-col card !p-0 overflow-hidden min-h-[220px] max-h-[300px] xl:max-h-none shrink-0 xl:shrink">
-          <div className="px-3 py-2.5 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <button type="button" onClick={toggleSelectAll} className="text-primary-600">
-                {selectedCids.size === filteredStatements.length && filteredStatements.length > 0 ? (
-                  <CheckSquare className="w-4 h-4" />
-                ) : (
-                  <Square className="w-4 h-4 text-primary-400" />
-                )}
+      <div className="flex flex-col md:flex-row gap-2.5 flex-1 min-h-0 overflow-hidden">
+        {/* Left Column: Records Table (Collapsible) */}
+        {showCustomerList && (
+          <div className="w-full md:w-60 lg:w-64 min-w-[235px] max-w-[260px] flex flex-col card !p-0 overflow-hidden min-h-[160px] max-h-[240px] md:max-h-none shrink-0 border border-primary-200">
+            <div className="px-2 py-1.5 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={toggleSelectAll} className="text-primary-600 cursor-pointer">
+                  {selectedCids.size === filteredStatements.length && filteredStatements.length > 0 ? (
+                    <CheckSquare className="w-3.5 h-3.5" />
+                  ) : (
+                    <Square className="w-3.5 h-3.5 text-primary-400" />
+                  )}
+                </button>
+                <span className="font-bold text-primary-800 text-[11px]">
+                  Selected {selectedStatements.length} / {filteredStatements.length}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCustomerList(false)}
+                className="text-[10px] font-semibold text-primary-500 hover:text-primary-800 px-1 py-0.5 rounded hover:bg-primary-100 transition cursor-pointer"
+                title="Hide customer list to expand bill preview"
+              >
+                Hide
               </button>
-              <span className="font-bold text-primary-800 text-xs">
-                Selected {selectedStatements.length} / {filteredStatements.length}
-              </span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto overflow-x-hidden">
+              {loading ? (
+                <div className="text-center py-12 text-primary-400 text-xs">Loading sales...</div>
+              ) : filteredStatements.length === 0 ? (
+                <div className="text-center py-12 text-primary-400 text-xs">No sales match filter</div>
+              ) : (
+                <table className="w-full text-[11px] table-fixed">
+                  <thead className="sticky top-0 bg-primary-50 border-b border-primary-100 z-10 text-[10px]">
+                    <tr className="text-left text-primary-600">
+                      <th className="w-6 px-1 py-1 text-center"></th>
+                      <th className="px-1.5 py-1 font-semibold">
+                        <SortHeader column="name" label="Customer" />
+                      </th>
+                      <th className="px-1 py-1 font-semibold text-right w-14">
+                        <SortHeader column="totalSale" label="Sale" align="right" />
+                      </th>
+                      <th className="px-1.5 py-1 font-semibold text-right w-16">
+                        <SortHeader column="closing" label="Closing" align="right" />
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStatements.map((st) => {
+                      const cid = String(st.customerId);
+                      const selected = selectedCids.has(cid);
+                      return (
+                        <tr
+                          key={cid}
+                          onClick={() => toggleSelectOne(cid)}
+                          className={`border-b border-primary-100 cursor-pointer transition ${
+                            selected ? 'bg-primary-100/60 font-medium' : 'hover:bg-primary-50/40'
+                          }`}
+                        >
+                          <td className="px-1 py-1 text-center w-6" onClick={(e) => e.stopPropagation()}>
+                            <button type="button" onClick={() => toggleSelectOne(cid)} className="cursor-pointer">
+                              {selected ? (
+                                <CheckSquare className="w-3.5 h-3.5 text-primary-600" />
+                              ) : (
+                                <Square className="w-3.5 h-3.5 text-primary-300" />
+                              )}
+                            </button>
+                          </td>
+                          <td className="px-1.5 py-1 text-primary-800 min-w-0">
+                            <div className="font-semibold text-[11px] leading-snug truncate" title={st.name}>
+                              {st.name}
+                            </div>
+                            {st.nameTelugu ? (
+                              <span className="text-[9.5px] text-primary-400 truncate block">{st.nameTelugu}</span>
+                            ) : null}
+                          </td>
+                          <td className="px-1 py-1 text-right text-primary-700 font-semibold tabular-nums text-[11px] whitespace-nowrap w-14">
+                            {formatCurrency(st.totalSale)}
+                          </td>
+                          <td className="px-1.5 py-1 text-right text-primary-800 font-bold tabular-nums text-[11px] whitespace-nowrap w-16">
+                            {formatCurrency(st.closing)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
-
-          <div className="flex-1 overflow-auto">
-            {loading ? (
-              <div className="text-center py-16 text-primary-400 text-xs">Loading sales...</div>
-            ) : filteredStatements.length === 0 ? (
-              <div className="text-center py-16 text-primary-400 text-xs">No sales match filter</div>
-            ) : (
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-primary-50 border-b border-primary-100 z-10">
-                  <tr className="text-left text-primary-600">
-                    <th className="w-7 px-2 py-2"></th>
-                    <th className="px-2 py-2 font-semibold">
-                      <SortHeader column="name" label="Customer" />
-                    </th>
-                    <th className="px-2 py-2 font-semibold text-right">
-                      <SortHeader column="totalSale" label="Sale" />
-                    </th>
-                    <th className="px-2 py-2 font-semibold text-right">
-                      <SortHeader column="closing" label="Closing" />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredStatements.map((st) => {
-                    const cid = String(st.customerId);
-                    const selected = selectedCids.has(cid);
-                    return (
-                      <tr
-                        key={cid}
-                        onClick={() => toggleSelectOne(cid)}
-                        className={`border-b border-primary-50 cursor-pointer transition ${
-                          selected ? 'bg-primary-50/70 font-medium' : 'hover:bg-primary-50/30'
-                        }`}
-                      >
-                        <td className="px-1.5 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
-                          <button type="button" onClick={() => toggleSelectOne(cid)}>
-                            {selected ? (
-                              <CheckSquare className="w-3.5 h-3.5 text-primary-600" />
-                            ) : (
-                              <Square className="w-3.5 h-3.5 text-primary-300" />
-                            )}
-                          </button>
-                        </td>
-                        <td className="px-2 py-1.5 text-primary-800">
-                          <div className="font-semibold text-xs leading-snug truncate max-w-[110px]">{st.name}</div>
-                          {st.nameTelugu ? (
-                            <span className="text-[11px] text-primary-400 truncate block">{st.nameTelugu}</span>
-                          ) : null}
-                        </td>
-                        <td className="px-2 py-1.5 text-right text-primary-700 font-semibold tabular-nums text-xs">
-                          {formatCurrency(st.totalSale)}
-                        </td>
-                        <td className="px-2 py-1.5 text-right text-primary-800 font-bold tabular-nums text-xs">
-                          {formatCurrency(st.closing)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+        )}
 
         {/* Right Column: Live Bill Preview */}
-        <div className="xl:col-span-9 flex flex-col card !p-0 overflow-hidden min-h-[300px] flex-1">
-          <div className="px-4 py-2.5 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between flex-wrap gap-2">
-            <span className="font-bold text-primary-800 text-sm">
-              Live Preview ({selectedStatements.length} Bills · {perPage} per page layout)
-            </span>
-
-            {/* Prominent Layout Toggle Buttons */}
+        <div className="flex-1 min-w-0 flex flex-col card !p-0 overflow-hidden border border-primary-200">
+          <div className="px-3 py-1.5 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-primary-600 font-semibold">Layout:</span>
-              {[2, 4, 6].map((n) => (
+              {!showCustomerList && (
                 <button
-                  key={n}
                   type="button"
-                  onClick={() => setPerPage(n)}
-                  className={`px-3 py-1 text-xs rounded-md font-bold transition shadow-sm ${
-                    perPage === n
-                      ? 'bg-primary-800 text-white ring-2 ring-primary-400'
+                  onClick={() => setShowCustomerList(true)}
+                  className="px-2 py-0.5 rounded border border-primary-200 bg-white text-primary-700 hover:bg-primary-100 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                  title="Show customer list"
+                >
+                  <Users className="w-3 h-3 text-primary-500" /> Show List
+                </button>
+              )}
+              <span className="font-bold text-primary-800 text-xs">
+                Live Preview ({selectedStatements.length} Bills)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* View Layout Toggle: 1 Column vs 2 Columns */}
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-primary-500 font-semibold uppercase tracking-wide">View:</span>
+                <button
+                  type="button"
+                  onClick={() => setViewColumns(1)}
+                  className={`px-2 py-0.5 text-[11px] rounded-md font-semibold transition cursor-pointer ${
+                    viewColumns === 1
+                      ? 'bg-primary-800 text-white shadow-xs'
                       : 'bg-white text-primary-700 hover:bg-primary-100 border border-primary-200'
                   }`}
+                  title="1 Column (Full Width - Zero Scrolling)"
                 >
-                  {n} Per Page
+                  1 Col
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setViewColumns(2)}
+                  className={`px-2 py-0.5 text-[11px] rounded-md font-semibold transition cursor-pointer ${
+                    viewColumns === 2
+                      ? 'bg-primary-800 text-white shadow-xs'
+                      : 'bg-white text-primary-700 hover:bg-primary-100 border border-primary-200'
+                  }`}
+                  title="2 Columns Side by Side"
+                >
+                  2 Cols
+                </button>
+              </div>
+
+              {/* PDF Print N-Up Toggle */}
+              <div className="flex items-center gap-1 border-l border-primary-200 pl-2.5">
+                <span className="text-[10px] text-primary-500 font-semibold uppercase tracking-wide">Print:</span>
+                {[2, 4, 6].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setPerPage(n)}
+                    className={`px-1.5 py-0.5 text-[11px] rounded-md font-semibold transition cursor-pointer ${
+                      perPage === n
+                        ? 'bg-primary-800 text-white shadow-xs'
+                        : 'bg-white text-primary-700 hover:bg-primary-100 border border-primary-200'
+                    }`}
+                  >
+                    {n}/page
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto p-4 bg-primary-100/50">
+          <div className="flex-1 overflow-auto p-2.5 bg-primary-50/30">
             {selectedStatements.length === 0 ? (
-              <div className="text-center py-24 text-primary-400">
-                <FileText className="w-12 h-12 text-primary-300 mx-auto mb-2" />
-                <p className="font-medium text-primary-600">No sales selected for preview</p>
-                <p className="text-xs mt-1 text-primary-400">Select customers on the left to see live preview</p>
+              <div className="text-center py-20 text-primary-400">
+                <FileText className="w-10 h-10 text-primary-300 mx-auto mb-2" />
+                <p className="font-medium text-primary-600 text-xs">No sales selected for preview</p>
+                <p className="text-[11px] mt-1 text-primary-400">Select customers on the left to see live preview</p>
               </div>
             ) : (
               (() => {
                 let globalRowIdx = 0;
                 return (
-                  <div className="grid gap-4 grid-cols-1 xl:grid-cols-2">
+                  <div
+                    className={`grid gap-2.5 ${
+                      viewColumns === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'
+                    }`}
+                  >
                     {selectedStatements.slice(0, 12).map((st) => {
                       return (
                         <div
                           key={st.customerId}
-                          className="card !p-3.5 border border-primary-200 shadow-sm bg-white text-xs space-y-2.5 relative overflow-hidden"
+                          className="card !p-0 border border-primary-200 shadow-sm bg-white overflow-hidden flex flex-col"
                         >
-                          <div className="text-center border-b border-primary-100 pb-2">
-                            <p className="font-bold text-primary-900 text-base">{st.name}</p>
+                          <div className="bg-primary-50/90 px-2.5 py-1 border-b border-primary-200 flex items-center gap-1.5">
+                            <span className="font-bold text-primary-900 text-xs truncate">{st.name}</span>
                             {st.nameTelugu ? (
-                              <p className="text-xs text-primary-500 font-medium">{st.nameTelugu}</p>
+                              <span className="text-[10px] text-primary-600 font-medium truncate">({st.nameTelugu})</span>
                             ) : null}
                           </div>
 
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-xs min-w-[340px]">
+                          <div className="overflow-x-auto flex-1">
+                            <table className="w-full text-[11px] excel-grid border border-primary-200">
                               <thead>
-                                <tr className="border-b border-primary-200 text-primary-600 font-semibold text-left bg-primary-50/70 whitespace-nowrap">
-                                  <th className="py-1.5 px-1 font-bold">తేదీ</th>
-                                  <th className="py-1.5 px-1 font-bold min-w-[7rem]">వస్తువు</th>
-                                  <th className="py-1.5 px-1 text-right font-bold w-12">బ్యాగ్</th>
-                                  <th className="py-1.5 px-1 text-right font-bold w-16">బరువు (kg)</th>
-                                  <th className="py-1.5 px-1 text-right font-bold w-16">ధర</th>
-                                  <th className="py-1.5 px-1 text-right font-bold">మొత్తం</th>
+                                <tr className="bg-accent-200 text-accent-900 text-left whitespace-nowrap">
+                                  <th className="bg-accent-200 px-1.5 py-1 font-bold text-center w-16 text-[10px]">తేదీ</th>
+                                  <th className="bg-accent-200 px-1.5 py-1 font-bold min-w-[5.5rem] text-[10px]">వస్తువు</th>
+                                  <th className="bg-accent-200 px-1 py-1 text-right font-bold w-10 text-[10px]">బ్యాగ్</th>
+                                  <th className="bg-accent-200 px-1.5 py-1 text-right font-bold w-14 text-[10px]">బరువు (kg)</th>
+                                  <th className="bg-accent-200 px-1.5 py-1 text-right font-bold w-14 text-[10px]">ధర</th>
+                                  <th className="bg-accent-200 px-1.5 py-1 text-right font-bold w-18 text-[10px]">మొత్తం</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-primary-100">
-                                <tr>
-                                  <td className="py-1 px-1"></td>
-                                  <td className="py-1 px-1 font-medium text-primary-700">Opening</td>
-                                  <td className="py-1 px-1"></td>
-                                  <td className="py-1 px-1"></td>
-                                  <td className="py-1 px-1"></td>
-                                  <td className="py-1 px-1 text-right font-semibold">{formatCurrency(st.opening || 0)}</td>
+                              <tbody>
+                                <tr className="bg-surface hover:bg-primary-50/40 text-[11px]">
+                                  <td className="px-1.5 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
+                                  <td className="px-1.5 py-0.5 font-semibold text-primary-700">Opening</td>
+                                  <td className="px-1 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
+                                  <td className="px-1.5 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
+                                  <td className="px-1.5 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
+                                  <td className="px-1.5 py-0.5 text-right font-semibold tabular-nums text-primary-800">{formatCurrency(st.opening || 0)}</td>
                                 </tr>
                                 {(st.sales || []).map((s, idx) => {
                                   const rIdx = globalRowIdx++;
@@ -757,17 +848,24 @@ export default function SalesPrint({ path: windowPath }) {
                                     )?._id || s.materialId || '';
 
                                   return (
-                                    <tr key={rowKey} className="hover:bg-primary-50/40 transition">
-                                      <td className="py-1 px-1 text-primary-500 whitespace-nowrap">
-                                        {formatDateOnly(s.date)}
+                                    <tr
+                                      key={rowKey}
+                                      className={
+                                        idx % 2 === 0
+                                          ? 'bg-surface hover:bg-primary-50/40'
+                                          : 'bg-primary-50/20 hover:bg-primary-50/50'
+                                      }
+                                    >
+                                      <td className="px-1.5 py-0.5 text-primary-600 text-center whitespace-nowrap tabular-nums text-[10.5px]">
+                                        {formatShortDate(s.date)}
                                       </td>
-                                      <td className="py-1 px-1 min-w-[7rem]">
+                                      <td className="px-1 py-0.5 min-w-[5.5rem]">
                                         <select
                                           key={`${s.saleId}-mat-${s.materialId || s.material}`}
                                           data-print-row={rIdx}
                                           data-print-col={0}
                                           onKeyDown={(e) => handleGridKeyDown(e, rIdx, 0)}
-                                          className={`${cellStyle} font-semibold text-primary-800 cursor-pointer`}
+                                          className={`${cellStyle} font-semibold text-primary-800 cursor-pointer text-[11px] py-0.5`}
                                           defaultValue={selectedMatId}
                                           onChange={(e) => {
                                             const newMatId = e.target.value;
@@ -790,7 +888,7 @@ export default function SalesPrint({ path: windowPath }) {
                                           ))}
                                         </select>
                                       </td>
-                                      <td className="py-1 px-1 w-12 text-right">
+                                      <td className="px-1 py-0.5 text-right w-10">
                                         <input
                                           key={`${s.saleId}-bags-${s.bags}`}
                                           data-print-row={rIdx}
@@ -799,7 +897,7 @@ export default function SalesPrint({ path: windowPath }) {
                                           inputMode="numeric"
                                           autoComplete="off"
                                           defaultValue={s.bags || 1}
-                                          className={`${cellStyle} text-right font-medium tabular-nums text-primary-800`}
+                                          className={`${cellStyle} text-right font-semibold tabular-nums text-primary-800 text-[11px] py-0.5`}
                                           onBlur={(e) => {
                                             const newBags = Math.max(1, Math.floor(Number(e.target.value)) || 1);
                                             if (newBags === Number(s.bags)) return;
@@ -807,18 +905,21 @@ export default function SalesPrint({ path: windowPath }) {
                                           }}
                                           onKeyDown={(e) => {
                                             handleGridKeyDown(e, rIdx, 1);
-                                            if (e.key === 'Enter') e.currentTarget.blur();
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              e.currentTarget.blur();
+                                            }
                                           }}
                                         />
                                       </td>
-                                      <td className="py-1 px-1 w-16 text-right">
+                                      <td className="px-1 py-0.5 text-right w-14">
                                         {s.saleType === 'by_bag' ? (
                                           <span
                                             tabIndex={0}
                                             data-print-row={rIdx}
                                             data-print-col={2}
                                             onKeyDown={(e) => handleGridKeyDown(e, rIdx, 2)}
-                                            className="text-primary-400 font-medium py-1 px-1 block outline-none focus:ring-1 focus:ring-amber-500 rounded cursor-pointer"
+                                            className="text-primary-400 font-medium py-0.5 px-1 block text-center outline-none cursor-default text-[10px]"
                                           >
                                             —
                                           </span>
@@ -831,7 +932,7 @@ export default function SalesPrint({ path: windowPath }) {
                                             inputMode="decimal"
                                             autoComplete="off"
                                             defaultValue={s.weight != null ? s.weight : ''}
-                                            className={`${cellStyle} text-right font-medium tabular-nums text-primary-700`}
+                                            className={`${cellStyle} text-right font-medium tabular-nums text-primary-700 text-[11px] py-0.5`}
                                             onBlur={(e) => {
                                               const newWeight = Number(e.target.value) || 0;
                                               if (newWeight === Number(s.weight)) return;
@@ -839,13 +940,16 @@ export default function SalesPrint({ path: windowPath }) {
                                             }}
                                             onKeyDown={(e) => {
                                               handleGridKeyDown(e, rIdx, 2);
-                                              if (e.key === 'Enter') e.currentTarget.blur();
+                                              if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                e.currentTarget.blur();
+                                              }
                                             }}
                                           />
                                         )}
                                       </td>
-                                      <td className="py-1 px-1 w-16 text-right">
-                                        <div className="flex flex-col items-end">
+                                      <td className="px-1 py-0.5 text-right w-14">
+                                        <div className="flex items-center justify-end gap-0.5">
                                           <input
                                             key={`${s.saleId}-rate-${s.ratePerKg}`}
                                             data-print-row={rIdx}
@@ -854,7 +958,7 @@ export default function SalesPrint({ path: windowPath }) {
                                             inputMode="decimal"
                                             autoComplete="off"
                                             defaultValue={s.ratePerKg != null ? s.ratePerKg : ''}
-                                            className={`${cellStyle} text-right font-medium tabular-nums text-primary-700`}
+                                            className={`${cellStyle} text-right font-medium tabular-nums text-primary-700 text-[11px] py-0.5`}
                                             onBlur={(e) => {
                                               const newRate = Number(e.target.value) || 0;
                                               if (newRate === Number(s.ratePerKg)) return;
@@ -862,60 +966,69 @@ export default function SalesPrint({ path: windowPath }) {
                                             }}
                                             onKeyDown={(e) => {
                                               handleGridKeyDown(e, rIdx, 3);
-                                              if (e.key === 'Enter') e.currentTarget.blur();
+                                              if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                e.currentTarget.blur();
+                                              }
                                             }}
                                           />
                                           {s.saleType === 'by_bag' && (
-                                            <span className="inline-block text-[9px] font-semibold px-1 py-0.2 rounded bg-amber-100 text-amber-800 leading-none whitespace-nowrap">
-                                              per bag
+                                            <span className="text-[8px] font-bold px-1 rounded bg-amber-100 text-amber-800 leading-tight whitespace-nowrap">
+                                              bag
                                             </span>
                                           )}
                                         </div>
                                       </td>
-                                <td className="py-1 px-1 text-right font-bold text-primary-800 whitespace-nowrap">
-                                  {formatCurrency(lineTotal)}
-                                  {coolyAmt > 0 ? (
-                                    <span className="text-[10px] text-emerald-700 block font-normal">
-                                      (incl. ₹{coolyAmt} cooly)
-                                    </span>
-                                  ) : null}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                          {(st.payments || []).map((p, pIdx) => (
-                            <tr key={`payment-${pIdx}`} className="text-emerald-700 bg-emerald-50/30">
-                              <td className="py-1 px-1">{formatDateOnly(p.date)}</td>
-                              <td className="py-1 px-1 font-medium" colSpan={4}>Paid</td>
-                              <td className="py-1 px-1 text-right font-bold">- {formatCurrency(p.amount)}</td>
-                            </tr>
-                          ))}
-                          <tr className="font-bold text-primary-900 border-t border-primary-200 bg-primary-50/30 whitespace-nowrap">
-                            <td className="py-1.5 px-1 font-bold text-xs" colSpan={5}>
-                              Total
-                            </td>
-                            <td className="py-1.5 px-1 text-right font-bold text-sm text-primary-900">
-                              {formatCurrency(st.totalSale)}
-                            </td>
-                          </tr>
-                          <tr className="font-bold text-primary-900 border-t border-primary-200 bg-primary-50/60 whitespace-nowrap">
-                            <td className="py-1.5 px-1 font-bold text-xs" colSpan={5}>
-                              Closing
-                            </td>
-                            <td className="py-1.5 px-1 text-right font-bold text-sm text-primary-900">
-                              {formatCurrency(st.closing)}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                                      <td className="px-1.5 py-0.5 text-right font-bold text-primary-900 whitespace-nowrap tabular-nums text-[11px]">
+                                        {formatCurrency(lineTotal)}
+                                        {coolyAmt > 0 ? (
+                                          <span className="text-[9px] text-emerald-700 block font-normal leading-tight">
+                                            (incl. ₹{coolyAmt} cooly)
+                                          </span>
+                                        ) : null}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                                {(st.payments || []).map((p, pIdx) => (
+                                  <tr key={`payment-${pIdx}`} className="text-emerald-800 bg-emerald-50/40 text-[11px]">
+                                    <td className="px-1.5 py-0.5 text-center whitespace-nowrap text-[10.5px]">{formatShortDate(p.date)}</td>
+                                    <td className="px-1.5 py-0.5 font-semibold" colSpan={4}>Paid</td>
+                                    <td className="px-1.5 py-0.5 text-right font-bold tabular-nums text-[11px]">- {formatCurrency(p.amount)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot className="border-t-2 border-primary-300 bg-accent-200">
+                                <tr className="bg-accent-200 text-accent-900 font-bold whitespace-nowrap text-[11px]">
+                                  <td className="bg-accent-200 px-1.5 py-1 font-bold text-[10.5px] uppercase tracking-wide text-accent-900" colSpan={5}>
+                                    Total
+                                  </td>
+                                  <td className="bg-accent-200 px-1.5 py-1 text-right font-bold text-xs tabular-nums text-accent-900">
+                                    {formatCurrency(st.totalSale)}
+                                  </td>
+                                </tr>
+                                <tr className="bg-accent-100/70 text-accent-900 font-bold whitespace-nowrap text-[11px]">
+                                  <td className="bg-accent-100/70 px-1.5 py-1 font-bold text-[10.5px] uppercase tracking-wide text-accent-900" colSpan={5}>
+                                    Closing
+                                  </td>
+                                  <td className="bg-accent-100/70 px-1.5 py-1 text-right font-bold text-xs tabular-nums text-accent-900">
+                                    {formatCurrency(st.closing)}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                          <div className="flex items-center justify-between px-2.5 py-0.5 bg-primary-50/40 border-t border-primary-100 text-[9.5px] text-primary-400 font-medium shrink-0">
+                            <span>Enter / blur to save • Arrow keys to navigate</span>
+                            <span>{(st.sales || []).length} items</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 );
-              })}
-            </div>
-          );
-        })()
-      )}
+              })()
+            )}
           </div>
         </div>
       </div>

@@ -43,6 +43,7 @@ export const MODULE_REGISTRY = {
   '/sales-report-2': { title: 'Day wise sale report', icon: 'FileBarChart' },
   '/cash-checklist': { title: 'Cash Checklist', icon: 'Banknote' },
   '/less-checklist': { title: 'Less Checklist', icon: 'Receipt' },
+  '/hamali-report': { title: 'Hamali Report', icon: 'Calculator' },
   '/settings': { title: 'Price Settings', icon: 'Settings' },
   '/shortcuts': { title: 'Shortcut Settings', icon: 'Keyboard' },
   '/whatsapp-settings': { title: 'WhatsApp Settings', icon: 'MessageSquare' },
@@ -200,12 +201,19 @@ export function MDIProvider({ children }) {
       const icon = meta.icon || 'Package';
 
       const isWide =
-        basePath === '/sell' ||
+        basePath.startsWith('/sell') ||
+        basePath.startsWith('/sales-print') ||
+        basePath.startsWith('/bill-print') ||
         basePath === '/ledger' ||
         basePath === '/sales-report' ||
+        basePath === '/sales-report-2' ||
+        basePath === '/cash-checklist' ||
+        basePath === '/less-checklist' ||
+        basePath === '/hamali-report' ||
         basePath === '/sales-orders' ||
+        basePath === '/sales-orders/previous' ||
         urlId === 'sales-order-detail';
-      const defaultWidth = isWide ? 960 : 840;
+      const defaultWidth = isWide ? 1040 : 840;
       const defaultHeight = isWide ? 620 : 540;
 
       if (existingIndex >= 0) {
@@ -363,14 +371,20 @@ export function MDIProvider({ children }) {
         const count = openNonMin.length;
 
         const isWide =
-          path === '/sell' ||
+          path.startsWith('/sell') ||
+          path.startsWith('/sales-print') ||
+          path.startsWith('/bill-print') ||
           path === '/ledger' ||
           path === '/sales-report' ||
+          path === '/sales-report-2' ||
+          path === '/cash-checklist' ||
+          path === '/less-checklist' ||
+          path === '/hamali-report' ||
           path === '/sales-orders' ||
           id === 'sales-order-detail';
 
-        const defaultWidth = Math.min(isWide ? 900 : 760, Math.max(560, containerWidth - 40));
-        const defaultHeight = Math.min(isWide ? 600 : 510, Math.max(400, containerHeight - 40));
+        const defaultWidth = Math.min(isWide ? 1040 : 760, Math.max(560, containerWidth - 40));
+        const defaultHeight = Math.min(isWide ? 620 : 510, Math.max(400, containerHeight - 40));
 
         // Horizontal step spacing of ~ 260px - 300px ensures previous window title & body remain clearly visible side-by-side
         const stepX = Math.min(280, Math.max(160, Math.floor((containerWidth - 650) / Math.max(1, count))));
@@ -518,14 +532,20 @@ export function MDIProvider({ children }) {
     else if (basePath.startsWith('/customers/')) winId = 'customer-detail';
     else if (basePath.startsWith('/sales-orders/') && basePath !== '/sales-orders/previous') winId = 'sales-order-detail';
 
-    setWindows((prev) =>
-      prev.map((w) => (w.id === winId ? { ...w, path: newPath } : w))
-    );
+    setWindows((prev) => {
+      const existing = prev.find((w) => w.id === winId);
+      if (!existing || existing.path === newPath) return prev;
+      return prev.map((w) => (w.id === winId ? { ...w, path: newPath } : w));
+    });
 
     try {
       const curPath = window.location.pathname;
-      if (curPath === basePath || curPath === '/' || curPath === newPath.split('?')[0]) {
-        window.history.replaceState(null, '', newPath);
+      const targetBase = newPath.split('?')[0];
+      if (curPath === basePath || curPath === targetBase) {
+        const fullCur = window.location.pathname + window.location.search;
+        if (fullCur !== newPath) {
+          window.history.replaceState(null, '', newPath);
+        }
       }
     } catch {
       /* ignore */
@@ -714,14 +734,21 @@ export function MDIProvider({ children }) {
 
         const idx = visibleIdx++;
         const isWide =
-          w.path === '/sell' ||
+          w.path?.startsWith('/sell') ||
+          w.path?.startsWith('/sales-print') ||
+          w.path?.startsWith('/bill-print') ||
           w.path === '/ledger' ||
           w.path === '/sales-report' ||
+          w.path === '/sales-report-2' ||
+          w.path === '/cash-checklist' ||
+          w.path === '/less-checklist' ||
+          w.path === '/hamali-report' ||
           w.path === '/sales-orders' ||
+          w.path === '/sales-orders/previous' ||
           w.id === 'sales-order-detail';
 
-        const winWidth = Math.min(isWide ? 900 : 760, Math.max(560, containerWidth - 40));
-        const winHeight = Math.min(isWide ? 580 : 510, Math.max(400, containerHeight - 40));
+        const winWidth = Math.min(isWide ? 1040 : 760, Math.max(560, containerWidth - 40));
+        const winHeight = Math.min(isWide ? 620 : 510, Math.max(400, containerHeight - 40));
 
         let newX = 20 + idx * stepX;
         let newY = 20 + (idx % 4) * 35;

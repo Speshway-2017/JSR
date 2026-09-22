@@ -67,8 +67,7 @@
           "to": "mongodb"
         }
       ],
-      "icon": "build/icon.png",
-      "signAndEditExecutable": false
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -80,6 +79,8 @@
       "shortcutName": "JSR",
       "uninstallDisplayName": "JSR",
       "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
       "license": "build/license.txt",
       "artifactName": "JSR-Setup-${version}.${ext}"
     },

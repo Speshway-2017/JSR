@@ -9,8 +9,18 @@ import { matchesSearchFields, searchAndSortItems } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
 import { useMDI } from '../context/MDIContext';
 
+function dateToLocalISO(dt) {
+  if (!dt) return '';
+  const d = new Date(dt);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function todayInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  return dateToLocalISO(new Date());
 }
 
 function appliedCooly(rate, bags, perBag) {
@@ -461,9 +471,12 @@ export default function Sell({ path: windowPath }) {
     ? flatRows.find((r) => r.saleId === editingSaleId)?.serial || flatRows.length
     : flatRows.length + 1;
 
-  const loadDaySales = async () => {
-    if (!date) return;
-    const res = await api.get('/sales', { params: { date } });
+  const loadDaySales = async (targetDate = date) => {
+    if (!targetDate) {
+      setSales([]);
+      return [];
+    }
+    const res = await api.get('/sales', { params: { date: targetDate } });
     setSales(res.data);
     return res.data;
   };
@@ -619,14 +632,21 @@ export default function Sell({ path: windowPath }) {
   }, [reloadAll]);
 
   useEffect(() => {
-    loadDaySales().catch(() => setSales([]));
     if (date) {
+      loadDaySales(date).catch(() => setSales([]));
       window.dispatchEvent(new CustomEvent('jsr_sales_date_changed', { detail: { date } }));
+    } else {
+      setSales([]);
     }
   }, [date]);
 
+  const remoteFetchedSaleIdRef = useRef('');
+
   useEffect(() => {
-    if (!focusSaleId) return;
+    if (!focusSaleId) {
+      remoteFetchedSaleIdRef.current = '';
+      return;
+    }
     const target = sales.find((s) => s._id === focusSaleId);
     if (target) {
       if (editingSaleId !== target._id) {
@@ -634,21 +654,23 @@ export default function Sell({ path: windowPath }) {
       }
       return;
     }
-    // If not found in current day's sales list, fetch directly
+    // If not found in current day's sales list, fetch directly once
+    if (remoteFetchedSaleIdRef.current === focusSaleId) return;
+    remoteFetchedSaleIdRef.current = focusSaleId;
     let active = true;
     api
       .get(`/sales/${focusSaleId}`)
       .then((res) => {
         if (!active || !res.data) return;
         fillFromSale(res.data, 0);
-        const d = new Date(res.data.createdAt).toISOString().slice(0, 10);
-        if (d !== date) setDate(d);
+        const d = dateToLocalISO(res.data.createdAt);
+        if (d && d !== date) setDate(d);
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, [sales, focusSaleId, editingSaleId, date]);
+  }, [sales, focusSaleId, editingSaleId]);
 
   useEffect(() => {
     if (!focusSaleId || !focusRowRef.current) return;
@@ -714,7 +736,7 @@ export default function Sell({ path: windowPath }) {
     setFocusBagIdx(0);
   };
 
-  const clearEntry = ({ clearFocus = true } = {}) => {
+  const clearEntry = ({ clearFocus = true, focusName = true } = {}) => {
     editingSaleIdRef.current = '';
     setEditingSaleId('');
     setEditingLineIndex(0);
@@ -736,8 +758,10 @@ export default function Sell({ path: windowPath }) {
     } else {
       setRate('');
     }
-    nameRef.current?.focus();
-    if (searchParams.get('saleId') || searchParams.get('customerId')) {
+    if (focusName) {
+      nameRef.current?.focus();
+    }
+    if (searchParams.get('saleId') || searchParams.get('customerId') || searchParams.get('highlightSaleId')) {
       setSearchParams({}, { replace: true });
     }
   };
@@ -1232,8 +1256,11 @@ export default function Sell({ path: windowPath }) {
                 onChange={(e) => {
                   const newDate = e.target.value;
                   setDate(newDate);
-                  clearEntry();
-                  if (typeof updateWindowPath === 'function') {
+                  clearEntry({ clearFocus: true, focusName: false });
+                  setFilterCustomer('');
+                  setFilterVendor('');
+                  setFilterItem('');
+                  if (newDate && typeof updateWindowPath === 'function') {
                     updateWindowPath('/sell', `/sell?date=${newDate}`);
                   }
                 }}

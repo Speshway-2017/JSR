@@ -282,172 +282,206 @@ export default function CashChecklist() {
   };
 
   const dateError = startDate > endDate;
-  const hasRows = !loading && !dateError && filteredEntries.length > 0;
+  const hasRows = !loading && !dateError && (filteredEntries.length > 0 || summary.openingBalance !== 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-2.5 max-w-4xl">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="page-title">Cash Checklist</h1>
-          <p className="text-primary-400 text-sm mt-0.5">
-            Filter by name, date range or side
+          <h1 className="text-sm font-bold text-primary-800">Cash Checklist</h1>
+          <p className="text-primary-400 text-[11px] mt-0.5">
+            Filter cash received / paid transactions by party, date range or side
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={handlePrint}
-            disabled={!filteredEntries.length}
-            className="btn-secondary !py-2 !px-4 !text-sm disabled:opacity-50 flex items-center gap-1.5"
+            disabled={!filteredEntries.length && summary.openingBalance === 0}
+            className="btn-primary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
           >
-            <Printer className="w-4 h-4" /> Print
+            <Printer className="w-3 h-3" /> Print
           </button>
           <button
             type="button"
             onClick={exportExcel}
-            disabled={!filteredEntries.length}
-            className="btn-primary !py-2 !px-4 !text-sm disabled:opacity-50 flex items-center gap-1.5"
+            disabled={!filteredEntries.length && summary.openingBalance === 0}
+            className="btn-secondary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
           >
-            <Download className="w-4 h-4" /> Export Excel
+            <Download className="w-3 h-3 text-primary-600" /> Export Excel
           </button>
         </div>
       </div>
 
-      <div className="card !p-3 sm:!p-4">
-        <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-primary-400 w-9">From</label>
+      {/* Filter Card */}
+      <div className="card !p-2.5 space-y-2">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              From *
+            </label>
             <input
               type="date"
-              className="input-field !py-2 !text-sm"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-primary-400 w-9">To</label>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              To *
+            </label>
             <input
               type="date"
-              className="input-field !py-2 !text-sm"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={endDate}
               min={startDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
-          <select
-            className="input-field !py-2 !text-sm min-w-[140px] flex-1 sm:flex-none sm:w-48"
-            value={partyId}
-            onChange={(e) => setPartyId(e.target.value)}
-            title="Name wise"
-          >
-            <option value="">All names</option>
-            {partiesOptions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.type})
-              </option>
-            ))}
-          </select>
-          <select
-            className="input-field !py-2 !text-sm min-w-[120px] flex-1 sm:flex-none sm:w-36"
-            value={cashSideFilter}
-            onChange={(e) => setCashSideFilter(e.target.value)}
-            title="Side wise"
-          >
-            <option value="">All sides</option>
-            <option value="credit">Credit</option>
-            <option value="debit">Debit</option>
-          </select>
-          <select
-            className="input-field !py-2 !text-sm min-w-[140px] flex-1 sm:flex-none sm:w-44"
-            value={paymentTypeFilter}
-            onChange={(e) => setPaymentTypeFilter(e.target.value)}
-            title="Type of Payment"
-          >
-            <option value="">All payment types</option>
-            <option value="Cash">Cash</option>
-            <option value="PhonePe">PhonePe</option>
-            <option value="Google Pay">Google Pay</option>
-            <option value="Card">Card</option>
-            <option value="Bank Transfer">Bank Transfer</option>
-            <option value="Other">Other</option>
-          </select>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Party
+            </label>
+            <select
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              value={partyId}
+              onChange={(e) => setPartyId(e.target.value)}
+              title="Name wise"
+            >
+              <option value="">All names ({partiesOptions.length})</option>
+              {partiesOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.type})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Side
+            </label>
+            <select
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              value={cashSideFilter}
+              onChange={(e) => setCashSideFilter(e.target.value)}
+              title="Side wise"
+            >
+              <option value="">All sides</option>
+              <option value="credit">Credit</option>
+              <option value="debit">Debit</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Payment Type
+            </label>
+            <select
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              value={paymentTypeFilter}
+              onChange={(e) => setPaymentTypeFilter(e.target.value)}
+              title="Type of Payment"
+            >
+              <option value="">All payment types</option>
+              <option value="Cash">Cash</option>
+              <option value="PhonePe">PhonePe</option>
+              <option value="Google Pay">Google Pay</option>
+              <option value="Card">Card</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
         </div>
         {dateError && (
-          <p className="text-xs text-red-500 mt-2">From date must be on or before To date</p>
+          <p className="text-xs text-red-500 mt-1">From date must be on or before To date</p>
         )}
       </div>
 
+      {/* Summary KPI Strip */}
       {hasRows && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
-          <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between">
-            <span className="text-xs text-primary-400">Opening Balance</span>
-            <span className="font-semibold text-sky-700">{formatCurrency(summary.openingBalance)}</span>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div className="card !py-2 !px-2.5 flex items-center justify-between border border-primary-200">
+            <span className="text-[10.5px] font-medium text-primary-500">Opening</span>
+            <span className="font-bold text-sky-700 text-xs tabular-nums">
+              {formatCurrency(summary.openingBalance)}
+            </span>
           </div>
-          <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between">
-            <span className="text-xs text-primary-400">Total Credit</span>
-            <span className="font-semibold text-emerald-700">{formatCurrency(summary.totalCredit)}</span>
+          <div className="card !py-2 !px-2.5 flex items-center justify-between border border-primary-200">
+            <span className="text-[10.5px] font-medium text-primary-500">Credit</span>
+            <span className="font-bold text-emerald-700 text-xs tabular-nums">
+              {formatCurrency(summary.totalCredit)}
+            </span>
           </div>
-          <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between">
-            <span className="text-xs text-primary-400">Total Debit</span>
-            <span className="font-semibold text-blue-700">{formatCurrency(summary.totalDebit)}</span>
+          <div className="card !py-2 !px-2.5 flex items-center justify-between border border-primary-200">
+            <span className="text-[10.5px] font-medium text-primary-500">Debit</span>
+            <span className="font-bold text-blue-700 text-xs tabular-nums">
+              {formatCurrency(summary.totalDebit)}
+            </span>
           </div>
-          <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between">
-            <span className="text-xs text-primary-400">Total Less</span>
-            <span className="font-semibold text-amber-700">{formatCurrency(summary.totalLess)}</span>
+          <div className="card !py-2 !px-2.5 flex items-center justify-between border border-primary-200">
+            <span className="text-[10.5px] font-medium text-primary-500">Less</span>
+            <span className="font-bold text-amber-700 text-xs tabular-nums">
+              {formatCurrency(summary.totalLess)}
+            </span>
           </div>
-          <div className="card !py-3 !px-3 sm:!px-4 flex items-center justify-between bg-emerald-50/50 border-emerald-200">
-            <span className="text-xs text-emerald-800 font-medium">Closing Balance</span>
-            <span className="font-bold text-emerald-800 text-sm sm:text-base">{formatCurrency(summary.closingBalance)}</span>
+          <div className="card !py-2 !px-2.5 flex items-center justify-between border border-emerald-300 bg-emerald-50/50">
+            <span className="text-[10.5px] font-semibold text-emerald-800">Closing</span>
+            <span className="font-bold text-emerald-800 text-xs tabular-nums">
+              {formatCurrency(summary.closingBalance)}
+            </span>
           </div>
         </div>
       )}
 
-      <div className="card !p-0 overflow-hidden">
+      {/* Main Table */}
+      <div className="card !p-0 overflow-hidden border border-primary-200">
         {loading ? (
-          <div className="text-center py-12 text-primary-400 text-sm">Loading cash entries...</div>
+          <div className="text-center py-12 text-primary-400 text-xs">Loading cash entries...</div>
         ) : dateError ? (
-          <div className="text-center py-12 text-red-500 text-sm">Fix the date range</div>
+          <div className="text-center py-12 text-red-500 text-xs">Fix the date range</div>
         ) : !filteredEntries.length && summary.openingBalance === 0 ? (
           <div className="text-center py-12">
-            <FileBarChart className="w-10 h-10 text-primary-300 mx-auto mb-2" />
-            <p className="text-primary-400 text-sm">No cash entries for this filter</p>
+            <FileBarChart className="w-8 h-8 text-primary-300 mx-auto mb-1.5" />
+            <p className="text-primary-400 text-xs">No cash entries for this filter</p>
           </div>
         ) : (
           <>
-            <div className="md:hidden divide-y divide-primary-100">
-              <div className="px-4 py-3 bg-sky-50 flex justify-between text-xs font-semibold text-sky-800">
+            {/* Mobile Cards */}
+            <div className="md:hidden divide-y divide-primary-100 text-xs">
+              <div className="px-3 py-2 bg-sky-50 flex justify-between text-xs font-semibold text-sky-800">
                 <span>Opening Balance (as of {formatDateOnly(startDate)})</span>
-                <span>{formatCurrency(summary.openingBalance)}</span>
+                <span className="tabular-nums font-bold">{formatCurrency(summary.openingBalance)}</span>
               </div>
               {filteredEntries.map((row) => (
-                <div key={row.id} className="px-4 py-3">
+                <div key={row.id} className="px-3 py-2.5 hover:bg-primary-50/40 transition">
                   <div className="flex justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-primary-700">
+                      <p className="font-semibold text-primary-800 text-xs">
                         {row.partyName}
                         {row.partyNameTelugu && (
-                          <span className="text-xs text-primary-400 font-normal ml-1">
+                          <span className="text-[10.5px] text-primary-400 font-normal ml-1">
                             ({row.partyNameTelugu})
                           </span>
                         )}
                       </p>
-                      <p className="text-xs text-primary-400">{formatDate(row.date)}</p>
-                      <p className="text-xs text-primary-500 mt-1">
+                      <p className="text-[10.5px] text-primary-400 mt-0.5">{formatDate(row.date)}</p>
+                      <p className="text-[11px] text-primary-500 mt-1">
                         {row.partyType} · {row.paymentType || 'Cash'} ({row.cashSide === 'credit' ? 'Credit' : 'Debit'})
                       </p>
                       {row.lessAmount > 0 && (
-                        <p className="text-xs text-amber-700 font-medium">
+                        <p className="text-[11px] text-amber-700 font-medium">
                           Less: {formatCurrency(row.lessAmount)}
                         </p>
                       )}
                     </div>
                     <div className="text-right shrink-0">
                       {row.cashSide === 'credit' ? (
-                        <p className="font-bold text-emerald-700">
+                        <p className="font-bold text-emerald-700 text-xs tabular-nums">
                           Credit: {formatCurrency(row.amount)}
                         </p>
                       ) : (
-                        <p className="font-bold text-blue-700">
+                        <p className="font-bold text-blue-700 text-xs tabular-nums">
                           Debit: {formatCurrency(row.amount)}
                         </p>
                       )}
@@ -455,116 +489,105 @@ export default function CashChecklist() {
                   </div>
                 </div>
               ))}
-              <div className="px-4 py-3 bg-emerald-100 flex justify-between text-sm font-bold text-emerald-900">
+              <div className="px-3 py-2 bg-emerald-50 border-t border-primary-200 flex justify-between text-xs font-bold text-emerald-900">
                 <span>Closing Balance</span>
-                <span>{formatCurrency(summary.closingBalance)}</span>
+                <span className="tabular-nums">{formatCurrency(summary.closingBalance)}</span>
               </div>
             </div>
 
+            {/* Desktop Table */}
             <div className="overflow-x-auto hidden md:block">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-primary-50/80 border-b border-primary-100">
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">
+                  <tr className="bg-primary-50/80 text-left border-b border-primary-200">
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide whitespace-nowrap">
                       Date & Time
                     </th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
                       Name
                     </th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-20">
                       Type
                     </th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide">
-                      Type of Payment
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-28">
+                      Payment Type
                     </th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-20">
                       Less
                     </th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-24">
                       Credit
                     </th>
-                    <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase tracking-wide text-right">
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-24">
                       Debit
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-primary-100 text-sm">
+                <tbody>
                   {/* Opening Balance Row */}
                   <tr className="bg-sky-50/60 font-semibold border-b border-sky-100">
-                    <td className="py-2.5 px-4 text-sky-800 whitespace-nowrap text-xs">
+                    <td className="px-3 py-2 text-sky-800 whitespace-nowrap text-xs">
                       As of {formatDateOnly(startDate)}
                     </td>
-                    <td className="py-2.5 px-4 text-sky-900 font-bold">
-                      Opening Balance
-                    </td>
-                    <td className="py-2.5 px-4 text-sky-700 font-medium">
-                      —
-                    </td>
-                    <td className="py-2.5 px-4 text-sky-700 font-medium">
-                      —
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-400 text-right">
-                      —
-                    </td>
-                    <td className="py-2.5 px-4 text-emerald-700 text-right tabular-nums font-bold">
+                    <td className="px-3 py-2 text-sky-900 font-bold">Opening Balance</td>
+                    <td className="px-3 py-2 text-sky-700 font-medium">—</td>
+                    <td className="px-3 py-2 text-sky-700 font-medium">—</td>
+                    <td className="px-3 py-2 text-slate-400 text-right">—</td>
+                    <td className="px-3 py-2 text-emerald-700 text-right tabular-nums font-bold">
                       {summary.openingBalance > 0 ? formatCurrency(summary.openingBalance) : '—'}
                     </td>
-                    <td className="py-2.5 px-4 text-blue-700 text-right tabular-nums font-bold">
+                    <td className="px-3 py-2 text-blue-700 text-right tabular-nums font-bold">
                       {summary.openingBalance < 0 ? formatCurrency(Math.abs(summary.openingBalance)) : '—'}
                     </td>
                   </tr>
 
                   {filteredEntries.map((row) => (
-                    <tr key={row.id} className="hover:bg-primary-50/40">
-                      <td className="py-2.5 px-4 text-primary-600 whitespace-nowrap">
+                    <tr key={row.id} className="border-b border-primary-100 hover:bg-primary-50/40 transition">
+                      <td className="px-3 py-2 text-primary-600 whitespace-nowrap text-xs">
                         {formatDate(row.date)}
                       </td>
-                      <td className="py-2.5 px-4 font-semibold text-primary-800">
+                      <td className="px-3 py-2 font-semibold text-primary-800 text-xs">
                         {row.partyName}
                         {row.partyNameTelugu && (
-                          <span className="text-xs text-primary-400 font-normal ml-1">
+                          <span className="text-[10px] text-primary-400 font-normal ml-1">
                             ({row.partyNameTelugu})
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-4 text-primary-600 font-medium">
-                        {row.partyType}
-                      </td>
-                      <td className="py-2.5 px-4 text-primary-600 font-medium">
-                        {row.paymentType || 'Cash'}
-                      </td>
-                      <td className="py-2.5 px-4 text-amber-700 text-right tabular-nums font-medium">
+                      <td className="px-3 py-2 text-primary-600 text-xs">{row.partyType}</td>
+                      <td className="px-3 py-2 text-primary-600 text-xs">{row.paymentType || 'Cash'}</td>
+                      <td className="px-3 py-2 text-amber-700 text-right tabular-nums text-xs font-medium">
                         {row.lessAmount > 0 ? formatCurrency(row.lessAmount) : '—'}
                       </td>
-                      <td className="py-2.5 px-4 text-emerald-700 text-right tabular-nums font-bold">
+                      <td className="px-3 py-2 text-emerald-700 text-right tabular-nums font-bold text-xs">
                         {row.cashSide === 'credit' ? formatCurrency(row.amount) : '—'}
                       </td>
-                      <td className="py-2.5 px-4 text-blue-700 text-right tabular-nums font-bold">
+                      <td className="px-3 py-2 text-blue-700 text-right tabular-nums font-bold text-xs">
                         {row.cashSide === 'debit' ? formatCurrency(row.amount) : '—'}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-primary-50 border-t-2 border-primary-200">
-                    <td colSpan={4} className="py-2.5 px-4 text-sm font-bold text-primary-800">
+                  <tr className="bg-accent-50 border-t border-primary-200 font-semibold text-xs">
+                    <td colSpan={4} className="px-3 py-2 font-bold text-primary-800">
                       Period Total ({summary.count} records)
                     </td>
-                    <td className="py-2.5 px-4 text-sm font-bold text-amber-700 text-right">
+                    <td className="px-3 py-2 text-amber-700 text-right tabular-nums font-bold">
                       {formatCurrency(summary.totalLess)}
                     </td>
-                    <td className="py-2.5 px-4 text-sm font-bold text-emerald-700 text-right">
+                    <td className="px-3 py-2 text-emerald-700 text-right tabular-nums font-bold">
                       {formatCurrency(summary.totalCredit)}
                     </td>
-                    <td className="py-2.5 px-4 text-sm font-bold text-blue-700 text-right">
+                    <td className="px-3 py-2 text-blue-700 text-right tabular-nums font-bold">
                       {formatCurrency(summary.totalDebit)}
                     </td>
                   </tr>
-                  <tr className="bg-emerald-100/80 border-t-2 border-emerald-300">
-                    <td colSpan={5} className="py-3 px-4 text-base font-extrabold text-emerald-950">
+                  <tr className="bg-accent-100/70 border-t border-primary-200 font-bold text-xs text-accent-900">
+                    <td colSpan={5} className="px-3 py-2 font-bold uppercase tracking-wide">
                       Closing Balance
                     </td>
-                    <td colSpan={2} className="py-3 px-4 text-base font-extrabold text-emerald-900 text-right tabular-nums">
+                    <td colSpan={2} className="px-3 py-2 text-right font-bold tabular-nums text-xs text-accent-900">
                       {formatCurrency(summary.closingBalance)}
                     </td>
                   </tr>

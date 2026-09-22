@@ -9,14 +9,15 @@ import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
 import { generateAccountStatementHtml } from '../utils/statementPdf';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
-import { useMDI } from '../context/MDIContext';
-
 function todayInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export default function Outstanding({ path: windowPath }) {
-  const { updateWindowPath } = useMDI();
   const isOnline = useOnlineStatus();
 
   const today = todayInputValue();
@@ -26,22 +27,6 @@ export default function Outstanding({ path: windowPath }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [collapsedSchedules, setCollapsedSchedules] = useState({});
-
-  useEffect(() => {
-    if (date && typeof updateWindowPath === 'function') {
-      updateWindowPath('/outstanding', `/outstanding?date=${date}`);
-    }
-  }, [date, updateWindowPath]);
-
-  useEffect(() => {
-    if (windowPath && windowPath.includes('?')) {
-      const sp = new URLSearchParams(windowPath.split('?')[1]);
-      const pDate = sp.get('date');
-      const pSched = sp.get('scheduleId');
-      if (pDate) setDate(pDate);
-      if (pSched) setScheduleId(pSched);
-    }
-  }, [windowPath]);
 
   useEffect(() => {
     api
@@ -154,30 +139,34 @@ export default function Outstanding({ path: windowPath }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5 max-w-3xl">
       <div>
-        <h1 className="page-title">Outstanding</h1>
-        <p className="text-primary-400 text-sm mt-0.5">
+        <h1 className="text-sm font-bold text-primary-800">Outstanding</h1>
+        <p className="text-primary-400 text-[11px] mt-0.5">
           Customer credit balance as of a date
         </p>
       </div>
 
-      <form onSubmit={loadReport} className="card space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <form onSubmit={loadReport} className="card !p-3 space-y-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-end">
           <div>
-            <label className="label">Date *</label>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Date *
+            </label>
             <input
               type="date"
-              className="input-field"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
             />
           </div>
           <div>
-            <label className="label">Schedule</label>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Schedule
+            </label>
             <select
-              className="input-field"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
               value={scheduleId}
               onChange={(e) => setScheduleId(e.target.value)}
             >
@@ -189,9 +178,13 @@ export default function Outstanding({ path: windowPath }) {
               ))}
             </select>
           </div>
-          <div className="flex items-end">
-            <button type="submit" className="btn-primary w-full" disabled={loading}>
-              <Scale className="w-4 h-4" />
+          <div>
+            <button
+              type="submit"
+              className="btn-primary !py-1.5 !px-3 !text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 w-full h-8 cursor-pointer"
+              disabled={loading}
+            >
+              <Scale className="w-3.5 h-3.5" />
               {loading ? 'Loading…' : 'Show outstanding'}
             </button>
           </div>
@@ -199,29 +192,31 @@ export default function Outstanding({ path: windowPath }) {
       </form>
 
       {data && (
-        <div className="space-y-4">
-          <div className="card flex flex-wrap items-center justify-between gap-4 py-3 px-4 bg-primary-50/50">
+        <div className="space-y-2.5">
+          <div className="card !p-2.5 flex flex-wrap items-center justify-between gap-2.5 bg-primary-50/40 border border-primary-200/60">
             <div>
-              <p className="font-bold text-primary-900 text-base">As of {formatDateOnly(data.date)}</p>
-              <p className="text-xs text-primary-500 font-medium">
-                {data.rows.length} total {data.rows.length === 1 ? 'customer' : 'customers'} {groupedSchedules.length > 0 && `across ${groupedSchedules.length} ${groupedSchedules.length === 1 ? 'schedule' : 'schedules'}`}
+              <p className="font-bold text-primary-900 text-xs">As of {formatDateOnly(data.date)}</p>
+              <p className="text-[10px] text-primary-500 font-medium mt-0.5">
+                {data.rows.length} total {data.rows.length === 1 ? 'customer' : 'customers'}
+                {groupedSchedules.length > 0 &&
+                  ` across ${groupedSchedules.length} ${groupedSchedules.length === 1 ? 'schedule' : 'schedules'}`}
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={handlePrint}
-                className="btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+                className="btn-primary !py-1 !px-2.5 !text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shrink-0"
               >
-                <Printer className="w-3.5 h-3.5" />
+                <Printer className="w-3 h-3" />
                 Print
               </button>
               {groupedSchedules.length > 1 && (
-                <div className="flex items-center gap-2 text-xs font-medium">
+                <div className="flex items-center gap-1.5 text-[11px] font-medium">
                   <button
                     type="button"
                     onClick={expandAll}
-                    className="text-primary-700 hover:text-primary-900 hover:underline"
+                    className="text-primary-700 hover:text-primary-900 hover:underline cursor-pointer"
                   >
                     Expand All
                   </button>
@@ -229,15 +224,15 @@ export default function Outstanding({ path: windowPath }) {
                   <button
                     type="button"
                     onClick={collapseAll}
-                    className="text-primary-700 hover:text-primary-900 hover:underline"
+                    className="text-primary-700 hover:text-primary-900 hover:underline cursor-pointer"
                   >
                     Collapse All
                   </button>
                 </div>
               )}
-              <div className="text-right">
-                <p className="text-xs text-primary-500 font-medium uppercase tracking-wider">Total Outstanding</p>
-                <p className="text-lg font-extrabold text-primary-900 tabular-nums">
+              <div className="text-right border-l border-primary-200/80 pl-3">
+                <p className="text-[9px] text-primary-500 font-semibold uppercase tracking-wider">Total Outstanding</p>
+                <p className="text-sm font-extrabold text-primary-900 tabular-nums">
                   {formatCurrency(data.totals.closing)}
                 </p>
               </div>
@@ -245,63 +240,69 @@ export default function Outstanding({ path: windowPath }) {
           </div>
 
           {groupedSchedules.length === 0 ? (
-            <div className="card p-8 text-center text-primary-400">
+            <div className="card !p-6 text-center text-xs text-primary-400">
               No outstanding for this date / schedule
             </div>
           ) : (
             groupedSchedules.map((group) => {
               const isCollapsed = !!collapsedSchedules[group.scheduleName];
               return (
-                <div key={group.scheduleName} className="card !p-0 overflow-hidden shadow-sm border border-primary-200/60">
+                <div key={group.scheduleName} className="card !p-0 overflow-hidden shadow-none border border-primary-200">
                   <button
                     type="button"
                     onClick={() => toggleSchedule(group.scheduleName)}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-primary-800 to-primary-700 hover:from-primary-900 hover:to-primary-800 text-white flex flex-wrap items-center justify-between gap-2 text-left cursor-pointer transition-colors focus:outline-none"
+                    className="w-full px-3 py-1.5 bg-gradient-to-r from-primary-800 to-primary-700 hover:from-primary-900 hover:to-primary-800 text-white flex flex-wrap items-center justify-between gap-2 text-left cursor-pointer transition-colors focus:outline-none"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       {isCollapsed ? (
-                        <ChevronRight className="w-5 h-5 text-primary-200" />
+                        <ChevronRight className="w-3.5 h-3.5 text-primary-200 shrink-0" />
                       ) : (
-                        <ChevronDown className="w-5 h-5 text-primary-200" />
+                        <ChevronDown className="w-3.5 h-3.5 text-primary-200 shrink-0" />
                       )}
-                      <span className="font-bold text-base tracking-wide">{group.scheduleName}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-white/20 text-white font-medium">
+                      <span className="font-bold text-xs tracking-wide">{group.scheduleName}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 text-white font-medium">
                         {group.rows.length} {group.rows.length === 1 ? 'customer' : 'customers'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-primary-200">Subtotal:</span>
-                      <span className="font-bold text-white tabular-nums text-base">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-primary-200 text-[11px]">Subtotal:</span>
+                      <span className="font-bold text-white tabular-nums text-xs">
                         {formatCurrency(group.totalClosing)}
                       </span>
                     </div>
                   </button>
                   {!isCollapsed && (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                      <table className="w-full text-xs table-fixed">
                         <thead>
-                          <tr className="bg-primary-50/80 text-left text-primary-700 border-b border-primary-100">
-                            <th className="px-4 py-2.5 font-semibold">Customer</th>
-                            <th className="px-4 py-2.5 font-semibold text-right">Closing Balance</th>
-                            <th className="px-4 py-2.5 font-semibold text-center w-32">WhatsApp</th>
+                          <tr className="bg-primary-50/80 text-left border-b border-primary-100">
+                            <th className="px-3 py-1.5 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                              Customer
+                            </th>
+                            <th className="px-3 py-1.5 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[140px]">
+                              Closing Balance
+                            </th>
+                            <th className="px-3 py-1.5 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-center w-[85px]">
+                              WhatsApp
+                            </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-primary-50">
+                        <tbody>
                           {group.rows.map((row) => (
-                            <tr key={row.customerId} className="hover:bg-primary-50/40 transition-colors">
-                              <td className="px-4 py-2.5 font-medium text-primary-900">{row.name}</td>
-                              <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-primary-800">
+                            <tr key={row.customerId} className="border-b border-primary-100 hover:bg-primary-50/40 transition-colors">
+                              <td className="px-3 py-1.5 font-medium text-primary-900 truncate">{row.name}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums font-semibold text-primary-800">
                                 {formatCurrency(row.closing)}
                               </td>
-                              <td className="px-4 py-2.5 text-center">
+                              <td className="px-3 py-1.5 text-center">
                                 {isOnline && (
                                   <button
                                     type="button"
                                     onClick={() => handleSendWhatsAppRow(row)}
-                                    className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-xs font-medium inline-flex items-center gap-1 transition-colors"
+                                    className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[11px] font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
                                     title="Send Outstanding Statement via WhatsApp"
                                   >
-                                    <Send className="w-3 h-3 text-emerald-600" /> Send
+                                    <Send className="w-2.5 h-2.5 text-emerald-600" /> Send
                                   </button>
                                 )}
                               </td>
@@ -310,11 +311,11 @@ export default function Outstanding({ path: windowPath }) {
                         </tbody>
                         <tfoot>
                           <tr className="bg-primary-50/50 border-t border-primary-100 font-semibold text-primary-800">
-                            <td className="px-4 py-2.5">Schedule Subtotal</td>
-                            <td className="px-4 py-2.5 text-right tabular-nums text-primary-900 font-bold">
+                            <td className="px-3 py-1.5 text-xs text-primary-600">Schedule Subtotal</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums text-primary-900 font-bold text-xs">
                               {formatCurrency(group.totalClosing)}
                             </td>
-                            <td></td>
+                            <td className="px-3 py-1.5"></td>
                           </tr>
                         </tfoot>
                       </table>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Calendar, Printer, RefreshCw, Layers, Calculator, CheckCircle2, XCircle } from 'lucide-react';
+import { Printer, RefreshCw, Layers, Calculator, CheckCircle2, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
@@ -77,12 +77,12 @@ export default function HamaliReport({ path: windowPath }) {
     const rowDetails = [];
 
     (sales || []).forEach((sale) => {
-      const isCooly = (Number(sale.handlingCharges) > 0 || Number(sale.coolyRate) > 0);
+      const isCooly = Number(sale.handlingCharges) > 0 || Number(sale.coolyRate) > 0;
       const custName = sale.customer?.name || '—';
       const vendName = sale.vendor?.name || '—';
 
       (sale.lines || []).forEach((line) => {
-        const lineBags = Number(line.bagCount) || (line.bags?.length) || 1;
+        const lineBags = Number(line.bagCount) || line.bags?.length || 1;
         const isByBag = line.saleType === 'by_bag';
         totalSaleBags += lineBags;
 
@@ -150,48 +150,33 @@ export default function HamaliReport({ path: windowPath }) {
     const formattedDate = formatDateOnly(date);
 
     const html = `<!DOCTYPE html>
-<html>
+<html lang="te">
 <head>
   <meta charset="utf-8" />
   <title>Hamali Report - ${formattedDate}</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 16px; background: #ffffff; color: #111827; }
-    .preview-toolbar {
-      position: sticky; top: 0; z-index: 5;
-      display: flex; justify-content: flex-end; gap: 10px;
-      padding: 10px 16px; background: #ffffff; border-bottom: 1px solid #e5e7eb;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 16px;
-    }
-    .preview-toolbar button {
-      font: inherit; font-size: 14px; font-weight: 500;
-      padding: 8px 16px; cursor: pointer; border-radius: 6px;
-      border: 1px solid #d1d5db; background: #ffffff; color: #374151;
-    }
-    .preview-toolbar button.primary { background: #166534; border-color: #166534; color: #ffffff; font-weight: 600; }
-    .preview-toolbar button.primary:hover { background: #15803d; }
-    .header { text-align: center; border-bottom: 2px solid #111827; padding-bottom: 12px; margin-bottom: 16px; }
-    .header h1 { margin: 0; font-size: 20px; font-weight: 800; color: #064e3b; }
-    .header p { margin: 4px 0 0 0; font-size: 13px; color: #4b5563; }
-    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
-    .kpi-card { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; background: #f9fafb; }
-    .kpi-card.total { background: #ecfdf5; border-color: #a7f3d0; border-left: 4px solid #10b981; }
-    .kpi-card .label { font-size: 11px; font-weight: 600; color: #4b5563; margin-bottom: 4px; }
-    .kpi-card.total .label { color: #047857; }
-    .kpi-card .val { font-size: 18px; font-weight: 800; color: #111827; }
-    .kpi-card.total .val { font-size: 20px; color: #064e3b; }
-    .kpi-card .sub { font-size: 10px; font-weight: 600; color: #047857; margin-top: 4px; }
-    .section-title { font-size: 14px; font-weight: 700; color: #111827; margin-bottom: 8px; margin-top: 16px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
-    th, td { border: 1px solid #d1d5db; padding: 6px 10px; }
-    th { background: #f3f4f6; font-weight: 700; color: #374151; }
-    tr:nth-child(even) { background: #f9fafb; }
-    .total-row { background: #d1fae5 !important; font-weight: 800; }
-    .total-row td { border-top: 2px solid #059669; color: #064e3b; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background: #fff; color: #111; }
+    .preview-toolbar { position: sticky; top: 0; display: flex; justify-content: flex-end; gap: 10px; padding: 10px 16px; background: #f4f4f5; border-bottom: 1px solid #e4e4e7; }
+    .preview-toolbar button { font: inherit; padding: 8px 16px; cursor: pointer; border-radius: 6px; border: 1px solid #d4d4d8; background: #fff; }
+    .preview-toolbar button.primary { background: #166534; border-color: #166534; color: #fff; font-weight: 600; }
+    .container { max-width: 900px; margin: 20px auto; padding: 0 16px; }
+    h1 { margin: 0 0 4px; font-size: 22px; color: #166534; text-align: center; }
+    p { font-size: 13px; color: #666; margin: 0 0 16px; text-align: center; }
+    .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+    .kpi-card { border: 1px solid #e4e4e7; border-radius: 8px; padding: 12px; text-align: center; background: #fafafa; }
+    .kpi-card.main { background: #f0fdf4; border-color: #86efac; }
+    .kpi-card .label { font-size: 11px; color: #71717a; font-weight: 600; margin-bottom: 4px; text-transform: uppercase; }
+    .kpi-card .val { font-size: 18px; font-weight: 800; color: #18181b; }
+    .kpi-card.main .val { font-size: 22px; color: #166534; }
+    .kpi-card .sub { font-size: 11px; font-weight: 600; color: #166534; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 14px; }
+    th, td { border: 1px solid #e4e4e7; padding: 6px 10px; text-align: left; }
+    th { background: #f4f4f5; font-weight: 600; }
+    .total-row td { background: #f0fdf4; font-weight: 700; font-size: 13px; }
     @media print {
-      @page { size: portrait; margin: 8mm; }
-      body { padding: 0; }
       .preview-toolbar { display: none !important; }
+      .container { margin: 0; max-width: 100%; }
     }
   </style>
 </head>
@@ -200,95 +185,93 @@ export default function HamaliReport({ path: windowPath }) {
     <button type="button" onclick="window.close()">Close</button>
     <button type="button" class="primary" onclick="window.print()">Print / Save PDF</button>
   </div>
-
-  <div class="header">
+  <div class="container">
     <h1>JSR AGRI TRADES - Hamali Report (కూలీ నివేదిక)</h1>
     <p>Calculated Cooly / Hamali charges for sales on <strong>${formattedDate}</strong></p>
-  </div>
 
-  <div class="kpi-grid">
-    <div class="kpi-card total">
-      <div class="label">Total Hamali Price</div>
-      <div class="val">${formatCurrency(hamaliCalc.totalHamali)}</div>
-      <div class="sub">Final calculated cooly</div>
+    <div class="kpi-row">
+      <div class="kpi-card main">
+        <div class="label">Total Hamali Price</div>
+        <div class="val">${formatCurrency(hamaliCalc.totalHamali)}</div>
+        <div class="sub">Total calculated</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Weight (General)</div>
+        <div class="val">${hamaliCalc.byWeightBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
+        <div class="sub">8 × ${hamaliCalc.byWeightBags} = ${formatCurrency(hamaliCalc.amtByWeight)}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">By Bag (General)</div>
+        <div class="val">${hamaliCalc.byBagBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
+        <div class="sub">5 × ${hamaliCalc.byBagBags} = ${formatCurrency(hamaliCalc.amtByBag)}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Weight + Cooly</div>
+        <div class="val">${hamaliCalc.byWeightCoolyBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
+        <div class="sub">15 × ${hamaliCalc.byWeightCoolyBags} = ${formatCurrency(hamaliCalc.amtByWeightCooly)}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Bag + Cooly</div>
+        <div class="val">${hamaliCalc.byBagCoolyBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
+        <div class="sub">6 × ${hamaliCalc.byBagCoolyBags} = ${formatCurrency(hamaliCalc.amtByBagCooly)}</div>
+      </div>
     </div>
-    <div class="kpi-card">
-      <div class="label">Sales by Weight</div>
-      <div class="val">${hamaliCalc.byWeightBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
-      <div class="sub">8 × ${hamaliCalc.byWeightBags} = ${formatCurrency(hamaliCalc.amtByWeight)}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="label">Sales by Bag</div>
-      <div class="val">${hamaliCalc.byBagBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
-      <div class="sub">5 × ${hamaliCalc.byBagBags} = ${formatCurrency(hamaliCalc.amtByBag)}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="label">Weight Sales + Cooly</div>
-      <div class="val">${hamaliCalc.byWeightCoolyBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
-      <div class="sub">15 × ${hamaliCalc.byWeightCoolyBags} = ${formatCurrency(hamaliCalc.amtByWeightCooly)}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="label">Bag Sales + Cooly</div>
-      <div class="val">${hamaliCalc.byBagCoolyBags} <span style="font-size: 11px; font-weight: 400;">bags</span></div>
-      <div class="sub">6 × ${hamaliCalc.byBagCoolyBags} = ${formatCurrency(hamaliCalc.amtByBagCooly)}</div>
-    </div>
-  </div>
 
-  <div class="section-title">Formula Calculation Breakdown</div>
-  <table>
-    <thead>
-      <tr>
-        <th>Formula Component Description</th>
-        <th>Sale Type</th>
-        <th>Cooly Applied</th>
-        <th style="text-align: right;">No. of Bags</th>
-        <th style="text-align: right;">Rate / Bag</th>
-        <th style="text-align: right;">Calculated Total</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td style="font-weight: 600;">8 × (number of bags sales happened by weight)</td>
-        <td>By Weight</td>
-        <td>All</td>
-        <td style="text-align: right; font-weight: 700;">${hamaliCalc.byWeightBags}</td>
-        <td style="text-align: right;">₹8</td>
-        <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByWeight)}</td>
-      </tr>
-      <tr>
-        <td style="font-weight: 600;">5 × (number of bags sales happened by bags)</td>
-        <td>By Bag</td>
-        <td>All</td>
-        <td style="text-align: right; font-weight: 700;">${hamaliCalc.byBagBags}</td>
-        <td style="text-align: right;">₹5</td>
-        <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByBag)}</td>
-      </tr>
-      <tr>
-        <td style="font-weight: 600;">15 × (number of bags sold to customer by weight with cooly)</td>
-        <td>By Weight</td>
-        <td style="color: #047857; font-weight: 600;">Yes (Cooly Checked)</td>
-        <td style="text-align: right; font-weight: 700;">${hamaliCalc.byWeightCoolyBags}</td>
-        <td style="text-align: right;">₹15</td>
-        <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByWeightCooly)}</td>
-      </tr>
-      <tr>
-        <td style="font-weight: 600;">6 × (number of bags sold to customer by bags with cooly)</td>
-        <td>By Bag</td>
-        <td style="color: #047857; font-weight: 600;">Yes (Cooly Checked)</td>
-        <td style="text-align: right; font-weight: 700;">${hamaliCalc.byBagCoolyBags}</td>
-        <td style="text-align: right;">₹6</td>
-        <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByBagCooly)}</td>
-      </tr>
-      <tr class="total-row">
-        <td style="font-size: 13px;">TOTAL HAMALI / COOLY PRICE</td>
-        <td>—</td>
-        <td>—</td>
-        <td style="text-align: right; font-size: 13px;">${hamaliCalc.totalSaleBags} bags</td>
-        <td style="text-align: right;">—</td>
-        <td style="text-align: right; font-size: 14px;">${formatCurrency(hamaliCalc.totalHamali)}</td>
-      </tr>
-    </tbody>
-  </table>
+    <h3 style="font-size: 14px; margin: 16px 0 6px; color: #166534;">Formula Calculation Breakdown</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Formula Component Description</th>
+          <th>Sale Type</th>
+          <th>Cooly Applied</th>
+          <th style="text-align: right;">No. of Bags</th>
+          <th style="text-align: right;">Rate / Bag</th>
+          <th style="text-align: right;">Calculated Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>8 × (number of bags sales happened by weight)</strong></td>
+          <td>By Weight</td>
+          <td>All</td>
+          <td style="text-align: right; font-weight: 700;">${hamaliCalc.byWeightBags}</td>
+          <td style="text-align: right;">₹8</td>
+          <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByWeight)}</td>
+        </tr>
+        <tr>
+          <td><strong>5 × (number of bags sales happened by bags)</strong></td>
+          <td>By Bag</td>
+          <td>All</td>
+          <td style="text-align: right; font-weight: 700;">${hamaliCalc.byBagBags}</td>
+          <td style="text-align: right;">₹5</td>
+          <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByBag)}</td>
+        </tr>
+        <tr>
+          <td><strong>15 × (number of bags sold to customer by weight with cooly)</strong></td>
+          <td>By Weight</td>
+          <td>Yes (Cooly Checked)</td>
+          <td style="text-align: right; font-weight: 700;">${hamaliCalc.byWeightCoolyBags}</td>
+          <td style="text-align: right;">₹15</td>
+          <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByWeightCooly)}</td>
+        </tr>
+        <tr>
+          <td><strong>6 × (number of bags sold to customer by bags with cooly)</strong></td>
+          <td>By Bag</td>
+          <td>Yes (Cooly Checked)</td>
+          <td style="text-align: right; font-weight: 700;">${hamaliCalc.byBagCoolyBags}</td>
+          <td style="text-align: right;">₹6</td>
+          <td style="text-align: right; font-weight: 700; color: #15803d;">${formatCurrency(hamaliCalc.amtByBagCooly)}</td>
+        </tr>
+        <tr class="total-row">
+          <td style="font-size: 13px;">TOTAL HAMALI / COOLY PRICE</td>
+          <td colspan="2"></td>
+          <td style="text-align: right; font-size: 13px;">${hamaliCalc.totalSaleBags} bags</td>
+          <td style="text-align: right;">—</td>
+          <td style="text-align: right; font-size: 14px; color: #166534;">${formatCurrency(hamaliCalc.totalHamali)}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </body>
 </html>`;
 
@@ -296,173 +279,219 @@ export default function HamaliReport({ path: windowPath }) {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-2.5 max-w-5xl">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-extrabold text-primary-900 tracking-tight flex items-center gap-2">
-            <Calculator className="w-7 h-7 text-emerald-600" />
+          <h1 className="text-sm font-bold text-primary-800 flex items-center gap-1.5">
+            <Calculator className="w-4 h-4 text-emerald-600" />
             Hamali Report (కూలీ నివేదిక)
           </h1>
-          <p className="text-xs text-primary-500 mt-1">
+          <p className="text-primary-400 text-[11px] mt-0.5">
             Calculated Cooly / Hamali charges for sales on {formatDateOnly(date)}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-primary-200 shadow-sm">
-            <Calendar className="w-4 h-4 text-primary-500" />
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            className="btn-secondary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs"
+            onClick={loadHamaliSales}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+          <button
+            type="button"
+            className="btn-primary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs"
+            onClick={handlePrint}
+          >
+            <Printer className="w-3 h-3" /> Print / Save PDF
+          </button>
+        </div>
+      </div>
+
+      {/* Filter Card */}
+      <div className="card !p-2.5">
+        <div className="flex items-center gap-2 max-w-xs">
+          <div className="w-full">
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+              Date *
+            </label>
             <input
               type="date"
-              className="text-sm font-semibold text-primary-800 bg-transparent outline-none cursor-pointer"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
-
-          <button
-            type="button"
-            className="btn-secondary !py-2 !px-3 text-xs"
-            onClick={loadHamaliSales}
-            disabled={loading}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </button>
-
-          <button
-            type="button"
-            className="btn-primary !py-2 !px-4 text-xs"
-            onClick={handlePrint}
-          >
-            <Printer className="w-4 h-4" /> Print / Save PDF
-          </button>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="card !p-4 border-l-4 border-emerald-500 bg-gradient-to-br from-emerald-50/50 to-white">
-          <p className="text-xs font-medium text-emerald-700">Total Hamali Price</p>
-          <p className="text-2xl font-black text-emerald-900 mt-1">
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div className="card !py-2 !px-2.5 flex flex-col justify-between border border-emerald-300 bg-emerald-50/50">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+            Total Hamali
+          </span>
+          <span className="text-sm font-bold text-emerald-900 tabular-nums my-0.5">
             {formatCurrency(hamaliCalc.totalHamali)}
-          </p>
-          <p className="text-[10px] text-emerald-600 mt-1">Final calculated cooly amount</p>
+          </span>
+          <span className="text-[9.5px] text-emerald-700 font-medium">Final calculated</span>
         </div>
 
-        <div className="card !p-4">
-          <p className="text-xs font-medium text-primary-500">Sales by Weight (General)</p>
-          <p className="text-xl font-bold text-primary-800 mt-1">
-            {hamaliCalc.byWeightBags} <span className="text-xs font-normal text-primary-500">bags</span>
-          </p>
-          <p className="text-xs font-semibold text-emerald-700 mt-1">
+        <div className="card !py-2 !px-2.5 flex flex-col justify-between border border-primary-200">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+            Weight (General)
+          </span>
+          <span className="text-xs font-bold text-primary-800 tabular-nums my-0.5">
+            {hamaliCalc.byWeightBags} <span className="text-[10px] font-normal text-primary-500">bags</span>
+          </span>
+          <span className="text-[9.5px] font-semibold text-emerald-700 tabular-nums">
             8 × {hamaliCalc.byWeightBags} = {formatCurrency(hamaliCalc.amtByWeight)}
-          </p>
+          </span>
         </div>
 
-        <div className="card !p-4">
-          <p className="text-xs font-medium text-primary-500">Sales by Bag (General)</p>
-          <p className="text-xl font-bold text-primary-800 mt-1">
-            {hamaliCalc.byBagBags} <span className="text-xs font-normal text-primary-500">bags</span>
-          </p>
-          <p className="text-xs font-semibold text-emerald-700 mt-1">
+        <div className="card !py-2 !px-2.5 flex flex-col justify-between border border-primary-200">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+            By Bag (General)
+          </span>
+          <span className="text-xs font-bold text-primary-800 tabular-nums my-0.5">
+            {hamaliCalc.byBagBags} <span className="text-[10px] font-normal text-primary-500">bags</span>
+          </span>
+          <span className="text-[9.5px] font-semibold text-emerald-700 tabular-nums">
             5 × {hamaliCalc.byBagBags} = {formatCurrency(hamaliCalc.amtByBag)}
-          </p>
+          </span>
         </div>
 
-        <div className="card !p-4">
-          <p className="text-xs font-medium text-primary-500">Weight Sales + Customer Cooly</p>
-          <p className="text-xl font-bold text-primary-800 mt-1">
-            {hamaliCalc.byWeightCoolyBags} <span className="text-xs font-normal text-primary-500">bags</span>
-          </p>
-          <p className="text-xs font-semibold text-emerald-700 mt-1">
+        <div className="card !py-2 !px-2.5 flex flex-col justify-between border border-primary-200">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+            Weight + Cooly
+          </span>
+          <span className="text-xs font-bold text-primary-800 tabular-nums my-0.5">
+            {hamaliCalc.byWeightCoolyBags} <span className="text-[10px] font-normal text-primary-500">bags</span>
+          </span>
+          <span className="text-[9.5px] font-semibold text-emerald-700 tabular-nums">
             15 × {hamaliCalc.byWeightCoolyBags} = {formatCurrency(hamaliCalc.amtByWeightCooly)}
-          </p>
+          </span>
         </div>
 
-        <div className="card !p-4">
-          <p className="text-xs font-medium text-primary-500">Bag Sales + Customer Cooly</p>
-          <p className="text-xl font-bold text-primary-800 mt-1">
-            {hamaliCalc.byBagCoolyBags} <span className="text-xs font-normal text-primary-500">bags</span>
-          </p>
-          <p className="text-xs font-semibold text-emerald-700 mt-1">
+        <div className="card !py-2 !px-2.5 flex flex-col justify-between border border-primary-200">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+            Bag + Cooly
+          </span>
+          <span className="text-xs font-bold text-primary-800 tabular-nums my-0.5">
+            {hamaliCalc.byBagCoolyBags} <span className="text-[10px] font-normal text-primary-500">bags</span>
+          </span>
+          <span className="text-[9.5px] font-semibold text-emerald-700 tabular-nums">
             6 × {hamaliCalc.byBagCoolyBags} = {formatCurrency(hamaliCalc.amtByBagCooly)}
-          </p>
+          </span>
         </div>
       </div>
 
-      {/* Formula Breakdown Table */}
-      <div className="card !p-0 overflow-hidden">
-        <div className="px-5 py-4 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between">
-          <h2 className="font-bold text-primary-800 text-sm flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-600" /> Formula Calculation Breakdown
+      {/* Formula Calculation Breakdown Table */}
+      <div className="card !p-0 overflow-hidden border border-primary-200">
+        <div className="px-3 py-1.5 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between">
+          <h2 className="font-bold text-primary-800 text-xs flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-emerald-600" /> Formula Calculation Breakdown
           </h2>
-          <span className="text-xs text-primary-500 font-mono">
+          <span className="text-[10.5px] text-primary-500 font-medium">
             Date: {formatDateOnly(date)}
           </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="bg-primary-100/60 text-primary-800 font-semibold text-xs border-b border-primary-200">
-                <th className="py-3 px-4">Formula Component Description</th>
-                <th className="py-3 px-4">Sale Type</th>
-                <th className="py-3 px-4">Cooly Applied</th>
-                <th className="py-3 px-4 text-right">No. of Bags</th>
-                <th className="py-3 px-4 text-right">Rate / Bag</th>
-                <th className="py-3 px-4 text-right">Calculated Total</th>
+              <tr className="bg-primary-50/80 text-left border-b border-primary-200">
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                  Formula Component Description
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-24">
+                  Sale Type
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-36">
+                  Cooly Applied
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-24">
+                  No. of Bags
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-20">
+                  Rate / Bag
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-28">
+                  Calculated Total
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-primary-100 font-medium">
-              <tr className="hover:bg-primary-50/50">
-                <td className="py-3 px-4 font-semibold text-primary-800">
+            <tbody>
+              <tr className="border-b border-primary-100 hover:bg-primary-50/40 transition">
+                <td className="px-3 py-2 font-semibold text-primary-800">
                   8 × (number of bags sales happened by weight)
                 </td>
-                <td className="py-3 px-4 text-xs font-mono text-primary-600">By Weight</td>
-                <td className="py-3 px-4 text-xs text-primary-500">All</td>
-                <td className="py-3 px-4 text-right font-bold text-primary-900">{hamaliCalc.byWeightBags}</td>
-                <td className="py-3 px-4 text-right text-primary-600">₹8</td>
-                <td className="py-3 px-4 text-right font-bold text-emerald-700">{formatCurrency(hamaliCalc.amtByWeight)}</td>
+                <td className="px-3 py-2 text-primary-600">By Weight</td>
+                <td className="px-3 py-2 text-primary-500">All</td>
+                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums">
+                  {hamaliCalc.byWeightBags}
+                </td>
+                <td className="px-3 py-2 text-right text-primary-600">₹8</td>
+                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums">
+                  {formatCurrency(hamaliCalc.amtByWeight)}
+                </td>
               </tr>
-              <tr className="hover:bg-primary-50/50">
-                <td className="py-3 px-4 font-semibold text-primary-800">
+              <tr className="border-b border-primary-100 hover:bg-primary-50/40 transition">
+                <td className="px-3 py-2 font-semibold text-primary-800">
                   5 × (number of bags sales happened by bags)
                 </td>
-                <td className="py-3 px-4 text-xs font-mono text-primary-600">By Bag</td>
-                <td className="py-3 px-4 text-xs text-primary-500">All</td>
-                <td className="py-3 px-4 text-right font-bold text-primary-900">{hamaliCalc.byBagBags}</td>
-                <td className="py-3 px-4 text-right text-primary-600">₹5</td>
-                <td className="py-3 px-4 text-right font-bold text-emerald-700">{formatCurrency(hamaliCalc.amtByBag)}</td>
+                <td className="px-3 py-2 text-primary-600">By Bag</td>
+                <td className="px-3 py-2 text-primary-500">All</td>
+                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums">
+                  {hamaliCalc.byBagBags}
+                </td>
+                <td className="px-3 py-2 text-right text-primary-600">₹5</td>
+                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums">
+                  {formatCurrency(hamaliCalc.amtByBag)}
+                </td>
               </tr>
-              <tr className="hover:bg-primary-50/50">
-                <td className="py-3 px-4 font-semibold text-primary-800">
+              <tr className="border-b border-primary-100 hover:bg-primary-50/40 transition">
+                <td className="px-3 py-2 font-semibold text-primary-800">
                   15 × (number of bags sold to customer by weight with cooly)
                 </td>
-                <td className="py-3 px-4 text-xs font-mono text-primary-600">By Weight</td>
-                <td className="py-3 px-4 text-xs font-bold text-emerald-600">Yes (Cooly Checked)</td>
-                <td className="py-3 px-4 text-right font-bold text-primary-900">{hamaliCalc.byWeightCoolyBags}</td>
-                <td className="py-3 px-4 text-right text-primary-600">₹15</td>
-                <td className="py-3 px-4 text-right font-bold text-emerald-700">{formatCurrency(hamaliCalc.amtByWeightCooly)}</td>
+                <td className="px-3 py-2 text-primary-600">By Weight</td>
+                <td className="px-3 py-2 font-semibold text-emerald-700">Yes (Cooly Checked)</td>
+                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums">
+                  {hamaliCalc.byWeightCoolyBags}
+                </td>
+                <td className="px-3 py-2 text-right text-primary-600">₹15</td>
+                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums">
+                  {formatCurrency(hamaliCalc.amtByWeightCooly)}
+                </td>
               </tr>
-              <tr className="hover:bg-primary-50/50">
-                <td className="py-3 px-4 font-semibold text-primary-800">
+              <tr className="border-b border-primary-100 hover:bg-primary-50/40 transition">
+                <td className="px-3 py-2 font-semibold text-primary-800">
                   6 × (number of bags sold to customer by bags with cooly)
                 </td>
-                <td className="py-3 px-4 text-xs font-mono text-primary-600">By Bag</td>
-                <td className="py-3 px-4 text-xs font-bold text-emerald-600">Yes (Cooly Checked)</td>
-                <td className="py-3 px-4 text-right font-bold text-primary-900">{hamaliCalc.byBagCoolyBags}</td>
-                <td className="py-3 px-4 text-right text-primary-600">₹6</td>
-                <td className="py-3 px-4 text-right font-bold text-emerald-700">{formatCurrency(hamaliCalc.amtByBagCooly)}</td>
+                <td className="px-3 py-2 text-primary-600">By Bag</td>
+                <td className="px-3 py-2 font-semibold text-emerald-700">Yes (Cooly Checked)</td>
+                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums">
+                  {hamaliCalc.byBagCoolyBags}
+                </td>
+                <td className="px-3 py-2 text-right text-primary-600">₹6</td>
+                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums">
+                  {formatCurrency(hamaliCalc.amtByBagCooly)}
+                </td>
               </tr>
             </tbody>
             <tfoot>
-              <tr className="bg-emerald-100/70 border-t-2 border-emerald-300 font-extrabold text-emerald-950">
-                <td colSpan={3} className="py-3.5 px-4 text-base">
+              <tr className="bg-accent-50 border-t-2 border-primary-200 font-bold text-xs">
+                <td colSpan={3} className="px-3 py-2 text-primary-800 font-bold uppercase tracking-wide">
                   TOTAL HAMALI / COOLY PRICE
                 </td>
-                <td className="py-3.5 px-4 text-right text-base">{hamaliCalc.totalSaleBags} bags</td>
-                <td className="py-3.5 px-4 text-right text-xs uppercase tracking-wide text-emerald-800">—</td>
-                <td className="py-3.5 px-4 text-right text-lg text-emerald-900">
+                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums">
+                  {hamaliCalc.totalSaleBags} bags
+                </td>
+                <td className="px-3 py-2 text-right text-primary-400">—</td>
+                <td className="px-3 py-2 text-right font-bold text-accent-700 tabular-nums text-xs">
                   {formatCurrency(hamaliCalc.totalHamali)}
                 </td>
               </tr>
@@ -472,57 +501,77 @@ export default function HamaliReport({ path: windowPath }) {
       </div>
 
       {/* Itemized Sales Table */}
-      <div className="card !p-0 overflow-hidden">
-        <div className="px-5 py-4 border-b border-primary-100 bg-primary-50/50 flex items-center justify-between">
-          <h3 className="font-bold text-primary-800 text-sm">Itemized Sales Entries ({hamaliCalc.rowDetails.length})</h3>
+      <div className="card !p-0 overflow-hidden border border-primary-200">
+        <div className="px-3 py-1.5 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between">
+          <h3 className="font-bold text-primary-800 text-xs">
+            Itemized Sales Entries ({hamaliCalc.rowDetails.length})
+          </h3>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="bg-primary-50 text-primary-700 font-semibold text-xs border-b border-primary-100">
-                <th className="py-2.5 px-4">#</th>
-                <th className="py-2.5 px-4">Customer</th>
-                <th className="py-2.5 px-4">Vendor</th>
-                <th className="py-2.5 px-4">Product</th>
-                <th className="py-2.5 px-4 text-center">Sale Type</th>
-                <th className="py-2.5 px-4 text-center">Cooly Status</th>
-                <th className="py-2.5 px-4 text-right">Bags</th>
-                <th className="py-2.5 px-4 text-right">Hamali Amount</th>
+              <tr className="bg-primary-50/80 text-left border-b border-primary-200">
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-12">
+                  #
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                  Customer
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                  Vendor
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                  Product
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-center w-24">
+                  Sale Type
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-center w-24">
+                  Cooly
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-20">
+                  Bags
+                </th>
+                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-28">
+                  Hamali Amount
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-primary-100 text-xs font-medium">
+            <tbody>
               {hamaliCalc.rowDetails.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-primary-400 font-normal">
+                  <td colSpan={8} className="px-3 py-8 text-center text-primary-400 text-xs">
                     No sales records found for {formatDateOnly(date)}
                   </td>
                 </tr>
               ) : (
                 hamaliCalc.rowDetails.map((row, idx) => (
-                  <tr key={`${row.saleId}-${idx}`} className="hover:bg-primary-50/40">
-                    <td className="py-2.5 px-4 text-primary-400 font-mono">{idx + 1}</td>
-                    <td className="py-2.5 px-4 font-semibold text-primary-800">{row.customerName}</td>
-                    <td className="py-2.5 px-4 text-primary-600">{row.vendorName}</td>
-                    <td className="py-2.5 px-4 text-primary-700">{row.materialName}</td>
-                    <td className="py-2.5 px-4 text-center">
-                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-primary-100 text-primary-700">
+                  <tr key={`${row.saleId}-${idx}`} className="border-b border-primary-100 hover:bg-primary-50/40 transition">
+                    <td className="px-3 py-2 text-primary-400 font-mono text-[10px]">{idx + 1}</td>
+                    <td className="px-3 py-2 font-semibold text-primary-800 text-xs">{row.customerName}</td>
+                    <td className="px-3 py-2 text-primary-600 text-xs">{row.vendorName}</td>
+                    <td className="px-3 py-2 text-primary-700 text-xs">{row.materialName}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className="inline-block px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-primary-100/70 text-primary-700">
                         {row.saleType}
                       </span>
                     </td>
-                    <td className="py-2.5 px-4 text-center">
+                    <td className="px-3 py-2 text-center">
                       {row.isCooly ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold text-[11px]">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Yes
+                        <span className="inline-flex items-center gap-0.5 text-emerald-700 font-semibold text-[10.5px]">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Yes
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-primary-400 text-[11px]">
-                          <XCircle className="w-3.5 h-3.5 text-primary-300" /> No
+                        <span className="inline-flex items-center gap-0.5 text-primary-400 text-[10.5px]">
+                          <XCircle className="w-3 h-3 text-primary-300" /> No
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 px-4 text-right font-bold text-primary-900">{row.bags}</td>
-                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">
+                    <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums text-xs">
+                      {row.bags}
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums text-xs">
                       {formatCurrency(row.hamaliTotal)}
                     </td>
                   </tr>

@@ -69,29 +69,29 @@ export default function Transactions() {
   }, [transactions, searchQuery]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5 max-w-3xl">
       <div>
-        <h1 className="page-title">Transaction History</h1>
-        <p className="text-primary-400 text-sm mt-0.5">Customer & vendor credits and payments</p>
+        <h1 className="text-sm font-bold text-primary-800">Transaction History</h1>
+        <p className="text-primary-400 text-[11px] mt-0.5">Customer & vendor credits and payments</p>
       </div>
 
-      <div className="card !p-3 sm:!p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="w-4 h-4 text-primary-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              className="input-field !pl-9 !py-2 !text-sm"
-              placeholder="Search by party or description…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+      <div className="card !p-3 space-y-2.5">
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 text-primary-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            className="h-8 w-full rounded-lg border border-primary-200 bg-surface pl-8 pr-2.5 py-1 text-xs text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+            placeholder="Search by party or description…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
 
-          <div className="flex items-center gap-2 min-w-[140px] shrink-0">
-            <label className="text-xs text-primary-400 shrink-0">Vendor</label>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Vendor</label>
             <select
-              className="input-field !py-2 !text-sm flex-1"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={vendorId}
               onChange={(e) => setVendorId(e.target.value)}
             >
@@ -104,10 +104,10 @@ export default function Transactions() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2 min-w-[140px] shrink-0">
-            <label className="text-xs text-primary-400 shrink-0">Customer</label>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Customer</label>
             <select
-              className="input-field !py-2 !text-sm flex-1"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
             >
@@ -120,10 +120,10 @@ export default function Transactions() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2 min-w-[140px] shrink-0">
-            <label className="text-xs text-primary-400 shrink-0">Type</label>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Type</label>
             <select
-              className="input-field !py-2 !text-sm flex-1"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={type}
               onChange={(e) => setType(e.target.value)}
             >
@@ -137,38 +137,38 @@ export default function Transactions() {
         </div>
       </div>
 
-      <div className="card !p-0 overflow-hidden">
+      <div className="card !p-0 overflow-hidden border border-primary-200">
         {loading ? (
-          <div className="text-center py-12 text-primary-400 text-sm">Loading transactions…</div>
+          <div className="text-center py-8 text-primary-400 text-xs">Loading transactions…</div>
         ) : filteredTransactions.length === 0 ? (
-          <div className="text-center py-12">
-            <Receipt className="w-10 h-10 text-primary-300 mx-auto mb-2" />
-            <p className="text-primary-400 text-sm">No transactions found</p>
+          <div className="text-center py-8">
+            <Receipt className="w-8 h-8 text-primary-300 mx-auto mb-1.5" />
+            <p className="text-primary-400 text-xs">No transactions found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left table-fixed">
               <thead>
-                <tr className="bg-primary-50/80 border-b border-primary-100">
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Date</th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Type</th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Party</th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Description</th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase text-right">Amount</th>
+                <tr className="bg-primary-50/80 border-b border-primary-200">
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-[140px]">Date</th>
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-[120px]">Type</th>
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-[120px]">Party</th>
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">Description</th>
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[100px]">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredTransactions.map((tx) => (
-                  <tr key={tx._id} className="border-b border-primary-50 hover:bg-primary-50/30">
-                    <td className="py-2.5 px-4 text-sm text-primary-600 whitespace-nowrap">{formatDate(tx.createdAt)}</td>
-                    <td className="py-2.5 px-4">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${transactionTypeColors[tx.type] || 'bg-primary-100 text-primary-600'}`}>
+                  <tr key={tx._id} className="border-b border-primary-100 hover:bg-primary-50/40 transition">
+                    <td className="py-2 px-3 text-xs text-primary-600 whitespace-nowrap">{formatDate(tx.createdAt)}</td>
+                    <td className="py-2 px-3">
+                      <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap ${transactionTypeColors[tx.type] || 'bg-primary-100 text-primary-600'}`}>
                         {transactionTypeLabels[tx.type] || tx.type}
                       </span>
                     </td>
-                    <td className="py-2.5 px-4 text-sm text-primary-600">{partyName(tx)}</td>
-                    <td className="py-2.5 px-4 text-sm text-primary-600 max-w-xs truncate">{tx.description}</td>
-                    <td className="py-2.5 px-4 text-sm font-semibold text-primary-700 text-right whitespace-nowrap">
+                    <td className="py-2 px-3 text-xs font-semibold text-primary-800 truncate">{partyName(tx)}</td>
+                    <td className="py-2 px-3 text-xs text-primary-500 truncate">{tx.description}</td>
+                    <td className="py-2 px-3 text-xs font-bold text-primary-800 text-right whitespace-nowrap tabular-nums">
                       {tx.type?.includes('payment') ? '-' : '+'}{formatCurrency(tx.amount)}
                     </td>
                   </tr>
@@ -178,10 +178,10 @@ export default function Transactions() {
           </div>
         )}
         {transactions.length >= limit && (
-          <div className="p-3 text-center border-t border-primary-100 bg-primary-50/40">
+          <div className="px-3 py-2 text-center border-t border-primary-200 bg-surface">
             <button
               type="button"
-              className="btn-secondary !py-1.5 !px-4 !text-xs"
+              className="btn-secondary !py-1.5 !px-4 !text-xs font-semibold"
               onClick={() => setLimit((prev) => prev + 200)}
             >
               Load More Transactions

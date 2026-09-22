@@ -63,44 +63,50 @@ export default function ShortcutSettings() {
   const moduleGroup = AVAILABLE_SHORTCUT_OPTIONS.filter((o) => o.group === 'Application Modules');
 
   return (
-    <div className="space-y-4 max-w-3xl">
-      <div>
-        <h1 className="page-title flex items-center gap-2">
-          <Keyboard className="w-7 h-7 text-primary-500" /> Shortcut Settings
-        </h1>
-        <p className="text-primary-400 text-sm mt-0.5">
-          Customize function keys (F1 – F12) to open application modules or control internal windows
-        </p>
+    <div className="space-y-2.5 max-w-3xl">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h1 className="text-sm font-bold text-primary-800 flex items-center gap-1.5">
+            <Keyboard className="w-4 h-4 text-emerald-600" /> Shortcut Settings
+          </h1>
+          <p className="text-primary-400 text-[11px] mt-0.5">
+            Customize function keys (F1 – F12) to open application modules or control internal windows
+          </p>
+        </div>
       </div>
 
-      <form onSubmit={handleSaveShortcuts} className="card space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-primary-100">
+      <form onSubmit={handleSaveShortcuts} className="card !p-3 space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-primary-100">
           <div>
-            <h2 className="font-bold text-primary-800 text-base">Function Key Customization (F1 – F12)</h2>
-            <p className="text-xs text-primary-400">
+            <h2 className="font-bold text-primary-800 text-xs">Function Key Customization (F1 – F12)</h2>
+            <p className="text-[10.5px] text-primary-400">
               Assign function keys to trigger window actions or open pages
             </p>
           </div>
           <button
             type="button"
             onClick={handleResetShortcuts}
-            className="btn-secondary !py-1.5 !px-3 !text-xs self-start sm:self-auto cursor-pointer"
+            className="btn-secondary !py-1 !px-2.5 !text-xs self-start sm:self-auto cursor-pointer shadow-2xs flex items-center gap-1"
           >
-            <RotateCcw className="w-3.5 h-3.5" /> Reset Defaults
+            <RotateCcw className="w-3 h-3" /> Reset Defaults
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {FUNCTION_KEYS.map((key) => {
             const currentVal = bindingToValue(localShortcuts[key]);
             return (
-              <div key={key} className="flex items-center gap-3 p-2.5 rounded-lg border border-primary-100 bg-surface">
-                <span className="w-12 h-9 flex items-center justify-center font-bold text-xs bg-primary-100 text-primary-800 rounded-md border border-primary-200 shrink-0">
+              <div
+                key={key}
+                className="flex items-center gap-2 p-1.5 px-2 rounded-lg border border-primary-100 bg-surface hover:border-primary-200 transition"
+              >
+                <span className="w-9 h-7 flex items-center justify-center font-bold text-[11px] bg-primary-100 text-primary-800 rounded-md border border-primary-200 shrink-0">
                   {key}
                 </span>
                 <div className="flex-1 min-w-0">
                   <select
-                    className="input-field !py-1.5 !px-2.5 text-xs w-full cursor-pointer"
+                    className="h-7 w-full rounded-md border border-primary-200 bg-surface px-2 py-0 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 cursor-pointer transition"
                     value={currentVal}
                     onChange={(e) => handleShortcutChange(key, e.target.value)}
                   >
@@ -133,28 +139,31 @@ export default function ShortcutSettings() {
         </div>
 
         {/* Built-in Navigation Shortcuts Info Box */}
-        <div className="bg-primary-50/70 border border-primary-100 rounded-xl p-3.5 space-y-2">
-          <h3 className="font-semibold text-xs text-primary-700 flex items-center gap-1.5 uppercase tracking-wide">
-            <Command className="w-4 h-4 text-primary-500" /> Built-in Window Navigation Shortcuts
+        <div className="bg-primary-50/70 border border-primary-100 rounded-lg p-2.5 space-y-1.5">
+          <h3 className="font-semibold text-[10px] text-primary-600 uppercase tracking-wide flex items-center gap-1.5">
+            <Command className="w-3.5 h-3.5 text-primary-500" /> Built-in Window Navigation Shortcuts
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-primary-600">
-            <div className="flex items-center justify-between bg-surface px-3 py-1.5 rounded-lg border border-primary-100">
-              <span>Switch to Next Open Window</span>
-              <kbd className="font-mono bg-primary-100 px-1.5 py-0.5 rounded text-[11px] font-bold text-primary-800">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs text-primary-600">
+            <div className="flex items-center justify-between bg-surface px-2.5 py-1 rounded border border-primary-100">
+              <span className="text-[11px]">Switch to Next Open Window</span>
+              <kbd className="font-mono bg-primary-100 px-1.5 py-0.5 rounded text-[10px] font-bold text-primary-800">
                 Ctrl + Tab
               </kbd>
             </div>
-            <div className="flex items-center justify-between bg-surface px-3 py-1.5 rounded-lg border border-primary-100">
-              <span>Switch to Previous Window</span>
-              <kbd className="font-mono bg-primary-100 px-1.5 py-0.5 rounded text-[11px] font-bold text-primary-800">
+            <div className="flex items-center justify-between bg-surface px-2.5 py-1 rounded border border-primary-100">
+              <span className="text-[11px]">Switch to Previous Window</span>
+              <kbd className="font-mono bg-primary-100 px-1.5 py-0.5 rounded text-[10px] font-bold text-primary-800">
                 Ctrl + Shift + Tab
               </kbd>
             </div>
           </div>
         </div>
 
-        <button type="submit" className="btn-primary w-full cursor-pointer">
-          <Save className="w-4 h-4" /> Save Shortcut Settings
+        <button
+          type="submit"
+          className="btn-primary !py-1.5 !px-4 !text-xs font-semibold flex items-center justify-center gap-1.5 w-full cursor-pointer shadow-2xs"
+        >
+          <Save className="w-3.5 h-3.5" /> Save Shortcut Settings
         </button>
       </form>
     </div>

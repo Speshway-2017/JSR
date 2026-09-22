@@ -75,138 +75,142 @@ export default function InventoryHistory() {
   const hasRows = !loading && !dateError && data?.rows?.length > 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-2.5 max-w-3xl">
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="page-title">Inventory History</h1>
-          <p className="text-primary-400 text-sm mt-0.5">
+          <h1 className="text-sm font-bold text-primary-800">Inventory History</h1>
+          <p className="text-primary-400 text-[11px] mt-0.5">
             Purchases + vendor loads from sales (same as Sale Patty)
           </p>
         </div>
         <button
           onClick={exportExcel}
           disabled={!data?.rows?.length}
-          className="btn-primary !py-2 !px-4 !text-sm disabled:opacity-50"
+          className="btn-primary !py-1.5 !px-3 !text-xs font-semibold disabled:opacity-50 shrink-0 flex items-center gap-1.5"
         >
-          <Download className="w-4 h-4" /> Export Excel
+          <Download className="w-3.5 h-3.5" /> Export Excel
         </button>
       </div>
 
-      <div className="card !p-3 sm:!p-4">
-        <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-primary-400 w-9">From</label>
+      <div className="card !p-3 space-y-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">From</label>
             <input
               type="date"
-              className="input-field !py-2 !text-sm"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-primary-400 w-9">To</label>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">To</label>
             <input
               type="date"
-              className="input-field !py-2 !text-sm"
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={endDate}
               min={startDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
-          <select
-            className="input-field !py-2 !text-sm w-40"
-            value={materialId}
-            onChange={(e) => setMaterialId(e.target.value)}
-          >
-            <option value="">All materials</option>
-            {materials.map((m) => (
-              <option key={m._id} value={m._id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="input-field !py-2 !text-sm w-40"
-            value={vendorId}
-            onChange={(e) => setVendorId(e.target.value)}
-          >
-            <option value="">All vendors</option>
-            {vendors.map((v) => (
-              <option key={v._id} value={v._id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Material</label>
+            <select
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              value={materialId}
+              onChange={(e) => setMaterialId(e.target.value)}
+            >
+              <option value="">All materials</option>
+              {materials.map((m) => (
+                <option key={m._id} value={m._id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Vendor</label>
+            <select
+              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              value={vendorId}
+              onChange={(e) => setVendorId(e.target.value)}
+            >
+              <option value="">All vendors</option>
+              {vendors.map((v) => (
+                <option key={v._id} value={v._id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       {hasRows && (
-        <div className="card !py-3 !px-4 flex flex-wrap gap-4 justify-between text-sm">
-          <div className="flex gap-6">
-            <span>
-              <span className="text-primary-400">Total Weight </span>
-              <span className="font-semibold text-primary-700">
-                {formatWeight(data.summary.totalWeight)}
-              </span>
+        <div className="card !p-3 flex flex-wrap gap-4 text-xs">
+          <span>
+            <span className="text-primary-400">Total Weight </span>
+            <span className="font-bold text-primary-800 tabular-nums">
+              {formatWeight(data.summary.totalWeight)}
             </span>
-            <span>
-              <span className="text-primary-400">Total Amount </span>
-              <span className="font-semibold text-primary-700">
-                {formatCurrency(data.summary.totalAmount || 0)}
-              </span>
+          </span>
+          <span>
+            <span className="text-primary-400">Total Amount </span>
+            <span className="font-bold text-primary-800 tabular-nums">
+              {formatCurrency(data.summary.totalAmount || 0)}
             </span>
-          </div>
+          </span>
         </div>
       )}
 
-      <div className="card !p-0 overflow-hidden">
+      <div className="card !p-0 overflow-hidden border border-primary-200">
         {loading ? (
-          <div className="text-center py-12 text-primary-400 text-sm">Loading...</div>
+          <div className="text-center py-8 text-primary-400 text-xs">Loading...</div>
         ) : dateError ? (
-          <div className="text-center py-12 text-red-500 text-sm">Fix the date range</div>
+          <div className="text-center py-8 text-red-500 text-xs">Fix the date range</div>
         ) : !data?.rows?.length ? (
-          <div className="text-center py-12">
-            <ClipboardList className="w-10 h-10 text-primary-300 mx-auto mb-2" />
-            <p className="text-primary-400 text-sm">No purchase or load (sales) records for this range</p>
+          <div className="text-center py-8">
+            <ClipboardList className="w-8 h-8 text-primary-300 mx-auto mb-1.5" />
+            <p className="text-primary-400 text-xs">No purchase or load (sales) records for this range</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left table-fixed">
               <thead>
-                <tr className="bg-primary-50/80 border-b border-primary-100">
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Date</th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Source</th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Material</th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase">Vendor</th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase text-right">
+                <tr className="bg-primary-50/80 border-b border-primary-200">
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-[140px]">Date</th>
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-[70px]">Source</th>
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">Material</th>
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">Vendor</th>
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[80px]">
                     Weight
                   </th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase text-right">
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[70px]">
                     Rate
                   </th>
-                  <th className="py-2.5 px-4 text-xs font-semibold text-primary-500 uppercase text-right">
+                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[80px]">
                     Amount
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((row) => (
-                  <tr key={row.id} className="border-b border-primary-50">
-                    <td className="py-2.5 px-4 text-sm text-primary-600 whitespace-nowrap">
+                  <tr key={row.id} className="border-b border-primary-100 hover:bg-primary-50/40 transition">
+                    <td className="py-2 px-3 text-xs text-primary-600 whitespace-nowrap">
                       {formatDate(row.date)}
                     </td>
-                    <td className="py-2.5 px-4 text-sm text-primary-600">{sourceLabel(row.source)}</td>
-                    <td className="py-2.5 px-4 text-sm font-medium text-primary-700">
+                    <td className="py-2 px-3 text-xs text-primary-600">{sourceLabel(row.source)}</td>
+                    <td className="py-2 px-3 text-xs font-semibold text-primary-800 truncate">
                       {row.materialName}
                     </td>
-                    <td className="py-2.5 px-4 text-sm text-primary-600">{row.vendorName}</td>
-                    <td className="py-2.5 px-4 text-sm text-primary-600 text-right">
+                    <td className="py-2 px-3 text-xs text-primary-600 truncate">{row.vendorName}</td>
+                    <td className="py-2 px-3 text-xs text-primary-600 text-right whitespace-nowrap tabular-nums">
                       {formatWeight(row.totalWeight)}
                     </td>
-                    <td className="py-2.5 px-4 text-sm text-primary-600 text-right">
+                    <td className="py-2 px-3 text-xs text-primary-600 text-right whitespace-nowrap tabular-nums">
                       {row.ratePerKg ? formatCurrency(row.ratePerKg) : '—'}
                     </td>
-                    <td className="py-2.5 px-4 text-sm text-primary-600 text-right">
+                    <td className="py-2 px-3 text-xs font-bold text-primary-800 text-right whitespace-nowrap tabular-nums">
                       {row.amount ? formatCurrency(row.amount) : '—'}
                     </td>
                   </tr>
