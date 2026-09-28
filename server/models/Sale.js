@@ -23,7 +23,9 @@ const saleLineSchema = new mongoose.Schema(
 
 const saleSchema = new mongoose.Schema(
   {
-    customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+    customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: false, default: null },
+    isCashSale: { type: Boolean, default: false },
+    customerName: { type: String, default: '' },
     vendor: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
     load: { type: mongoose.Schema.Types.ObjectId, ref: 'Load', required: true },
     lines: [saleLineSchema],

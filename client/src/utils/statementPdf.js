@@ -34,10 +34,13 @@ export function generateAccountStatementHtml({
     transactions
       .filter((t) => t.type === 'customer_payment')
       .forEach((t) => {
+        const desc = t.reason
+          ? `${t.description || 'Customer Payment'} (${t.reason})`
+          : (t.description || 'Customer Payment');
         items.push({
           date: t.createdAt || t.date,
           type: 'Payment Received',
-          description: t.description || 'Customer Payment',
+          description: desc,
           debit: 0,
           credit: t.amount || 0,
         });
@@ -57,10 +60,13 @@ export function generateAccountStatementHtml({
     transactions
       .filter((t) => t.type === 'vendor_payment')
       .forEach((t) => {
+        const desc = t.reason
+          ? `${t.description || 'Vendor Payment'} (${t.reason})`
+          : (t.description || 'Vendor Payment');
         items.push({
           date: t.createdAt || t.date,
           type: 'Payment Made',
-          description: t.description || 'Vendor Payment',
+          description: desc,
           debit: t.amount || 0,
           credit: 0,
         });

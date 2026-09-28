@@ -392,7 +392,10 @@ export default function CustomerDetail({ path: windowPath }) {
               .map((tx) => (
                 <div key={tx._id} className="px-4 py-3 flex justify-between">
                   <div>
-                    <p className="text-sm text-primary-600">{tx.description}</p>
+                    <p className="text-sm text-primary-600">
+                      {tx.description}
+                      {tx.reason ? <span className="ml-1 text-xs text-primary-500 italic">({tx.reason})</span> : null}
+                    </p>
                     <p className="text-xs text-primary-400">{formatDate(tx.createdAt)}</p>
                   </div>
                   <p className="font-semibold text-primary-700">-{formatCurrency(tx.amount)}</p>

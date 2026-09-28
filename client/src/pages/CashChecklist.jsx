@@ -34,8 +34,12 @@ export default function CashChecklist() {
       ...customers.map((c) => ({ id: c._id, name: c.name, type: 'Customer' })),
       ...vendors.map((v) => ({ id: v._id, name: v.name, type: 'Vendor' })),
     ];
+    const hasCash = allEntries.some((e) => e.partyId === 'cash' || e.partyType === 'Cash Sale');
+    if (hasCash) {
+      list.unshift({ id: 'cash', name: 'Cash', type: 'Cash Sale' });
+    }
     return list.sort((a, b) => a.name.localeCompare(b.name));
-  }, [customers, vendors]);
+  }, [customers, vendors, allEntries]);
 
   const fetchEntries = useCallback(async () => {
     if (startDate > endDate) return;
@@ -48,9 +52,12 @@ export default function CashChecklist() {
       const parsed = raw
         .map((tx) => {
           const lessAmount = Number(tx.lessAmount) || 0;
+          const isCashSale = !tx.customer && !tx.vendor;
           const party = tx.customer || tx.vendor;
-          const pId = tx.customer?._id || tx.customer || tx.vendor?._id || tx.vendor || '';
-          const partyType = tx.customer ? 'Customer' : tx.vendor ? 'Vendor' : '—';
+          const pId = tx.customer?._id || tx.customer || tx.vendor?._id || tx.vendor || (isCashSale ? 'cash' : '');
+          const partyName = party?.name || (isCashSale || tx.description?.toLowerCase().includes('cash') ? 'Cash' : '—');
+          const partyNameTelugu = party?.nameTelugu || (isCashSale ? 'నగదు' : '');
+          const partyType = tx.customer ? 'Customer' : tx.vendor ? 'Vendor' : 'Cash Sale';
           const dt = new Date(tx.entryDate || tx.createdAt);
           const dateStr = dt.toISOString().slice(0, 10);
           return {
@@ -58,13 +65,14 @@ export default function CashChecklist() {
             date: dt,
             dateStr,
             partyId: String(pId),
-            partyName: party?.name || '—',
-            partyNameTelugu: party?.nameTelugu || '',
+            partyName,
+            partyNameTelugu,
             partyType,
             cashSide: tx.cashSide || 'credit',
             paymentType: tx.paymentType || 'Cash',
             amount: Math.max(0, (Number(tx.amount) || 0) - lessAmount),
             lessAmount: lessAmount,
+            reason: tx.reason || (isCashSale ? 'Direct Cash Sale' : ''),
           };
         })
         .filter((item) => item.amount > 0 || item.lessAmount > 0);
@@ -139,6 +147,7 @@ export default function CashChecklist() {
       Name: 'Opening Balance',
       Type: '—',
       'Type of Payment': '—',
+      Reason: '—',
       'Less (₹)': 0,
       'Credit (₹)': summary.openingBalance > 0 ? summary.openingBalance : 0,
       'Debit (₹)': summary.openingBalance < 0 ? Math.abs(summary.openingBalance) : 0,
@@ -150,6 +159,7 @@ export default function CashChecklist() {
         Name: item.partyName,
         Type: item.partyType,
         'Type of Payment': item.paymentType || 'Cash',
+        Reason: item.reason || '—',
         'Less (₹)': item.lessAmount > 0 ? item.lessAmount : 0,
         'Credit (₹)': item.cashSide === 'credit' ? item.amount : 0,
         'Debit (₹)': item.cashSide === 'debit' ? item.amount : 0,
@@ -162,6 +172,7 @@ export default function CashChecklist() {
       Name: '',
       Type: `Records: ${summary.count}`,
       'Type of Payment': '',
+      Reason: '',
       'Less (₹)': summary.totalLess,
       'Credit (₹)': summary.totalCredit,
       'Debit (₹)': summary.totalDebit,
@@ -171,13 +182,14 @@ export default function CashChecklist() {
       Name: '',
       Type: '',
       'Type of Payment': '',
+      Reason: '',
       'Less (₹)': '',
       'Credit (₹)': summary.closingBalance > 0 ? summary.closingBalance : 0,
       'Debit (₹)': summary.closingBalance < 0 ? Math.abs(summary.closingBalance) : 0,
     });
 
     const ws = XLSX.utils.json_to_sheet(sheetRows);
-    ws['!cols'] = [{ wch: 22 }, { wch: 24 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 16 }];
+    ws['!cols'] = [{ wch: 22 }, { wch: 24 }, { wch: 14 }, { wch: 18 }, { wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 16 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Cash Checklist');
     XLSX.writeFile(wb, `cash_checklist_${startDate}_to_${endDate}.xlsx`);
@@ -194,6 +206,7 @@ export default function CashChecklist() {
         <td><strong>Opening Balance</strong></td>
         <td>—</td>
         <td>—</td>
+        <td>—</td>
         <td style="text-align: right;">—</td>
         <td style="text-align: right; color: #15803d;">${summary.openingBalance > 0 ? formatCurrency(summary.openingBalance) : '—'}</td>
         <td style="text-align: right; color: #1d4ed8;">${summary.openingBalance < 0 ? formatCurrency(Math.abs(summary.openingBalance)) : '—'}</td>
@@ -208,6 +221,7 @@ export default function CashChecklist() {
         <td><strong>${e.partyName}</strong>${e.partyNameTelugu ? ` (${e.partyNameTelugu})` : ''}</td>
         <td>${e.partyType}</td>
         <td>${e.paymentType || 'Cash'}</td>
+        <td>${e.reason || '—'}</td>
         <td style="text-align: right; color: #b45309;">${e.lessAmount > 0 ? formatCurrency(e.lessAmount) : '—'}</td>
         <td style="text-align: right; font-weight: 700; color: #15803d;">${e.cashSide === 'credit' ? formatCurrency(e.amount) : '—'}</td>
         <td style="text-align: right; font-weight: 700; color: #1d4ed8;">${e.cashSide === 'debit' ? formatCurrency(e.amount) : '—'}</td>
@@ -255,6 +269,7 @@ export default function CashChecklist() {
           <th>Name</th>
           <th>Type</th>
           <th>Type of Payment</th>
+          <th>Reason</th>
           <th style="text-align: right;">Less (₹)</th>
           <th style="text-align: right;">Credit (₹)</th>
           <th style="text-align: right;">Debit (₹)</th>
@@ -264,13 +279,13 @@ export default function CashChecklist() {
         ${openBalRow}
         ${rowsHtml}
         <tr class="total-row">
-          <td colspan="5" style="text-align: right;">Period Total (${summary.count} records):</td>
+          <td colspan="6" style="text-align: right;">Period Total (${summary.count} records):</td>
           <td style="text-align: right; color: #b45309;">${formatCurrency(summary.totalLess)}</td>
           <td style="text-align: right; color: #15803d;">${formatCurrency(summary.totalCredit)}</td>
           <td style="text-align: right; color: #1d4ed8;">${formatCurrency(summary.totalDebit)}</td>
         </tr>
         <tr class="total-row" style="background: #e0f2fe; font-size: 15px;">
-          <td colspan="6" style="text-align: right; font-weight: 800;">Closing Balance:</td>
+          <td colspan="7" style="text-align: right; font-weight: 800;">Closing Balance:</td>
           <td colspan="2" style="text-align: right; font-weight: 800; color: #0369a1;">${formatCurrency(summary.closingBalance)}</td>
         </tr>
       </tbody>
@@ -469,6 +484,11 @@ export default function CashChecklist() {
                       <p className="text-[11px] text-primary-500 mt-1">
                         {row.partyType} · {row.paymentType || 'Cash'} ({row.cashSide === 'credit' ? 'Credit' : 'Debit'})
                       </p>
+                      {row.reason && (
+                        <p className="text-[11px] text-primary-600 italic mt-0.5">
+                          Reason: {row.reason}
+                        </p>
+                      )}
                       {row.lessAmount > 0 && (
                         <p className="text-[11px] text-amber-700 font-medium">
                           Less: {formatCurrency(row.lessAmount)}
@@ -512,6 +532,9 @@ export default function CashChecklist() {
                     <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-28">
                       Payment Type
                     </th>
+                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide min-w-[100px]">
+                      Reason
+                    </th>
                     <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-20">
                       Less
                     </th>
@@ -530,6 +553,7 @@ export default function CashChecklist() {
                       As of {formatDateOnly(startDate)}
                     </td>
                     <td className="px-3 py-2 text-sky-900 font-bold">Opening Balance</td>
+                    <td className="px-3 py-2 text-sky-700 font-medium">—</td>
                     <td className="px-3 py-2 text-sky-700 font-medium">—</td>
                     <td className="px-3 py-2 text-sky-700 font-medium">—</td>
                     <td className="px-3 py-2 text-slate-400 text-right">—</td>
@@ -556,6 +580,9 @@ export default function CashChecklist() {
                       </td>
                       <td className="px-3 py-2 text-primary-600 text-xs">{row.partyType}</td>
                       <td className="px-3 py-2 text-primary-600 text-xs">{row.paymentType || 'Cash'}</td>
+                      <td className="px-3 py-2 text-primary-600 text-xs max-w-[160px] truncate" title={row.reason}>
+                        {row.reason || '—'}
+                      </td>
                       <td className="px-3 py-2 text-amber-700 text-right tabular-nums text-xs font-medium">
                         {row.lessAmount > 0 ? formatCurrency(row.lessAmount) : '—'}
                       </td>
@@ -570,7 +597,7 @@ export default function CashChecklist() {
                 </tbody>
                 <tfoot>
                   <tr className="bg-accent-50 border-t border-primary-200 font-semibold text-xs">
-                    <td colSpan={4} className="px-3 py-2 font-bold text-primary-800">
+                    <td colSpan={5} className="px-3 py-2 font-bold text-primary-800">
                       Period Total ({summary.count} records)
                     </td>
                     <td className="px-3 py-2 text-amber-700 text-right tabular-nums font-bold">
@@ -584,7 +611,7 @@ export default function CashChecklist() {
                     </td>
                   </tr>
                   <tr className="bg-accent-100/70 border-t border-primary-200 font-bold text-xs text-accent-900">
-                    <td colSpan={5} className="px-3 py-2 font-bold uppercase tracking-wide">
+                    <td colSpan={6} className="px-3 py-2 font-bold uppercase tracking-wide">
                       Closing Balance
                     </td>
                     <td colSpan={2} className="px-3 py-2 text-right font-bold tabular-nums text-xs text-accent-900">

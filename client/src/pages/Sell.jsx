@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, ArrowUpDown, Printer, Trash2, CheckCircle2, Lock, Eye, EyeOff, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Printer, Trash2, Pencil, CheckCircle2, Lock, Eye, EyeOff, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDate, formatDateTimeSplit } from '../utils/format';
@@ -172,8 +172,18 @@ export default function Sell({ path: windowPath }) {
   const amount = Number((materialsAmount + coolyApplied).toFixed(2));
 
   const suggestions = useMemo(() => {
-    if (!nameQuery.trim()) return [];
-    return searchAndSortItems(customers, ['name', 'nameTelugu', 'mobile'], nameQuery).slice(0, 8);
+    const q = nameQuery.trim().toLowerCase();
+    if (!q) return [];
+    const list = searchAndSortItems(customers, ['name', 'nameTelugu', 'mobile'], nameQuery).slice(0, 8);
+    if ('cash'.startsWith(q) || 'నగదు'.startsWith(q) || q.includes('cash')) {
+      list.unshift({
+        _id: 'cash',
+        name: 'Cash',
+        nameTelugu: 'నగదు',
+        isCashSale: true,
+      });
+    }
+    return list;
   }, [customers, nameQuery]);
 
   const flatRows = useMemo(() => {
@@ -183,10 +193,15 @@ export default function Sell({ path: windowPath }) {
         const lineIdx = sale.lines.indexOf(line);
         const isEditingThis = editingSaleId === sale._id && lineIdx === editingLineIndex;
 
+        const isCash = sale.isCashSale || !sale.customer || sale.customerName === 'Cash';
+        const rawCustName = isCash ? 'Cash' : (sale.customer?.name || sale.customerName || 'Cash');
+        const rawCustId = isCash ? 'cash' : (sale.customer?._id || sale.customer || 'cash');
+
         if (isEditingThis) {
           const matObj = materials.find((m) => m._id === materialId);
           const custObj = customers.find((c) => c._id === customerId);
           const vendObj = vendors.find((v) => v._id === vendorId);
+          const editIsCash = customerId === 'cash' || nameQuery.trim().toLowerCase() === 'cash' || nameQuery.trim().toLowerCase() === 'నగదు';
 
           rows.push({
             saleId: sale._id,
@@ -194,8 +209,8 @@ export default function Sell({ path: windowPath }) {
             serial: sale.serialNo != null ? sale.serialNo : rows.length + 1,
             item: matObj?.name || line.materialName || '—',
             materialId: materialId || line.material?._id || line.material || '',
-            name: nameQuery || custObj?.name || sale.customer?.name || '—',
-            customerId: customerId || sale.customer?._id || sale.customer || '',
+            name: editIsCash ? 'Cash' : (nameQuery || custObj?.name || rawCustName || '—'),
+            customerId: editIsCash ? 'cash' : (customerId || rawCustId || ''),
             vendor: vendObj?.name || sale.vendor?.name || '—',
             vendorId: vendorId || sale.vendor?._id || sale.vendor || '',
             bags: bagCount,
@@ -205,7 +220,8 @@ export default function Sell({ path: windowPath }) {
             cooly: coolyApplied,
             coolyRate: coolyOn ? Number(cooly) || 0 : 0,
             coolyPerBag,
-            isPaid: !!isPaid,
+            isPaid: editIsCash ? true : !!isPaid,
+            isCashSale: editIsCash,
             amount: amount,
             createdAt: sale.createdAt,
             sale,
@@ -222,8 +238,8 @@ export default function Sell({ path: windowPath }) {
             serial: sale.serialNo != null ? sale.serialNo : rows.length + 1,
             item: line.materialName,
             materialId: line.material?._id || line.material || '',
-            name: sale.customer?.name || '—',
-            customerId: sale.customer?._id || sale.customer || '',
+            name: rawCustName,
+            customerId: rawCustId,
             vendor: sale.vendor?.name || '—',
             vendorId: sale.vendor?._id || sale.vendor || '',
             bags: line.bagCount,
@@ -234,6 +250,7 @@ export default function Sell({ path: windowPath }) {
             coolyRate: sale.coolyRate != null ? sale.coolyRate : sale.handlingCharges || 0,
             coolyPerBag: !!sale.coolyPerBag,
             isPaid: !!sale.isPaid,
+            isCashSale: isCash,
             amount: Number(line.totalAmount || 0) + (sale.handlingCharges || 0),
             createdAt: sale.createdAt,
             sale,
@@ -271,12 +288,20 @@ export default function Sell({ path: windowPath }) {
     const map = new Map();
     for (const r of flatRows) {
       if (r.customerId && !map.has(r.customerId)) {
-        const fullObj = customers.find((c) => c._id === r.customerId);
-        map.set(r.customerId, {
-          _id: r.customerId,
-          name: r.name,
-          nameTelugu: fullObj?.nameTelugu || '',
-        });
+        if (r.customerId === 'cash' || r.isCashSale) {
+          map.set('cash', {
+            _id: 'cash',
+            name: 'Cash',
+            nameTelugu: 'నగదు',
+          });
+        } else {
+          const fullObj = customers.find((c) => c._id === r.customerId);
+          map.set(r.customerId, {
+            _id: r.customerId,
+            name: r.name,
+            nameTelugu: fullObj?.nameTelugu || '',
+          });
+        }
       }
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -485,9 +510,10 @@ export default function Sell({ path: windowPath }) {
     if (!sale) return;
     fillingRef.current = true;
     const line = (sale.lines || [])[lineIndex] || (sale.lines || [])[0];
+    const isCash = sale.isCashSale || !sale.customer || sale.customerName === 'Cash';
     const cust = sale.customer;
-    const custId = cust?._id || (typeof cust === 'string' ? cust : '');
-    const custObj = customers.find((c) => c._id === custId) || (typeof cust === 'object' ? cust : null);
+    const custId = isCash ? 'cash' : (cust?._id || (typeof cust === 'string' ? cust : ''));
+    const custObj = isCash ? null : (customers.find((c) => c._id === custId) || (typeof cust === 'object' ? cust : null));
 
     editingSaleIdRef.current = sale._id;
     setEditingSaleId(sale._id);
@@ -497,7 +523,11 @@ export default function Sell({ path: windowPath }) {
     const vId = sale.vendor?._id || (typeof sale.vendor === 'string' ? sale.vendor : '');
     setVendorId(vId);
 
-    if (custObj || custId) {
+    if (isCash) {
+      setCustomerId('cash');
+      setNameQuery('Cash');
+      setCoolyOn(!!sale.handlingCharges || Number(sale.coolyRate) > 0);
+    } else if (custObj || custId) {
       setCustomerId(custObj?._id || custId);
       setNameQuery(custObj?.name || '');
       setCoolyOn(!!sale.handlingCharges || Number(sale.coolyRate) > 0);
@@ -649,12 +679,9 @@ export default function Sell({ path: windowPath }) {
     }
     const target = sales.find((s) => s._id === focusSaleId);
     if (target) {
-      if (editingSaleId !== target._id) {
-        fillFromSale(target, 0);
-      }
       return;
     }
-    // If not found in current day's sales list, fetch directly once
+    // If not found in current day's sales list, fetch directly once to sync date
     if (remoteFetchedSaleIdRef.current === focusSaleId) return;
     remoteFetchedSaleIdRef.current = focusSaleId;
     let active = true;
@@ -662,7 +689,6 @@ export default function Sell({ path: windowPath }) {
       .get(`/sales/${focusSaleId}`)
       .then((res) => {
         if (!active || !res.data) return;
-        fillFromSale(res.data, 0);
         const d = dateToLocalISO(res.data.createdAt);
         if (d && d !== date) setDate(d);
       })
@@ -670,7 +696,7 @@ export default function Sell({ path: windowPath }) {
     return () => {
       active = false;
     };
-  }, [sales, focusSaleId, editingSaleId]);
+  }, [sales, focusSaleId, date]);
 
   useEffect(() => {
     if (!focusSaleId || !focusRowRef.current) return;
@@ -722,6 +748,16 @@ export default function Sell({ path: windowPath }) {
   }, [bagWeights, focusBagIdx]);
 
   const pickCustomer = (c) => {
+    if (c._id === 'cash' || c.isCashSale) {
+      setCustomerId('cash');
+      setNameQuery('Cash');
+      setSuggestOpen(false);
+      setHighlight(-1);
+      setCoolyOn(false);
+      setCooly('0');
+      setFocusBagIdx(0);
+      return;
+    }
     setCustomerId(c._id);
     setNameQuery(c.name);
     setSuggestOpen(false);
@@ -759,7 +795,9 @@ export default function Sell({ path: windowPath }) {
       setRate('');
     }
     if (focusName) {
-      nameRef.current?.focus();
+      setTimeout(() => {
+        nameRef.current?.focus();
+      }, 50);
     }
     if (searchParams.get('saleId') || searchParams.get('customerId') || searchParams.get('highlightSaleId')) {
       setSearchParams({}, { replace: true });
@@ -816,8 +854,9 @@ export default function Sell({ path: windowPath }) {
       toast.error('Select vendor');
       return;
     }
-    if (!customerId) {
-      toast.error('Type and select a customer');
+    const isCash = customerId === 'cash' || nameQuery.trim().toLowerCase() === 'cash' || nameQuery.trim().toLowerCase() === 'నగదు';
+    if (!isCash && !customerId) {
+      toast.error('Type and select a customer or type Cash');
       return;
     }
     const isByBag = saleType === 'by_bag';
@@ -860,13 +899,16 @@ export default function Sell({ path: windowPath }) {
     setSaving(true);
     try {
       const payload = {
-        customerId,
+        customerId: isCash ? 'cash' : customerId,
+        isCashSale: isCash,
+        customerName: isCash ? 'Cash' : undefined,
         vendorId,
         date,
         handlingCharges: coolyOn ? coolyApplied : 0,
         coolyRate: coolyOn ? Number(cooly) || 0 : 0,
         coolyPerBag: coolyOn ? coolyPerBag : false,
-        isPaid,
+        isPaid: isCash ? true : isPaid,
+        paymentType: 'Cash',
         lines: [
           {
             materialId,
@@ -879,15 +921,12 @@ export default function Sell({ path: windowPath }) {
         ],
       };
       let savedSaleId = editingSaleId;
-      let savedSaleData = null;
       if (editingSaleId) {
-        const res = await api.put(`/sales/${editingSaleId}`, payload);
-        savedSaleData = res.data;
+        await api.put(`/sales/${editingSaleId}`, payload);
         toast.success('Sale updated');
       } else {
         const res = await api.post('/sales', payload);
         savedSaleId = res.data?._id;
-        savedSaleData = res.data;
         toast.success('Saved');
       }
       if (hasActiveFilters) {
@@ -895,19 +934,12 @@ export default function Sell({ path: windowPath }) {
         setFilterVendor('');
         setFilterItem('');
       }
-      const updatedSales = await loadDaySales();
+      await loadDaySales();
       window.dispatchEvent(new CustomEvent('jsr_data_updated'));
       if (savedSaleId) {
         setFocusSaleId(savedSaleId);
-        const freshSale = (updatedSales || []).find((s) => s._id === savedSaleId) || savedSaleData;
-        if (freshSale && editingSaleId) {
-          fillFromSale(freshSale, 0);
-        } else {
-          clearEntry({ clearFocus: false });
-        }
-      } else {
-        clearEntry({ clearFocus: false });
       }
+      clearEntry({ clearFocus: false, focusName: true });
       api.get('/customers').then((r) => setCustomers(r.data));
     } catch (err) {
       toast.error(err.response?.data?.message || 'Sale failed');
@@ -936,7 +968,8 @@ export default function Sell({ path: windowPath }) {
       return;
     }
     const sale = row.sale;
-    const customerIdNext = patch.customerId || sale.customer?._id || sale.customer;
+    const isCashNext = patch.customerId === 'cash' || patch.isCashSale || (!patch.customerId && (sale.isCashSale || !sale.customer));
+    const customerIdNext = isCashNext ? 'cash' : (patch.customerId || sale.customer?._id || sale.customer);
     const vendorIdNext = sale.vendor?._id || sale.vendor;
     if (!customerIdNext || !vendorIdNext) {
       toast.error('Sale is missing customer or vendor');
@@ -1044,9 +1077,16 @@ export default function Sell({ path: windowPath }) {
       return;
     }
     if (e.key === 'Enter') {
-      if (suggestOpen && suggestions.length) {
+      if (suggestOpen && suggestions.length && highlight >= 0) {
         e.preventDefault();
-        const pick = highlight >= 0 ? suggestions[highlight] : suggestions[0];
+        const pick = suggestions[highlight];
+        if (pick) pickCustomer(pick);
+      } else if (nameQuery.trim().toLowerCase() === 'cash' || nameQuery.trim().toLowerCase() === 'నగదు') {
+        e.preventDefault();
+        pickCustomer({ _id: 'cash', name: 'Cash', nameTelugu: 'నగదు', isCashSale: true });
+      } else if (suggestOpen && suggestions.length) {
+        e.preventDefault();
+        const pick = suggestions[0];
         if (pick) pickCustomer(pick);
       } else {
         e.preventDefault();
@@ -1126,8 +1166,13 @@ export default function Sell({ path: windowPath }) {
         const totalSale = Number(st.sales.reduce((acc, s) => acc + (Number(s.amount) || 0), 0).toFixed(2));
         const totalPaid = Number((st.payments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0).toFixed(2));
         const closing = Number((st.opening + totalSale - totalPaid).toFixed(2));
+        const entries = [
+          ...st.sales.map((s) => ({ ...s, isPayment: false })),
+          ...(st.payments || []).map((p) => ({ ...p, isPayment: true, material: p.description || 'Paid' })),
+        ].sort((a, b) => new Date(a.date || a.createdAt || 0).getTime() - new Date(b.date || b.createdAt || 0).getTime());
         return {
           ...st,
+          entries,
           totalSale,
           totalPaid,
           closing,
@@ -1160,7 +1205,8 @@ export default function Sell({ path: windowPath }) {
       if (editingSaleId === r.saleId) {
         clearEntry();
       }
-      fetchSales();
+      await loadDaySales();
+      window.dispatchEvent(new CustomEvent('jsr_data_updated'));
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Failed to delete sale');
     }
@@ -1181,77 +1227,88 @@ export default function Sell({ path: windowPath }) {
       {/* ── Responsive Horizontal Entry Form ── */}
       <form
         onSubmit={handleSave}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && editingSaleId) {
+            e.preventDefault();
+            clearEntry({ clearFocus: false, focusName: true });
+          }
+        }}
         className="shrink-0 bg-surface border border-primary-200 rounded-xl shadow-2xs overflow-hidden"
       >
         {/* Top toolbar: Mode & actions */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-accent-50/70 border-b border-primary-100">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-1.5 bg-accent-50/80 border-b border-primary-100">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-primary-800">
-                New Sales Entry
+              <span className="text-sm font-bold text-primary-800">
+                {editingSaleId ? 'Edit Sales Entry' : 'New Sales Entry'}
               </span>
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-surface border border-primary-200 text-[10px] font-bold text-primary-700">
+              <span className="inline-flex items-center px-2 py-0.5 rounded bg-surface border border-primary-200 text-xs font-bold text-primary-700">
                 S.No {nextSerial}
               </span>
+              {editingSaleId && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold">
+                  Editing
+                </span>
+              )}
             </div>
 
-            <div className="h-3.5 w-px bg-primary-200 shrink-0" />
+            <div className="h-4 w-px bg-primary-200 shrink-0" />
 
             {/* Sale Type radios */}
-            <div className="flex items-center gap-2.5">
-              <label className="inline-flex items-center gap-1 text-xs text-primary-700 font-medium cursor-pointer">
+            <div className="flex items-center gap-3">
+              <label className="inline-flex items-center gap-1.5 text-sm text-primary-700 font-medium cursor-pointer">
                 <input
                   type="radio"
                   name="saleType"
                   value="by_weight"
                   checked={saleType === 'by_weight'}
                   onChange={() => setSaleType('by_weight')}
-                  className="w-3.5 h-3.5 text-primary-600 focus:ring-primary-500"
+                  className="w-4 h-4 text-primary-600 focus:ring-primary-500"
                 />
                 By kg
               </label>
-              <label className="inline-flex items-center gap-1 text-xs text-primary-700 font-medium cursor-pointer">
+              <label className="inline-flex items-center gap-1.5 text-sm text-primary-700 font-medium cursor-pointer">
                 <input
                   type="radio"
                   name="saleType"
                   value="by_bag"
                   checked={saleType === 'by_bag'}
                   onChange={() => setSaleType('by_bag')}
-                  className="w-3.5 h-3.5 text-primary-600 focus:ring-primary-500"
+                  className="w-4 h-4 text-primary-600 focus:ring-primary-500"
                 />
                 By bag
               </label>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <button
               type="submit"
-              className="btn-primary !py-1 !px-3.5 !text-xs font-semibold"
+              className="btn-primary !py-1.5 !px-4 !text-sm font-semibold"
               disabled={saving}
             >
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? 'Saving...' : editingSaleId ? 'Update' : 'Save'}
             </button>
             <button
               type="button"
-              className="btn-secondary !py-1 !px-2.5 !text-xs font-semibold"
-              onClick={clearEntry}
+              className="btn-secondary !py-1.5 !px-3 !text-sm font-semibold"
+              onClick={() => clearEntry()}
             >
-              Clear
+              {editingSaleId ? 'Cancel' : 'Clear'}
             </button>
           </div>
         </div>
 
-        {/* Fixed 2-Row Inputs Structure — Identical height & layout for both by_weight and by_bag */}
-        <div className="p-2.5 space-y-2">
-          {/* Row 1: Primary Transaction Details (Fixed 1 Row, Never Wraps) */}
-          <div className="flex items-end gap-2">
+        {/* 2-Row Inputs Structure with enhanced font size */}
+        <div className="p-3 space-y-2.5">
+          {/* Row 1: Primary Transaction Details */}
+          <div className="flex items-end gap-2.5">
             {/* Date */}
-            <div className="flex flex-col shrink-0 w-28">
-              <label className="text-[10px] font-semibold text-primary-500 mb-0.5">Date *</label>
+            <div className="flex flex-col shrink-0 w-32">
+              <label className="text-xs font-semibold text-primary-600 mb-1">Date *</label>
               <input
                 type="date"
-                className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+                className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                 value={date}
                 onChange={(e) => {
                   const newDate = e.target.value;
@@ -1269,10 +1326,10 @@ export default function Sell({ path: windowPath }) {
             </div>
 
             {/* Product */}
-            <div className="flex flex-col flex-1 min-w-[120px]">
-              <label className="text-[10px] font-semibold text-primary-500 mb-0.5">Product *</label>
+            <div className="flex flex-col flex-1 min-w-[130px]">
+              <label className="text-xs font-semibold text-primary-600 mb-1">Product *</label>
               <select
-                className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+                className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
                 value={materialId}
                 onChange={(e) => setMaterialId(e.target.value)}
                 required
@@ -1287,10 +1344,10 @@ export default function Sell({ path: windowPath }) {
             </div>
 
             {/* Vendor */}
-            <div className="flex flex-col flex-1 min-w-[110px]">
-              <label className="text-[10px] font-semibold text-primary-500 mb-0.5">Vendor *</label>
+            <div className="flex flex-col flex-1 min-w-[120px]">
+              <label className="text-xs font-semibold text-primary-600 mb-1">Vendor *</label>
               <select
-                className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+                className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
                 value={vendorId}
                 onChange={(e) => setVendorId(e.target.value)}
                 required
@@ -1305,23 +1362,29 @@ export default function Sell({ path: windowPath }) {
             </div>
 
             {/* Customer Name */}
-            <div className="flex flex-col relative flex-1 min-w-[130px]">
-              <label className="text-[10px] font-semibold text-primary-500 mb-0.5">Name *</label>
+            <div className="flex flex-col relative flex-1 min-w-[140px]">
+              <label className="text-xs font-semibold text-primary-600 mb-1">Name *</label>
               <input
                 ref={nameRef}
-                className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+                className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 placeholder:text-primary-400 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                 value={nameQuery}
                 onChange={(e) => {
                   const val = e.target.value;
                   setNameQuery(val);
-                  const match = customers.find((c) => c.name.trim().toLowerCase() === val.trim().toLowerCase());
-                  if (match) {
-                    setCustomerId(match._id);
-                    const hasCooly = !!match.handlingCharges;
-                    setCoolyOn(hasCooly);
-                    if (hasCooly) setCooly((prev) => (!prev || prev === '0' ? salesCoolyRate : prev));
+                  if (val.trim().toLowerCase() === 'cash' || val.trim().toLowerCase() === 'నగదు') {
+                    setCustomerId('cash');
+                    setCoolyOn(false);
+                    setCooly('0');
                   } else {
-                    setCustomerId('');
+                    const match = customers.find((c) => c.name.trim().toLowerCase() === val.trim().toLowerCase());
+                    if (match) {
+                      setCustomerId(match._id);
+                      const hasCooly = !!match.handlingCharges;
+                      setCoolyOn(hasCooly);
+                      if (hasCooly) setCooly((prev) => (!prev || prev === '0' ? salesCoolyRate : prev));
+                    } else {
+                      setCustomerId('');
+                    }
                   }
                   setSuggestOpen(true);
                 }}
@@ -1334,18 +1397,18 @@ export default function Sell({ path: windowPath }) {
               {suggestOpen && suggestions.length > 0 && (
                 <ul
                   ref={custSuggestListRef}
-                  className="absolute top-full left-0 z-30 mt-0.5 w-56 max-h-40 overflow-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+                  className="absolute top-full left-0 z-30 mt-1 w-64 max-h-48 overflow-auto rounded-xl border border-primary-200 bg-surface shadow-card"
                 >
                   {suggestions.map((c, idx) => (
                     <li key={c._id}>
                       <button
                         type="button"
                         data-idx={idx}
-                        className={`w-full text-left px-3 py-1.5 text-xs ${idx === highlight ? 'bg-primary-100 text-primary-800' : 'hover:bg-primary-50'}`}
+                        className={`w-full text-left px-3 py-2 text-sm ${idx === highlight ? 'bg-primary-100 text-primary-800' : 'hover:bg-primary-50'}`}
                         onMouseDown={(ev) => { ev.preventDefault(); pickCustomer(c); }}
                       >
-                        {c.name}
-                        {c.nameTelugu ? <span className="block text-[10px] text-primary-400">{c.nameTelugu}</span> : null}
+                        <span className="font-medium">{c.name}</span>
+                        {c.nameTelugu ? <span className="block text-xs text-primary-400">{c.nameTelugu}</span> : null}
                       </button>
                     </li>
                   ))}
@@ -1354,21 +1417,21 @@ export default function Sell({ path: windowPath }) {
             </div>
 
             {/* Amount */}
-            <div className="flex flex-col shrink-0 w-24">
-              <label className="text-[10px] font-semibold text-primary-500 mb-0.5">Amount</label>
+            <div className="flex flex-col shrink-0 w-28">
+              <label className="text-xs font-semibold text-primary-600 mb-1">Amount</label>
               <input
-                className="h-8 w-full rounded-lg border border-primary-200 bg-accent-100 px-2 py-1 text-xs font-bold text-accent-800 text-right focus:outline-none tabular-nums shadow-2xs"
+                className="h-9 w-full rounded-lg border border-accent-300/80 bg-accent-100/90 px-2.5 py-1 text-base font-bold text-accent-900 text-right focus:outline-none tabular-nums shadow-2xs"
                 value={amount ? formatCurrency(amount) : ''}
                 readOnly
               />
             </div>
           </div>
 
-          {/* Row 2: Quantities, Rates, Cooly & Bag Weights (Fixed 1 Row, Constant Height) */}
-          <div className="flex items-center gap-2 pt-1 border-t border-primary-100/70 h-8">
+          {/* Row 2: Quantities, Rates, Cooly & Bag Weights */}
+          <div className="flex items-center gap-2.5 pt-1.5 border-t border-primary-100/70 min-h-[38px]">
             {/* Bags */}
-            <div className="flex items-center gap-1 shrink-0">
-              <label className="text-[10px] font-semibold text-primary-500 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <label className="text-xs font-semibold text-primary-600 shrink-0">
                 {isByBag ? 'Bags *' : 'Bags:'}
               </label>
               {isByBag ? (
@@ -1376,7 +1439,7 @@ export default function Sell({ path: windowPath }) {
                   type="text"
                   inputMode="numeric"
                   autoComplete="off"
-                  className="h-7 w-14 rounded-md border border-primary-200 bg-surface px-1.5 py-0.5 text-xs text-primary-700 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+                  className="h-8 w-16 rounded-lg border border-primary-200 bg-surface px-2 py-1 text-sm font-semibold text-primary-700 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                   placeholder="0"
                   value={directBagCount}
                   onChange={(e) => setDirectBagCount(e.target.value.replace(/[^\d]/g, ''))}
@@ -1384,7 +1447,7 @@ export default function Sell({ path: windowPath }) {
                 />
               ) : (
                 <input
-                  className="h-7 w-12 rounded-md border border-primary-200 bg-primary-50 px-1 py-0.5 text-xs text-primary-700 text-right focus:outline-none tabular-nums font-semibold"
+                  className="h-8 w-14 rounded-lg border border-primary-200 bg-primary-50 px-2 py-1 text-sm font-bold text-primary-800 text-right focus:outline-none tabular-nums"
                   value={bagCount || '0'}
                   readOnly
                 />
@@ -1392,11 +1455,11 @@ export default function Sell({ path: windowPath }) {
             </div>
 
             {/* Qty (kg) */}
-            <div className="flex items-center gap-1 shrink-0">
-              <label className="text-[10px] font-semibold text-primary-500 shrink-0">Qty (kg):</label>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <label className="text-xs font-semibold text-primary-600 shrink-0">Qty (kg):</label>
               <input
-                className={`h-7 w-16 rounded-md border border-primary-200 px-1.5 py-0.5 text-xs text-right focus:outline-none tabular-nums font-semibold ${
-                  isByBag ? 'bg-primary-50/70 text-primary-400' : 'bg-primary-50 text-primary-700'
+                className={`h-8 w-20 rounded-lg border border-primary-200 px-2 py-1 text-sm font-bold text-right focus:outline-none tabular-nums ${
+                  isByBag ? 'bg-primary-50/70 text-primary-400' : 'bg-primary-50 text-primary-800'
                 }`}
                 value={isByBag ? '—' : (qty ? qty.toFixed(1) : '')}
                 readOnly
@@ -1404,8 +1467,8 @@ export default function Sell({ path: windowPath }) {
             </div>
 
             {/* Rate */}
-            <div className="flex items-center gap-1 shrink-0">
-              <label className="text-[10px] font-semibold text-primary-500 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <label className="text-xs font-semibold text-primary-600 shrink-0">
                 {isByBag ? 'Rate/bag *' : 'Rate/kg *'}
               </label>
               <input
@@ -1413,7 +1476,7 @@ export default function Sell({ path: windowPath }) {
                 type="text"
                 inputMode="decimal"
                 autoComplete="off"
-                className="h-7 w-16 rounded-md border border-primary-200 bg-surface px-1.5 py-0.5 text-xs text-primary-700 text-right font-semibold focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+                className="h-8 w-20 rounded-lg border border-primary-200 bg-surface px-2 py-1 text-sm font-bold text-primary-800 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                 value={rate}
                 onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ''))}
                 onKeyDown={(e) => {
@@ -1426,13 +1489,13 @@ export default function Sell({ path: windowPath }) {
             </div>
 
             {/* Cooly */}
-            <div className="flex items-center gap-1 shrink-0">
-              <label className="text-[10px] font-semibold text-primary-500 shrink-0 flex items-center gap-1">
-                <span className="inline-flex items-center gap-0.5">
-                  Cooly <input type="checkbox" checked={coolyOn} onChange={(e) => { setCoolyOn(e.target.checked); if (e.target.checked) setCooly((p) => (!p || p === '0' ? salesCoolyRate : p)); else setCooly('0'); }} className="w-3 h-3" />
+            <div className="flex items-center gap-1.5 shrink-0">
+              <label className="text-xs font-semibold text-primary-600 shrink-0 flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 cursor-pointer">
+                  Cooly <input type="checkbox" checked={coolyOn} onChange={(e) => { setCoolyOn(e.target.checked); if (e.target.checked) setCooly((p) => (!p || p === '0' ? salesCoolyRate : p)); else setCooly('0'); }} className="w-3.5 h-3.5 rounded cursor-pointer" />
                 </span>
-                <span className="inline-flex items-center gap-0.5 font-normal text-primary-400">
-                  /bag <input type="checkbox" checked={coolyPerBag} disabled={!coolyOn} onChange={(e) => setCoolyPerBag(e.target.checked)} className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1 font-normal text-primary-500 cursor-pointer">
+                  /bag <input type="checkbox" checked={coolyPerBag} disabled={!coolyOn} onChange={(e) => setCoolyPerBag(e.target.checked)} className="w-3.5 h-3.5 rounded cursor-pointer" />
                 </span>
               </label>
               <input
@@ -1440,7 +1503,7 @@ export default function Sell({ path: windowPath }) {
                 type="text"
                 inputMode="decimal"
                 autoComplete="off"
-                className="h-7 w-14 rounded-md border border-primary-200 bg-surface px-1.5 py-0.5 text-xs text-primary-700 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition disabled:bg-primary-50 disabled:text-primary-400"
+                className="h-8 w-18 rounded-lg border border-primary-200 bg-surface px-2 py-1 text-sm font-semibold text-primary-700 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition disabled:bg-primary-50 disabled:text-primary-400"
                 value={cooly}
                 disabled={!coolyOn}
                 onChange={(e) => setCooly(e.target.value.replace(/[^\d.]/g, ''))}
@@ -1449,17 +1512,17 @@ export default function Sell({ path: windowPath }) {
             </div>
 
             {/* Vertical Divider */}
-            <div className="h-5 w-px bg-primary-200 shrink-0 mx-0.5" />
+            <div className="h-6 w-px bg-primary-200 shrink-0 mx-1" />
 
-            {/* Bag weights or by_bag indicator (always present, same height) */}
-            <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto no-scrollbar">
+            {/* Bag weights or by_bag indicator */}
+            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto no-scrollbar">
               {isByBag ? (
-                <span className="text-[11px] text-primary-400 font-medium italic whitespace-nowrap">
+                <span className="text-xs text-primary-500 font-medium italic whitespace-nowrap">
                   By bag sale — {directBagCount || '0'} bags · weights not applicable
                 </span>
               ) : (
                 <>
-                  <span className="text-[10px] font-semibold text-primary-600 shrink-0">Bag wts:</span>
+                  <span className="text-xs font-semibold text-primary-700 shrink-0">Bag wts:</span>
                   {bagWeights.map((bag, idx) => (
                     <div key={idx} className="relative inline-flex items-center shrink-0">
                       <input
@@ -1467,7 +1530,7 @@ export default function Sell({ path: windowPath }) {
                         type="text"
                         inputMode="decimal"
                         autoComplete="off"
-                        className="w-12 h-6 rounded border border-primary-200 bg-surface px-1 text-xs text-primary-700 pr-3.5 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+                        className="w-14 h-8 rounded-lg border border-primary-200 bg-surface px-1.5 text-sm font-semibold text-primary-800 text-center pr-4 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
                         placeholder={`${idx + 1}`}
                         value={bag}
                         onChange={(e) => updateBag(idx, e.target.value.replace(/[^\d.]/g, ''))}
@@ -1477,7 +1540,7 @@ export default function Sell({ path: windowPath }) {
                         <button
                           type="button"
                           onClick={() => removeBag(idx)}
-                          className="absolute right-0.5 top-1/2 -translate-y-1/2 text-primary-400 hover:text-rose-600 text-[10px] px-0.5 font-bold rounded cursor-pointer leading-none"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 text-primary-400 hover:text-rose-600 text-xs px-0.5 font-bold rounded cursor-pointer leading-none"
                         >×</button>
                       )}
                     </div>
@@ -1485,7 +1548,7 @@ export default function Sell({ path: windowPath }) {
                   <button
                     type="button"
                     onClick={() => { setBagWeights([...bagWeights, '']); setFocusBagIdx(bagWeights.length); }}
-                    className="px-1.5 py-0.5 text-[10px] font-semibold text-accent-800 bg-accent-100 hover:bg-accent-200 border border-accent-300/80 rounded transition cursor-pointer shrink-0"
+                    className="px-2.5 py-1 text-xs font-semibold text-accent-800 bg-accent-100 hover:bg-accent-200 border border-accent-300/80 rounded-lg transition cursor-pointer shrink-0"
                   >+ Add</button>
                 </>
               )}
@@ -1596,7 +1659,7 @@ export default function Sell({ path: windowPath }) {
                   <span>Entry Date Time</span>
                 </SortLabel>
               </th>
-              <th className="bg-accent-200 px-1 py-1.5 font-semibold text-center whitespace-nowrap sticky top-0 z-20 w-10">Action</th>
+              <th className="bg-accent-200 px-1 py-1.5 font-semibold text-center whitespace-nowrap sticky top-0 z-20 w-14">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -1927,9 +1990,10 @@ export default function Sell({ path: windowPath }) {
                           }
                         }}
                       >
-                        {r.customerId && !customers.some((c) => c._id === r.customerId) ? (
+                        {r.customerId && !customers.some((c) => c._id === r.customerId) && r.customerId !== 'cash' ? (
                           <option value={r.customerId}>{r.name}</option>
                         ) : null}
+                        <option value="cash">Cash (నగదు)</option>
                         {customers.map((c) => (
                           <option key={c._id} value={c._id}>
                             {c.name}
@@ -2291,18 +2355,31 @@ export default function Sell({ path: windowPath }) {
                         );
                       })()}
                     </td>
-                    <td className="px-1 py-0.5 text-center whitespace-nowrap w-10" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteSale(r);
-                        }}
-                        title="Delete sales entry"
-                        className="p-1 rounded text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <td className="px-1 py-0.5 text-center whitespace-nowrap w-14" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            requestEditSale(r.sale, r.lineIndex);
+                          }}
+                          title="Edit sales entry in form"
+                          className="p-1 rounded text-primary-600 hover:text-primary-800 hover:bg-primary-100 transition cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSale(r);
+                          }}
+                          title="Delete sales entry"
+                          className="p-1 rounded text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -2326,7 +2403,7 @@ export default function Sell({ path: windowPath }) {
                 {formatCurrency(totals.amount)}
               </td>
               <td className="bg-accent-200 px-1.5 py-1.5 w-28"></td>
-              <td className="bg-accent-200 px-1 py-1.5 w-10"></td>
+              <td className="bg-accent-200 px-1 py-1.5 w-14"></td>
             </tr>
           </tfoot>
         </table>

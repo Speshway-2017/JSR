@@ -63,7 +63,7 @@ export default function Transactions() {
     const q = searchQuery.trim();
     return transactions.filter((tx) => {
       const pName = partyName(tx);
-      const desc = tx.description || '';
+      const desc = [tx.description || '', tx.reason || ''].join(' ');
       return matchesPrefix(pName, q) || matchesPrefix(desc, q);
     });
   }, [transactions, searchQuery]);
@@ -167,7 +167,12 @@ export default function Transactions() {
                       </span>
                     </td>
                     <td className="py-2 px-3 text-xs font-semibold text-primary-800 truncate">{partyName(tx)}</td>
-                    <td className="py-2 px-3 text-xs text-primary-500 truncate">{tx.description}</td>
+                    <td className="py-2 px-3 text-xs text-primary-500 truncate" title={tx.reason ? `${tx.description || ''} (${tx.reason})` : tx.description}>
+                      {tx.description}
+                      {tx.reason ? (
+                        <span className="ml-1 text-[11px] text-primary-400 italic">({tx.reason})</span>
+                      ) : null}
+                    </td>
                     <td className="py-2 px-3 text-xs font-bold text-primary-800 text-right whitespace-nowrap tabular-nums">
                       {tx.type?.includes('payment') ? '-' : '+'}{formatCurrency(tx.amount)}
                     </td>

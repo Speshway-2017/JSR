@@ -18,6 +18,7 @@ import Transactions from './pages/Transactions';
 import InventoryHistory from './pages/InventoryHistory';
 import SalesReport from './pages/SalesReport';
 import SalesReport2 from './pages/SalesReport2';
+import CashSalesReport from './pages/CashSalesReport';
 import CashChecklist from './pages/CashChecklist';
 import LessChecklist from './pages/LessChecklist';
 import HamaliReport from './pages/HamaliReport';
@@ -78,6 +79,7 @@ export default function App() {
           <Route path="/sales-print" element={<SalesPrint />} />
           <Route path="/sales-report" element={<SalesReport />} />
           <Route path="/sales-report-2" element={<SalesReport2 />} />
+          <Route path="/cash-sales-report" element={<CashSalesReport />} />
           <Route path="/cash-checklist" element={<CashChecklist />} />
           <Route path="/less-checklist" element={<LessChecklist />} />
           <Route path="/hamali-report" element={<HamaliReport />} />

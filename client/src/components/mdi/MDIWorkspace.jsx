@@ -24,6 +24,7 @@ import BillPrint from '../../pages/BillPrint';
 import SalesPrint from '../../pages/SalesPrint';
 import SalesReport from '../../pages/SalesReport';
 import SalesReport2 from '../../pages/SalesReport2';
+import CashSalesReport from '../../pages/CashSalesReport';
 import CashChecklist from '../../pages/CashChecklist';
 import LessChecklist from '../../pages/LessChecklist';
 import HamaliReport from '../../pages/HamaliReport';
@@ -74,6 +75,8 @@ function renderModuleComponent(path) {
       return <SalesReport path={path} />;
     case '/sales-report-2':
       return <SalesReport2 path={path} />;
+    case '/cash-sales-report':
+      return <CashSalesReport path={path} />;
     case '/cash-checklist':
       return <CashChecklist path={path} />;
     case '/less-checklist':

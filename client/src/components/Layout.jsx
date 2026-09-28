@@ -75,6 +75,7 @@ const adminTopMenus = [
       { to: '/cash-checklist', label: 'Cash Checklist' },
       { to: '/less-checklist', label: 'Less Checklist' },
       { to: '/sales-report-2', label: 'Day wise sale report' },
+      { to: '/cash-sales-report', label: 'Cash sale report' },
       { to: '/hamali-report', label: 'Hamali Report' },
     ],
   },

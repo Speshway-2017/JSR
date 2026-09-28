@@ -131,9 +131,10 @@ async function reverseCashBalance(tx) {
 
 /** Applies cash entry to party balance and returns fields to store on the transaction. */
 async function applyCashEntry(body) {
-  const { customerId, vendorId, partyType, amount, less, cashSide, paymentType, entryDate, description } = body;
+  const { customerId, vendorId, partyType, amount, less, cashSide, paymentType, entryDate, description, reason } = body;
   const side = String(cashSide || 'credit').toLowerCase();
   const payType = paymentType || 'Cash';
+  const cleanReason = reason != null ? String(reason).trim() : '';
   const kind =
     partyType === 'vendor'
       ? 'vendor'
@@ -200,6 +201,7 @@ async function applyCashEntry(body) {
         entryDate: when,
         source: 'cash_entry',
         description: description || `${parts.join(' · ')} — ${customer.name}`,
+        reason: cleanReason,
         balanceAfter: customer.creditBalance,
       },
     };
@@ -236,8 +238,8 @@ async function applyCashEntry(body) {
     partyType: 'vendor',
     party: vendor,
     fields: {
-        vendor: vendorId,
-        customer: null,
+      vendor: vendorId,
+      customer: null,
       type: txType,
       amount: applied,
       lessAmount: side === 'debit' ? lessAmount : 0,
@@ -246,6 +248,7 @@ async function applyCashEntry(body) {
       entryDate: when,
       source: 'cash_entry',
       description: description || `${parts.join(' · ')} — ${vendor.name}`,
+      reason: cleanReason,
       balanceAfter: vendor.creditBalance,
     },
   };
@@ -264,6 +267,7 @@ function cashEntrySnapshot(tx) {
     paymentType: tx.paymentType || 'Cash',
     entryDate: tx.entryDate,
     description: tx.description,
+    reason: tx.reason || '',
   };
 }
 
@@ -314,6 +318,7 @@ router.put('/cash-entry/:id', async (req, res) => {
       tx.paymentType = result.fields.paymentType;
       tx.entryDate = result.fields.entryDate;
       tx.description = result.fields.description;
+      tx.reason = result.fields.reason || '';
       tx.balanceAfter = result.fields.balanceAfter;
       await tx.save();
 
@@ -340,13 +345,17 @@ router.put('/cash-entry/:id', async (req, res) => {
 router.get('/cash-entries', async (req, res) => {
   try {
     const { date, startDate, endDate } = req.query;
-    const filter = { source: 'cash_entry' };
+    const filter = { source: { $in: ['cash_entry', 'cash_sale', 'Direct Sale Payment'] } };
     if (startDate && endDate) {
       const start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
       filter.entryDate = { $gte: start, $lte: end };
+    } else if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.entryDate = { $lte: end };
     } else if (date) {
       const start = new Date(date);
       start.setHours(0, 0, 0, 0);

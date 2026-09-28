@@ -49,23 +49,112 @@ export function saleReport2InnerHtml(data) {
     ? `Total: <strong>${totalBags} Bags</strong>${totalKg > 0 ? ` | <strong>${totalKg} kg</strong>` : ''}`
     : '';
 
+  // Calculate or retrieve material summary
+  let summaryList = data?.materialSummary;
+  if (!summaryList || !summaryList.length) {
+    const sMap = new Map();
+    for (const col of columns) {
+      for (const mat of col.materials || []) {
+        const key = mat.materialName || mat.materialId;
+        if (!sMap.has(key)) {
+          sMap.set(key, {
+            materialId: mat.materialId,
+            materialName: mat.materialName,
+            materialNameTelugu: mat.materialNameTelugu,
+            bagCount: 0,
+            totalKg: 0,
+            totalAmount: 0,
+          });
+        }
+        const s = sMap.get(key);
+        s.bagCount += mat.bagCount || 0;
+        s.totalKg += mat.totalKg || 0;
+        s.totalAmount += (mat.totalAmount != null ? mat.totalAmount : (mat.entries || []).reduce((acc, e) => acc + (e.amount || 0), 0));
+      }
+    }
+    summaryList = [...sMap.values()].sort((a, b) =>
+      String(a.materialName || '').localeCompare(String(b.materialName || ''), 'en', { sensitivity: 'base', numeric: true })
+    );
+  }
+
+  const sumBags = summaryList.reduce((s, i) => s + (i.bagCount || 0), 0);
+  const sumKg = Number(summaryList.reduce((s, i) => s + (i.totalKg || 0), 0).toFixed(1));
+  const sumAmt = Math.round(summaryList.reduce((s, i) => s + (i.totalAmount || 0), 0));
+
+  const summaryRowsHtml = summaryList
+    .map((item) => {
+      const nameStr = esc(item.materialName);
+      const teStr = item.materialNameTelugu ? ` <span class="item-te">(${esc(item.materialNameTelugu)})</span>` : '';
+      const qtyStr = item.totalKg > 0
+        ? `${Number.isInteger(item.totalKg) ? item.totalKg : item.totalKg.toFixed(1)} kg`
+        : (item.bagCount ? `${item.bagCount} Bags` : '-');
+      const amtStr = `₹${Number(Math.round(item.totalAmount || 0)).toLocaleString('en-IN')}`;
+
+      return `<tr>
+        <td class="col-item">${nameStr}${teStr}</td>
+        <td class="col-bags">${item.bagCount || 0}</td>
+        <td class="col-qty">${esc(qtyStr)}</td>
+        <td class="col-amt">${amtStr}</td>
+      </tr>`;
+    })
+    .join('');
+
+  const summaryBlockHtml = `<section class="mat summary-block">
+    <div class="head summary-head">
+      <div class="summary-title">TOTAL SALE SUMMARY</div>
+      <div class="summary-te">మొత్తం అమ్మకాల వివరాలు</div>
+    </div>
+    <table class="summary-table">
+      <thead>
+        <tr>
+          <th class="col-item">Item</th>
+          <th class="col-bags">Bags</th>
+          <th class="col-qty">Qty</th>
+          <th class="col-amt">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${summaryRowsHtml}
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td class="col-item">TOTAL</td>
+          <td class="col-bags">${sumBags}</td>
+          <td class="col-qty">${sumKg > 0 ? `${sumKg} kg` : ''}</td>
+          <td class="col-amt">₹${Number(sumAmt).toLocaleString('en-IN')}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </section>`;
+
   // 5 columns x ~23 lines per column = ~115 lines max per A4 landscape sheet (172mm height)
   const LINES_PER_PAGE = 115;
+
+  const itemsToRender = [
+    ...columns.map((c) => ({
+      type: 'vendor',
+      data: c,
+      lineCount: 4 + (c.materials || []).reduce((acc, m) => acc + 2 + (m.entries?.length || 0), 0),
+    })),
+    {
+      type: 'summary',
+      html: summaryBlockHtml,
+      lineCount: 5 + summaryList.length + 2,
+    },
+  ];
+
   const pageChunks = [];
   let currentChunk = [];
   let currentLines = 0;
 
-  for (const col of columns) {
-    const vendLineCount = 4 + (col.materials || []).reduce((acc, m) => acc + 2 + (m.entries?.length || 0), 0);
-
-    if (currentChunk.length > 0 && currentLines + vendLineCount > LINES_PER_PAGE) {
+  for (const item of itemsToRender) {
+    if (currentChunk.length > 0 && currentLines + item.lineCount > LINES_PER_PAGE) {
       pageChunks.push(currentChunk);
       currentChunk = [];
       currentLines = 0;
     }
-
-    currentChunk.push(col);
-    currentLines += vendLineCount;
+    currentChunk.push(item);
+    currentLines += item.lineCount;
   }
 
   if (currentChunk.length > 0) {
@@ -77,7 +166,11 @@ export function saleReport2InnerHtml(data) {
   return pageChunks
     .map((chunk, pageIdx) => {
       const blocks = chunk
-        .map((vend) => {
+        .map((item) => {
+          if (item.type === 'summary') {
+            return item.html;
+          }
+          const vend = item.data;
           const vendTitle = esc(vend.vendorName);
           const vendTe = vend.vendorNameTelugu ? `<div class="te">${esc(vend.vendorNameTelugu)}</div>` : '';
 
@@ -109,7 +202,9 @@ export function saleReport2InnerHtml(data) {
 
           const colBags = vend.bagCount || 0;
           const colKg = vend.totalKg || 0;
-          const colSummary = `<div class="col-summary">Tot: <strong>${colBags} Bags</strong>${colKg > 0 ? `, <strong>${colKg} kg</strong>` : ''}</div>`;
+          const colAmount = vend.totalAmount || (vend.materials || []).reduce((s, m) => s + (m.totalAmount || (m.entries || []).reduce((acc, e) => acc + (e.amount || 0), 0)), 0);
+          const amountStr = colAmount > 0 ? ` | ₹${Number(colAmount).toLocaleString('en-IN')}` : '';
+          const colSummary = `<div class="col-summary">Tot: <strong>${colBags} Bags</strong>${colKg > 0 ? `, <strong>${colKg} kg</strong>` : ''}${amountStr}</div>`;
 
           return `<section class="mat"><div class="head">${vendTitle}${vendTe}</div>${matBlocks}${colSummary}</section>`;
         })
@@ -208,6 +303,99 @@ export const SALE_REPORT_2_CSS = `
   font-size: 12px;
   font-weight: 400;
   text-transform: none;
+}
+
+.summary-head {
+  padding: 4px 2px !important;
+}
+
+.summary-head .summary-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.summary-head .summary-te {
+  font-size: 10px;
+  font-weight: 400;
+  color: #cbd5e1;
+  margin-top: 1px;
+  text-transform: none;
+}
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.summary-table th {
+  border-bottom: 1.5px solid #1e293b;
+  padding: 4px 2px;
+  font-weight: 700;
+  color: #111827;
+  font-size: 11px;
+}
+
+.summary-table th.col-item,
+.summary-table td.col-item {
+  text-align: left;
+  padding-left: 2px;
+}
+
+.summary-table th.col-bags,
+.summary-table td.col-bags {
+  text-align: center;
+  width: 14%;
+}
+
+.summary-table th.col-qty,
+.summary-table td.col-qty {
+  text-align: center;
+  width: 22%;
+  white-space: nowrap;
+}
+
+.summary-table th.col-amt,
+.summary-table td.col-amt {
+  text-align: right;
+  padding-right: 2px;
+  width: 24%;
+  white-space: nowrap;
+}
+
+.summary-table td {
+  padding: 3px 2px;
+  border-bottom: 0.5px dashed #cbd5e1;
+  vertical-align: middle;
+  font-size: 11px;
+}
+
+.summary-table td.col-item {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.summary-table td.col-item .item-te {
+  font-size: 9.5px;
+  font-weight: 400;
+  color: #475569;
+}
+
+.summary-table td.col-amt {
+  font-weight: 700;
+  color: #111827;
+}
+
+.summary-table .total-row td {
+  border-top: 1.5px solid #1e293b;
+  border-bottom: 2px solid #1e293b;
+  font-weight: 800;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  background: #f8fafc;
+  color: #000000;
 }
 
 .mat-subgroup {
@@ -343,17 +531,37 @@ export const SALE_REPORT_2_CSS = `
   .line .vendor-tag {
     color: #111827 !important;
   }
+  .summary-table th {
+    border-bottom: 1.5px solid #000000 !important;
+    color: #000000 !important;
+  }
+  .summary-table td {
+    border-bottom: 0.5px dashed #666666 !important;
+    color: #000000 !important;
+  }
+  .summary-table .total-row td {
+    border-top: 1.5px solid #000000 !important;
+    border-bottom: 2px solid #000000 !important;
+    background: #f1f5f9 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
+  .summary-head .summary-te {
+    color: #e2e8f0 !important;
+  }
 }
 `;
 
-export async function openSaleReport2Print(data, previewTab) {
+export async function openSaleReport2Print(data, previewTab, reportTitle) {
   const fontCss = await ramabhadraFontFaceCss();
   const inner = saleReport2InnerHtml(data);
+  const title = reportTitle || (data?.isCashReport ? 'Day wise cash sale report' : 'Day wise sale report');
   const html = `<!DOCTYPE html>
 <html lang="te">
 <head>
   <meta charset="utf-8" />
-  <title>Day wise sale report</title>
+  <title>${title}</title>
   <style>
 ${fontCss}
 * { box-sizing: border-box; }
@@ -401,7 +609,7 @@ ${SALE_REPORT_2_CSS}
       var stage = document.querySelector('.stage');
       var bodyText = stage ? stage.innerText : document.body.innerText;
       var lines = bodyText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-      var text = '*JSR AGRI TRADES - Day Wise Sale Report*\n-----------------------------------\n' + lines.slice(0, 40).join('\n') + '\n-----------------------------------\n*Thank you!* 🙏';
+      var text = '*JSR AGRI TRADES - ${title}*\\n-----------------------------------\\n' + lines.slice(0, 40).join('\\n') + '\\n-----------------------------------\\n*Thank you!* 🙏';
       window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
     }
   </script>

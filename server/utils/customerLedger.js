@@ -79,14 +79,25 @@ export function particulars(tx) {
   if (tx.source === 'cash_entry') {
     const paid = cashPaid(tx);
     const less = lessAmount(tx);
+    let base = '';
     if (tx.type === 'customer_payment') {
       const bits = [];
       if (paid > 0) bits.push('Cash received');
       if (less > 0) bits.push('Less');
-      return bits.join(' · ') || 'Cash entry';
+      base = bits.join(' · ') || 'Cash entry';
+    } else {
+      base = tx.description || 'Cash debit';
     }
-    return tx.description || 'Cash debit';
+    if (tx.reason) {
+      return `${base} (${tx.reason})`;
+    }
+    return base;
   }
-  if (tx.type === 'customer_payment') return tx.description || 'Payment';
+  if (tx.type === 'customer_payment') {
+    return tx.reason ? `Payment (${tx.reason})` : (tx.description || 'Payment');
+  }
+  if (tx.reason) {
+    return `${tx.description || 'Credit'} (${tx.reason})`;
+  }
   return tx.description || 'Credit';
 }

@@ -146,53 +146,13 @@ export default function BillPrint({ path: windowPath }) {
     setLoading(true);
     try {
       if (billType === 'purchase') {
-        const res = await api.get('/purchases', {
-          params: { startDate, endDate, sort: 'desc' },
+        const res = await api.get('/reports/purchase-bills', {
+          params: { startDate, endDate },
         });
-        const purchaseStatements = (res.data || []).map((p) => {
-          const v = p.vendor && typeof p.vendor === 'object' ? p.vendor : {};
-          const totalAmount = Number(p.totalAmount || 0);
-          const opening = Number(v.creditBalance != null ? v.creditBalance - totalAmount : 0);
-          const closing = Number(v.creditBalance != null ? v.creditBalance : totalAmount);
-
-          return {
-            _id: String(p._id),
-            customerId: String(p._id),
-            purchaseId: String(p._id),
-            isPurchase: true,
-            partyType: 'vendor',
-            name: v.name || 'Vendor',
-            nameTelugu: v.nameTelugu || '',
-            mobile: v.mobile || '',
-            city: v.city || '',
-            vendor: v,
-            vendorId: v._id ? String(v._id) : '',
-            date: p.purchaseDate || p.createdAt,
-            purchaseDate: p.purchaseDate || p.createdAt,
-            lines: p.lines || [],
-            sales: (p.lines || []).map((l) => ({
-              date: p.purchaseDate || p.createdAt,
-              material: l.materialName || 'Item',
-              materialId: l.material ? String(l.material) : '',
-              bags: l.purchaseType === 'by_box' ? l.boxes || l.bags || 0 : l.bags || 0,
-              weight: Number(l.totalKg || 0),
-              rate: Number(l.ratePerKg || 0),
-              ratePerKg: Number(l.ratePerKg || 0),
-              amount: Number(l.amount || 0),
-              purchaseType: l.purchaseType,
-            })),
-            totalBags: p.totalBags || 0,
-            totalWeight: p.totalWeight || 0,
-            totalSale: totalAmount,
-            totalAmount,
-            opening,
-            closing,
-            notes: p.notes || '',
-            rawPurchase: p,
-          };
-        });
-        setData({ startDate, endDate, statements: purchaseStatements });
-        setSelectedCids(new Set(purchaseStatements.map((s) => String(s.customerId))));
+        setData(res.data);
+        if (res.data?.statements) {
+          setSelectedCids(new Set(res.data.statements.map((s) => String(s.customerId))));
+        }
       } else {
         const res = await api.get('/reports/bills', {
           params: { startDate, endDate },
@@ -483,7 +443,8 @@ export default function BillPrint({ path: windowPath }) {
             }
           }
           const cleanPhone = phone.replace(/\D/g, '');
-          const text = `*JSR AGRI TRADES - Purchase Bill*\nVendor: ${st.name}\nDate: ${formatDateOnly(st.date)}\nTotal Bags: ${st.totalBags}\nTotal Weight: ${Number(st.totalWeight).toFixed(1)} kg\n*Total Payable: ${formatCurrency(st.totalAmount)}*\nThank you! 🙏`;
+          const periodStr = startDate === endDate ? formatDateOnly(startDate) : `${formatDateOnly(startDate)} to ${formatDateOnly(endDate)}`;
+          const text = `*JSR AGRI TRADES - Purchase Bill*\nVendor: ${st.name}\nPeriod: ${periodStr}\nTotal Bags: ${st.totalBags || '—'}\nTotal Weight: ${Number(st.totalWeight || 0).toFixed(1)} kg\n*Total Amount: ${formatCurrency(st.totalAmount || st.totalSale)}*\nClosing Balance: ${formatCurrency(st.closing)}\nThank you! 🙏`;
           window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`, '_blank');
           continue;
         }
@@ -836,8 +797,7 @@ export default function BillPrint({ path: windowPath }) {
                             </div>
                             {st.isPurchase ? (
                               <span className="text-[9.5px] text-primary-400 truncate block">
-                                {formatDateOnly(st.date)}
-                                {st.totalBags ? ` · ${st.totalBags} bags` : ''}
+                                {[st.nameTelugu, st.city, st.totalBags ? `${st.totalBags} bags` : ''].filter(Boolean).join(' · ')}
                               </span>
                             ) : st.nameTelugu || st.scheduleName ? (
                               <span className="text-[9.5px] text-primary-400 truncate block">
@@ -952,7 +912,7 @@ export default function BillPrint({ path: windowPath }) {
                         <span className="font-bold text-primary-900 text-xs truncate">{st.name}</span>
                         {st.isPurchase ? (
                           <span className="text-[10px] text-primary-600 font-medium truncate">
-                            ({[st.nameTelugu, formatDateOnly(st.date)].filter(Boolean).join(' · ')})
+                            ({[st.nameTelugu, st.city].filter(Boolean).join(' · ') || 'Vendor'})
                           </span>
                         ) : st.nameTelugu || st.scheduleName ? (
                           <span className="text-[10px] text-primary-600 font-medium truncate">
@@ -996,65 +956,88 @@ export default function BillPrint({ path: windowPath }) {
                               {formatCurrency(st.opening || 0)}
                             </td>
                           </tr>
-                          {(st.sales || [])
-                            .filter((s) => String(s.material || '').toLowerCase() !== 'cooly' && !s.isCoolyLine)
-                            .map((s, idx) => {
-                              const baseAmount = Number(s.amount) || 0;
-                              const coolyAmt = Number(s.cooly) || Number(s.handlingCharges) || 0;
-                              const lineTotal = baseAmount + coolyAmt;
+                          {(() => {
+                            const statementEntries = (st.entries && st.entries.length)
+                              ? st.entries
+                              : [
+                                  ...(st.sales || []).map((s) => ({ ...s, isPayment: false })),
+                                  ...(st.payments || []).map((p) => ({
+                                    ...p,
+                                    isPayment: true,
+                                    material: p.description || 'Paid',
+                                  })),
+                                ].sort(
+                                  (a, b) =>
+                                    new Date(a.date || a.createdAt || 0).getTime() -
+                                    new Date(b.date || b.createdAt || 0).getTime()
+                                );
 
-                              return (
-                                <tr
-                                  key={idx}
-                                  className={
-                                    idx % 2 === 0 ? 'bg-surface hover:bg-primary-50/40' : 'bg-primary-50/20 hover:bg-primary-50/50'
-                                  }
-                                >
-                                  <td className="px-1.5 py-0.5 text-primary-600 text-center whitespace-nowrap tabular-nums text-[10.5px]">
-                                    {formatShortDate(s.date)}
-                                  </td>
-                                  <td className="px-1.5 py-0.5 min-w-[5.5rem] font-semibold text-primary-800">
-                                    <span title={s.material || 'Sale'}>{s.material || 'Sale'}</span>
-                                    {teluguMap[String(s.material || '').trim().toLowerCase()] &&
-                                    teluguMap[String(s.material || '').trim().toLowerCase()] !== String(s.material || '').trim() ? (
-                                      <span className="text-[9.5px] text-primary-400 font-normal block">
-                                        {teluguMap[String(s.material || '').trim().toLowerCase()]}
-                                      </span>
-                                    ) : null}
-                                  </td>
-                                  <td className="px-1 py-0.5 text-right tabular-nums text-primary-800 font-semibold w-10">
-                                    {s.bags || '—'}
-                                  </td>
-                                  <td className="px-1.5 py-0.5 text-right text-primary-700 font-medium tabular-nums w-14">
-                                    {s.weight ? `${s.weight}` : '—'}
-                                  </td>
-                                  <td className="px-1.5 py-0.5 text-right text-primary-700 font-medium tabular-nums w-14">
-                                    {s.ratePerKg ? `₹${s.ratePerKg}` : '—'}
-                                  </td>
-                                  <td className="px-1.5 py-0.5 text-right font-bold text-primary-900 whitespace-nowrap tabular-nums text-[11px] w-18">
-                                    {formatCurrency(lineTotal)}
-                                    {coolyAmt > 0 ? (
-                                      <span className="text-[9px] text-emerald-700 block font-normal leading-tight">
-                                        (incl. ₹{coolyAmt} cooly)
-                                      </span>
-                                    ) : null}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          {(st.payments || []).map((p, pIdx) => (
-                            <tr key={`payment-${pIdx}`} className="text-emerald-800 bg-emerald-50/40 text-[11px]">
-                              <td className="px-1.5 py-0.5 text-center whitespace-nowrap text-[10.5px]">
-                                {formatShortDate(p.date)}
-                              </td>
-                              <td className="px-1.5 py-0.5 font-semibold" colSpan={4}>
-                                Paid
-                              </td>
-                              <td className="px-1.5 py-0.5 text-right font-bold tabular-nums text-[11px]">
-                                - {formatCurrency(p.amount)}
-                              </td>
-                            </tr>
-                          ))}
+                            return statementEntries
+                              .filter((entry) => String(entry.material || '').toLowerCase() !== 'cooly' && !entry.isCoolyLine)
+                              .map((entry, idx) => {
+                                if (entry.isPayment || entry.type === 'payment') {
+                                  return (
+                                    <tr key={`pay-${idx}`} className="text-emerald-800 bg-emerald-50/50 text-[11px] font-medium">
+                                      <td className="px-1.5 py-0.5 text-center whitespace-nowrap tabular-nums text-[10.5px]">
+                                        {formatShortDate(entry.date)}
+                                      </td>
+                                      <td className="px-1.5 py-0.5 font-semibold text-emerald-800" colSpan={4}>
+                                        <div className="flex items-center gap-1">
+                                          <span>Paid</span>
+                                          <span className="text-[9.5px] text-emerald-600 font-normal">(చెల్లింపు)</span>
+                                        </div>
+                                      </td>
+                                      <td className="px-1.5 py-0.5 text-right font-bold text-emerald-800 whitespace-nowrap tabular-nums text-[11px]">
+                                        - {formatCurrency(entry.amount)}
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+
+                                const baseAmount = Number(entry.amount) || 0;
+                                const coolyAmt = Number(entry.cooly) || Number(entry.handlingCharges) || 0;
+                                const lineTotal = baseAmount + coolyAmt;
+
+                                return (
+                                  <tr
+                                    key={`sale-${idx}`}
+                                    className={
+                                      idx % 2 === 0 ? 'bg-surface hover:bg-primary-50/40' : 'bg-primary-50/20 hover:bg-primary-50/50'
+                                    }
+                                  >
+                                    <td className="px-1.5 py-0.5 text-primary-600 text-center whitespace-nowrap tabular-nums text-[10.5px]">
+                                      {formatShortDate(entry.date)}
+                                    </td>
+                                    <td className="px-1.5 py-0.5 min-w-[5.5rem] font-semibold text-primary-800">
+                                      <span title={entry.material || 'Sale'}>{entry.material || 'Sale'}</span>
+                                      {teluguMap[String(entry.material || '').trim().toLowerCase()] &&
+                                      teluguMap[String(entry.material || '').trim().toLowerCase()] !== String(entry.material || '').trim() ? (
+                                        <span className="text-[9.5px] text-primary-400 font-normal block">
+                                          {teluguMap[String(entry.material || '').trim().toLowerCase()]}
+                                        </span>
+                                      ) : null}
+                                    </td>
+                                    <td className="px-1 py-0.5 text-right tabular-nums text-primary-800 font-semibold w-10">
+                                      {entry.bags || '—'}
+                                    </td>
+                                    <td className="px-1.5 py-0.5 text-right text-primary-700 font-medium tabular-nums w-14">
+                                      {entry.weight ? `${entry.weight}` : '—'}
+                                    </td>
+                                    <td className="px-1.5 py-0.5 text-right text-primary-700 font-medium tabular-nums w-14">
+                                      {entry.ratePerKg ? `₹${entry.ratePerKg}` : '—'}
+                                    </td>
+                                    <td className="px-1.5 py-0.5 text-right font-bold text-primary-900 whitespace-nowrap tabular-nums text-[11px] w-18">
+                                      {formatCurrency(lineTotal)}
+                                      {coolyAmt > 0 ? (
+                                        <span className="text-[9px] text-emerald-700 block font-normal leading-tight">
+                                          (incl. ₹{coolyAmt} cooly)
+                                        </span>
+                                      ) : null}
+                                    </td>
+                                  </tr>
+                                );
+                              });
+                          })()}
                         </tbody>
                         <tfoot className="border-t-2 border-primary-300 bg-accent-200">
                           <tr className="bg-accent-200 text-accent-900 font-bold whitespace-nowrap text-[11px]">
@@ -1078,7 +1061,7 @@ export default function BillPrint({ path: windowPath }) {
                     </div>
                     <div className="flex items-center justify-between px-2.5 py-0.5 bg-primary-50/40 border-t border-primary-100 text-[9.5px] text-primary-400 font-medium shrink-0">
                       <span>Live Bill Preview</span>
-                      <span>{(st.sales || []).length} items</span>
+                      <span>{(st.entries || st.sales || []).length} items</span>
                     </div>
                   </div>
                 ))}

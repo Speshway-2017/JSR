@@ -16,6 +16,7 @@ const transactionSchema = new mongoose.Schema(
     entryDate: { type: Date, default: Date.now },
     source: { type: String, default: '', trim: true },
     description: { type: String, required: true },
+    reason: { type: String, default: '', trim: true },
     load: { type: mongoose.Schema.Types.ObjectId, ref: 'Load' },
     sale: { type: mongoose.Schema.Types.ObjectId, ref: 'Sale' },
     balanceAfter: { type: Number, default: 0 },

@@ -85,27 +85,56 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
     <td class="num">${esc(fmtMoney(opening))}</td>
   </tr>`;
 
-  // 2. Sales item rows
-  sales.forEach((s) => {
-    const rawName = s.material || s.materialName || '—';
-    if (String(rawName).toLowerCase() === 'cooly' || s.isCoolyLine) return;
+  // 2. Entries rows (Sales and Payments interleaved in chronological order)
+  const entries = summaryRow.entries && summaryRow.entries.length
+    ? summaryRow.entries
+    : [
+        ...sales.map((s) => ({ ...s, isPayment: false })),
+        ...(summaryRow.payments || []).map((p) => ({
+          ...p,
+          isPayment: true,
+          material: p.description || 'Paid',
+        })),
+      ].sort(
+        (a, b) =>
+          new Date(a.date || a.createdAt || 0).getTime() -
+          new Date(b.date || b.createdAt || 0).getTime()
+      );
 
-    const teName = s.materialNameTelugu || (teluguMap?.get ? teluguMap.get(String(rawName).trim().toLowerCase()) : teluguMap?.[String(rawName).trim().toLowerCase()]);
+  entries.forEach((entry) => {
+    if (entry.isPayment || entry.type === 'payment') {
+      const payAmtStr = `-${fmtMoney(entry.amount)}`;
+      const payDateStr = formatDateShort(entry.date || entry.createdAt || summaryRow.date || summaryRow.startDate);
+      rowsHtml += `<tr class="payment-row">
+        <td class="date">${esc(payDateStr)}</td>
+        <td class="item" style="font-weight:600;color:#047857;">Paid</td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num" style="font-weight:700;color:#047857;">${esc(payAmtStr)}</td>
+      </tr>`;
+      return;
+    }
+
+    const rawName = entry.material || entry.materialName || '—';
+    if (String(rawName).toLowerCase() === 'cooly' || entry.isCoolyLine) return;
+
+    const teName = entry.materialNameTelugu || (teluguMap?.get ? teluguMap.get(String(rawName).trim().toLowerCase()) : teluguMap?.[String(rawName).trim().toLowerCase()]);
     const matName = teName && teName.trim() && teName.trim().toLowerCase() !== String(rawName).trim().toLowerCase()
       ? `${rawName} (${teName.trim()})`
       : displayMaterialName(rawName, teluguMap);
-    const bagVal = s.bags != null ? s.bags : s.bagCount != null ? s.bagCount : 0;
+    const bagVal = entry.bags != null ? entry.bags : entry.bagCount != null ? entry.bagCount : 0;
     const bagsStr = Number(bagVal) > 0 ? String(bagVal) : '';
 
-    const weightVal = s.weight != null ? s.weight : s.totalKg != null ? s.totalKg : '';
+    const weightVal = entry.weight != null ? entry.weight : entry.totalKg != null ? entry.totalKg : '';
     const weightStr = Number(weightVal) > 0 ? fmtNum(weightVal) : '';
 
-    const rateVal = s.ratePerKg != null ? s.ratePerKg : s.rate != null ? s.rate : '';
+    const rateVal = entry.ratePerKg != null ? entry.ratePerKg : entry.rate != null ? entry.rate : '';
     const rateStr = Number(rateVal) > 0 ? fmtNum(rateVal) : '';
 
-    const lineTotal = (Number(s.amount) || 0) + (Number(s.cooly) || 0);
+    const lineTotal = (Number(entry.amount) || 0) + (Number(entry.cooly) || 0);
     const amtStr = fmtMoney(lineTotal);
-    const itemDateStr = formatDateShort(s.date || summaryRow.date || summaryRow.startDate);
+    const itemDateStr = formatDateShort(entry.date || summaryRow.date || summaryRow.startDate);
 
     rowsHtml += `<tr>
       <td class="date">${esc(itemDateStr)}</td>
@@ -137,7 +166,7 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
   <div class="party">
     ${esc(nameEn)}
     ${nameTe ? `<span class="te">${esc(nameTe)}</span>` : ''}
-    ${isPurchase ? `<span style="display:block;font-size:10px;font-weight:normal;color:#333;">Purchase Bill · ${esc(formatDateShort(summaryRow.purchaseDate || summaryRow.date))}</span>` : ''}
+    ${isPurchase ? `<span style="display:block;font-size:10px;font-weight:normal;color:#333;">Purchase Bill${summaryRow.city ? ` · ${esc(summaryRow.city)}` : (summaryRow.purchaseDate || summaryRow.date ? ` · ${esc(formatDateShort(summaryRow.purchaseDate || summaryRow.date))}` : '')}</span>` : ''}
   </div>
   <table class="lines">
     <thead>

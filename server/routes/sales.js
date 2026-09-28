@@ -208,10 +208,15 @@ function bagKgList(line) {
 /** Day-wise packing sheet: vendor columns, vegetable sub-sections, customer + bag weights. */
 router.get('/report-2', async (req, res) => {
   try {
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
-    const { start, end } = dayRange(date);
+    const { date, cashOnly, isCash: isCashParam } = req.query;
+    const { start, end } = dayRange(date || new Date().toISOString().slice(0, 10));
 
-    const sales = await Sale.find({ createdAt: { $gte: start, $lte: end } })
+    const filter = { createdAt: { $gte: start, $lte: end } };
+    if (cashOnly === 'true' || cashOnly === true || isCashParam === 'true' || isCashParam === true) {
+      filter.$or = [{ isCashSale: true }, { customer: null }, { customerName: 'Cash' }];
+    }
+
+    const sales = await Sale.find(filter)
       .populate('customer', 'name nameTelugu')
       .populate('vendor', 'name nameTelugu')
       .populate('lines.material', 'name nameTelugu')
@@ -226,8 +231,9 @@ router.get('/report-2', async (req, res) => {
       const vendorName = vendorDoc?.name || 'Unknown Vendor';
       const vendorNameTelugu = vendorDoc?.nameTelugu || '';
 
-      const customerName = sale.customer?.name || '—';
-      const customerId = String(sale.customer?._id || sale.customer || '');
+      const isCash = sale.isCashSale || !sale.customer || sale.customerName === 'Cash';
+      const customerName = isCash ? 'Cash' : (sale.customer?.name || sale.customerName || 'Cash');
+      const customerId = isCash ? 'cash' : String(sale.customer?._id || sale.customer || 'cash');
 
       if (!vendorsMap.has(vendorId)) {
         vendorsMap.set(vendorId, {
@@ -237,6 +243,7 @@ router.get('/report-2', async (req, res) => {
           materialsMap: new Map(),
           bagCount: 0,
           totalKg: 0,
+          totalAmount: 0,
         });
       }
       const vendObj = vendorsMap.get(vendorId);
@@ -255,6 +262,7 @@ router.get('/report-2', async (req, res) => {
             entries: [],
             bagCount: 0,
             totalKg: 0,
+            totalAmount: 0,
           });
         }
         const matObj = vendObj.materialsMap.get(materialId);
@@ -287,11 +295,15 @@ router.get('/report-2', async (req, res) => {
 
         matObj.bagCount += count;
         matObj.totalKg += lineTotalKg;
+        matObj.totalAmount += lineAmount;
 
         vendObj.bagCount += count;
         vendObj.totalKg += lineTotalKg;
+        vendObj.totalAmount += lineAmount;
       }
     }
+
+    const materialSummaryMap = new Map();
 
     const columns = [...vendorsMap.values()]
       .sort((a, b) => String(a.vendorName || '').localeCompare(String(b.vendorName || ''), 'en', { sensitivity: 'base', numeric: true }))
@@ -301,24 +313,57 @@ router.get('/report-2', async (req, res) => {
         vendorNameTelugu: vend.vendorNameTelugu,
         bagCount: vend.bagCount,
         totalKg: Number(vend.totalKg.toFixed(1)),
+        totalAmount: Math.round(vend.totalAmount || 0),
         materials: [...vend.materialsMap.values()]
           .sort((a, b) => String(a.materialName || '').localeCompare(String(b.materialName || ''), 'en', { sensitivity: 'base', numeric: true }))
-          .map((mat) => ({
-            materialId: mat.materialId,
-            materialName: mat.materialName,
-            materialNameTelugu: mat.materialNameTelugu,
-            bagCount: mat.bagCount,
-            totalKg: Number(mat.totalKg.toFixed(1)),
-            entries: mat.entries
-              .slice()
-              .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base', numeric: true })),
-          })),
+          .map((mat) => {
+            const matKey = mat.materialName || mat.materialId;
+            if (!materialSummaryMap.has(matKey)) {
+              materialSummaryMap.set(matKey, {
+                materialId: mat.materialId,
+                materialName: mat.materialName,
+                materialNameTelugu: mat.materialNameTelugu,
+                bagCount: 0,
+                totalKg: 0,
+                totalAmount: 0,
+              });
+            }
+            const sMat = materialSummaryMap.get(matKey);
+            sMat.bagCount += mat.bagCount;
+            sMat.totalKg += mat.totalKg;
+            sMat.totalAmount += mat.totalAmount;
+
+            return {
+              materialId: mat.materialId,
+              materialName: mat.materialName,
+              materialNameTelugu: mat.materialNameTelugu,
+              bagCount: mat.bagCount,
+              totalKg: Number(mat.totalKg.toFixed(1)),
+              totalAmount: Math.round(mat.totalAmount || 0),
+              entries: mat.entries
+                .slice()
+                .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base', numeric: true })),
+            };
+          }),
+      }));
+
+    const materialSummary = [...materialSummaryMap.values()]
+      .sort((a, b) => String(a.materialName || '').localeCompare(String(b.materialName || ''), 'en', { sensitivity: 'base', numeric: true }))
+      .map((m) => ({
+        materialId: m.materialId,
+        materialName: m.materialName,
+        materialNameTelugu: m.materialNameTelugu,
+        bagCount: m.bagCount,
+        totalKg: Number(m.totalKg.toFixed(1)),
+        totalAmount: Math.round(m.totalAmount || 0),
       }));
 
     const totalBags = columns.reduce((acc, c) => acc + (c.bagCount || 0), 0);
     const totalWeight = Number(columns.reduce((acc, c) => acc + (c.totalKg || 0), 0).toFixed(1));
+    const totalAmount = Math.round(columns.reduce((acc, c) => acc + (c.totalAmount || 0), 0));
 
-    res.json({ date: start, columns, totalBags, totalWeight });
+    const isCashReport = cashOnly === 'true' || cashOnly === true || isCashParam === 'true' || isCashParam === true;
+    res.json({ date: start, columns, totalBags, totalWeight, totalAmount, materialSummary, isCashReport });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -381,8 +426,8 @@ router.get('/report', async (req, res) => {
           id: `${sale._id}-${mat.materialName}-${mat.ratePerKg}`,
           saleId: sale._id,
           date: sale.createdAt,
-          customerName: sale.customer?.name || 'Unknown',
-          customerId: sale.customer?._id || sale.customer,
+          customerName: (sale.isCashSale || !sale.customer) ? 'Cash' : (sale.customer?.name || sale.customerName || 'Unknown'),
+          customerId: (sale.isCashSale || !sale.customer) ? 'cash' : (sale.customer?._id || sale.customer || 'cash'),
           materialName: mat.materialName,
           materialId: mat.materialId,
           ratePerKg: mat.ratePerKg,
@@ -419,18 +464,23 @@ router.get('/report', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { customerId, loadId, vendorId, date, lines, handlingCharges, coolyRate, coolyPerBag, isPaid, paymentType } =
+    const { customerId, loadId, vendorId, date, lines, handlingCharges, coolyRate, coolyPerBag, isPaid, paymentType, isCashSale, customerName } =
       req.body;
 
-    if (!customerId || !lines?.length) {
+    const isCash = !!isCashSale || customerId === 'cash' || String(customerId || '').toLowerCase() === 'cash' || customerName?.toLowerCase() === 'cash';
+
+    if ((!customerId && !isCash) || !lines?.length) {
       return res.status(400).json({ message: 'Customer and sale lines are required' });
     }
     if (!loadId && !vendorId) {
       return res.status(400).json({ message: 'Vendor is required' });
     }
 
-    const customer = await Customer.findById(customerId);
-    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    let customer = null;
+    if (!isCash) {
+      customer = await Customer.findById(customerId);
+      if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    }
 
     const saleDate = date || new Date().toISOString().slice(0, 10);
     let load = null;
@@ -472,12 +522,14 @@ router.post('/', async (req, res) => {
     const { start: dayStart, end: dayEnd } = dayRange(saleDate);
     const nextSerialNo = await getNextSerialNo(dayStart, dayEnd);
 
-    const isPaidBool = !!isPaid;
-    const paymentTypeVal = paymentType || 'Cash';
+    const isPaidBool = isCash ? true : !!isPaid;
+    const paymentTypeVal = isCash ? 'Cash' : (paymentType || 'Cash');
     const paidAmountVal = isPaidBool ? saleTotal : 0;
 
     const sale = await Sale.create({
-      customer: customerId,
+      customer: isCash ? null : customer._id,
+      isCashSale: isCash,
+      customerName: isCash ? 'Cash' : (customer?.name || ''),
       vendor: vendor._id,
       load: load._id,
       lines: processedLines,
@@ -494,43 +546,59 @@ router.post('/', async (req, res) => {
       createdAt: Number.isNaN(when.getTime()) ? undefined : when,
     });
 
-    if (!isPaidBool) {
-      customer.creditBalance += saleTotal;
-      await customer.save();
+    if (!isCash) {
+      if (!isPaidBool) {
+        customer.creditBalance += saleTotal;
+        await customer.save();
+      }
+
+      await Transaction.create({
+        customer: customer._id,
+        type: 'customer_credit',
+        amount: saleTotal,
+        description: `Sale${isPaidBool ? ' (Paid Direct)' : ''} - ${processedLines.map((l) => l.materialName).join(', ')}`,
+        sale: sale._id,
+        entryDate: when,
+        balanceAfter: customer.creditBalance,
+      });
+
+      if (isPaidBool) {
+        await Transaction.create({
+          customer: customer._id,
+          type: 'customer_payment',
+          amount: saleTotal,
+          cashSide: 'credit',
+          paymentType: paymentTypeVal,
+          description: `Direct Payment for Sale - ${processedLines.map((l) => l.materialName).join(', ')}`,
+          sale: sale._id,
+          entryDate: when,
+          source: 'Direct Sale Payment',
+          balanceAfter: customer.creditBalance,
+        });
+      }
+    } else {
+      // Direct spot Cash Sale: Cash received into business
+      await Transaction.create({
+        type: 'customer_payment',
+        cashSide: 'credit',
+        amount: saleTotal,
+        paymentType: 'Cash',
+        source: 'cash_entry',
+        description: `Cash Sale — ${processedLines.map((l) => l.materialName).join(', ')}`,
+        reason: 'Direct Cash Sale',
+        sale: sale._id,
+        entryDate: when,
+      });
     }
 
     vendor.creditBalance += materialsTotal;
     await vendor.save();
 
     await Transaction.create({
-      customer: customerId,
-      type: 'customer_credit',
-      amount: saleTotal,
-      description: `Sale${isPaidBool ? ' (Paid Direct)' : ''} - ${processedLines.map((l) => l.materialName).join(', ')}`,
-      sale: sale._id,
-      entryDate: when,
-      balanceAfter: customer.creditBalance,
-    });
-
-    if (isPaidBool) {
-      await Transaction.create({
-        customer: customerId,
-        type: 'customer_payment',
-        amount: saleTotal,
-        paymentType: paymentTypeVal,
-        description: `Direct Payment for Sale - ${processedLines.map((l) => l.materialName).join(', ')}`,
-        sale: sale._id,
-        entryDate: when,
-        source: 'Direct Sale Payment',
-        balanceAfter: customer.creditBalance,
-      });
-    }
-
-    await Transaction.create({
       vendor: vendor._id,
       type: 'vendor_credit',
       amount: materialsTotal,
-      description: `Sale to ${customer.name} - ${processedLines.map((l) => l.materialName).join(', ')}`,
+      description: `Sale to ${isCash ? 'Cash' : customer.name} - ${processedLines.map((l) => l.materialName).join(', ')}`,
       sale: sale._id,
       entryDate: when,
       balanceAfter: vendor.creditBalance,
@@ -565,15 +633,22 @@ router.put('/:id', async (req, res) => {
     const existing = await Sale.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: 'Sale not found' });
 
-    const { customerId, loadId, vendorId, date, lines, handlingCharges, coolyRate, coolyPerBag, isPaid, paymentType } =
+    const { customerId, loadId, vendorId, date, lines, handlingCharges, coolyRate, coolyPerBag, isPaid, paymentType, isCashSale, customerName } =
       req.body;
     if (!lines?.length) {
       return res.status(400).json({ message: 'Sale lines are required' });
     }
 
-    const nextCustomerId = customerId || existing.customer.toString();
-    const customer = await Customer.findById(nextCustomerId);
-    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    const isCash = isCashSale === true || customerId === 'cash' || String(customerId || '').toLowerCase() === 'cash' || customerName?.toLowerCase() === 'cash';
+
+    let customer = null;
+    if (!isCash) {
+      const nextCustomerId = customerId || (existing.customer ? existing.customer.toString() : null);
+      if (nextCustomerId && nextCustomerId !== 'cash') {
+        customer = await Customer.findById(nextCustomerId);
+      }
+      if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    }
 
     const saleDate = date || existing.createdAt.toISOString().slice(0, 10);
     let load = null;
@@ -591,7 +666,7 @@ router.put('/:id', async (req, res) => {
     if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
 
     const oldVendor = await Vendor.findById(existing.vendor);
-    const oldCustomer = await Customer.findById(existing.customer);
+    const oldCustomer = existing.customer ? await Customer.findById(existing.customer) : null;
 
     const stockMap = await getLoadStockMap(load._id);
     const sameLoad = load._id.toString() === existing.load?.toString();
@@ -625,11 +700,13 @@ router.put('/:id', async (req, res) => {
     );
     const oldSaleTotal = Number(existing.totalAmount || 0);
 
-    const wasPaid = !!existing.isPaid;
-    const nowPaid = isPaid !== undefined ? !!isPaid : wasPaid;
-    const paymentTypeVal = paymentType || existing.paymentType || 'Cash';
+    const wasPaid = existing.isCashSale || !existing.customer || !!existing.isPaid;
+    const nowPaid = isCash ? true : (isPaid !== undefined ? !!isPaid : wasPaid);
+    const paymentTypeVal = isCash ? 'Cash' : (paymentType || existing.paymentType || 'Cash');
 
-    existing.customer = customer._id;
+    existing.customer = isCash ? null : customer._id;
+    existing.isCashSale = isCash;
+    existing.customerName = isCash ? 'Cash' : (customer?.name || '');
     existing.vendor = vendor._id;
     existing.load = load._id;
     existing.lines = processedLines;
@@ -650,7 +727,7 @@ router.put('/:id', async (req, res) => {
     }
     await existing.save();
 
-    if (oldCustomer) {
+    if (oldCustomer && !isCash) {
       if (oldCustomer._id.toString() === customer._id.toString()) {
         if (!wasPaid && !nowPaid) {
           oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal + saleTotal).toFixed(2)));
@@ -670,12 +747,17 @@ router.put('/:id', async (req, res) => {
           await customer.save();
         }
       }
-    } else if (!nowPaid) {
+    } else if (oldCustomer && isCash) {
+      if (!wasPaid) {
+        oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal).toFixed(2)));
+        await oldCustomer.save();
+      }
+    } else if (!isCash && !nowPaid) {
       customer.creditBalance = Number((customer.creditBalance + saleTotal).toFixed(2));
       await customer.save();
     }
 
-    const refreshedCustomer = await Customer.findById(customer._id);
+    const refreshedCustomer = customer ? await Customer.findById(customer._id) : null;
 
     if (oldVendor && oldVendor._id.toString() !== vendor._id.toString()) {
       oldVendor.creditBalance = Math.max(0, Number((oldVendor.creditBalance - oldMaterialsTotal).toFixed(2)));
@@ -690,44 +772,73 @@ router.put('/:id', async (req, res) => {
       await vendor.save();
     }
 
-    const desc = `Sale${nowPaid ? ' (Paid Direct)' : ''} - ${processedLines.map((l) => l.materialName).join(', ')}`;
-    await Transaction.updateMany(
-      { sale: existing._id, type: 'customer_credit' },
-      {
-        $set: {
-          customer: customer._id,
-          amount: saleTotal,
-          description: desc,
-          entryDate: existing.createdAt,
-          balanceAfter: refreshedCustomer?.creditBalance || 0,
-        },
-      }
-    );
-
-    if (nowPaid) {
+    if (isCash) {
+      await Transaction.deleteMany({ sale: existing._id, type: 'customer_credit' });
       const existingPayTx = await Transaction.findOne({ sale: existing._id, type: 'customer_payment' });
       if (existingPayTx) {
-        existingPayTx.customer = customer._id;
+        existingPayTx.customer = null;
         existingPayTx.amount = saleTotal;
-        existingPayTx.paymentType = paymentTypeVal;
+        existingPayTx.cashSide = 'credit';
+        existingPayTx.paymentType = 'Cash';
+        existingPayTx.source = 'cash_entry';
+        existingPayTx.description = `Cash Sale — ${processedLines.map((l) => l.materialName).join(', ')}`;
+        existingPayTx.reason = 'Direct Cash Sale';
         existingPayTx.entryDate = existing.createdAt;
-        existingPayTx.balanceAfter = refreshedCustomer?.creditBalance || 0;
+        existingPayTx.balanceAfter = 0;
         await existingPayTx.save();
       } else {
         await Transaction.create({
-          customer: customer._id,
           type: 'customer_payment',
+          cashSide: 'credit',
           amount: saleTotal,
-          paymentType: paymentTypeVal,
-          description: `Direct Payment for Sale - ${processedLines.map((l) => l.materialName).join(', ')}`,
+          paymentType: 'Cash',
+          source: 'cash_entry',
+          description: `Cash Sale — ${processedLines.map((l) => l.materialName).join(', ')}`,
+          reason: 'Direct Cash Sale',
           sale: existing._id,
           entryDate: existing.createdAt,
-          source: 'Direct Sale Payment',
-          balanceAfter: refreshedCustomer?.creditBalance || 0,
         });
       }
     } else {
-      await Transaction.deleteMany({ sale: existing._id, type: 'customer_payment' });
+      const desc = `Sale${nowPaid ? ' (Paid Direct)' : ''} - ${processedLines.map((l) => l.materialName).join(', ')}`;
+      await Transaction.updateMany(
+        { sale: existing._id, type: 'customer_credit' },
+        {
+          $set: {
+            customer: customer._id,
+            amount: saleTotal,
+            description: desc,
+            entryDate: existing.createdAt,
+            balanceAfter: refreshedCustomer?.creditBalance || 0,
+          },
+        }
+      );
+
+      if (nowPaid) {
+        const existingPayTx = await Transaction.findOne({ sale: existing._id, type: 'customer_payment' });
+        if (existingPayTx) {
+          existingPayTx.customer = customer._id;
+          existingPayTx.amount = saleTotal;
+          existingPayTx.paymentType = paymentTypeVal;
+          existingPayTx.entryDate = existing.createdAt;
+          existingPayTx.balanceAfter = refreshedCustomer?.creditBalance || 0;
+          await existingPayTx.save();
+        } else {
+          await Transaction.create({
+            customer: customer._id,
+            type: 'customer_payment',
+            amount: saleTotal,
+            paymentType: paymentTypeVal,
+            description: `Direct Payment for Sale - ${processedLines.map((l) => l.materialName).join(', ')}`,
+            sale: existing._id,
+            entryDate: existing.createdAt,
+            source: 'Direct Sale Payment',
+            balanceAfter: refreshedCustomer?.creditBalance || 0,
+          });
+        }
+      } else {
+        await Transaction.deleteMany({ sale: existing._id, type: 'customer_payment' });
+      }
     }
 
     const vendorNow = await Vendor.findById(vendor._id);
@@ -737,7 +848,7 @@ router.put('/:id', async (req, res) => {
         $set: {
           vendor: vendor._id,
           amount: materialsTotal,
-          description: `Sale to ${customer.name} - ${processedLines.map((l) => l.materialName).join(', ')}`,
+          description: `Sale to ${isCash ? 'Cash' : customer.name} - ${processedLines.map((l) => l.materialName).join(', ')}`,
           entryDate: existing.createdAt,
           balanceAfter: vendorNow?.creditBalance || 0,
         },

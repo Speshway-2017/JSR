@@ -496,23 +496,25 @@ export function openPurchaseBillPreview(purchase) {
   if (!previewTab) return;
 
   const vendor = purchase.vendor && typeof purchase.vendor === 'object' ? purchase.vendor : {};
-  const vendorName = vendor.name || purchase.vendorName || 'Vendor';
-  const vendorTe = vendor.nameTelugu || purchase.vendorNameTelugu || '';
+  const vendorName = vendor.name || purchase.name || purchase.vendorName || 'Vendor';
+  const vendorTe = vendor.nameTelugu || purchase.nameTelugu || purchase.vendorNameTelugu || '';
   const vendorMobile = vendor.mobile || purchase.mobile || '';
   const vendorCity = vendor.city || purchase.city || '';
-  const dateStr = formatDate(purchase.purchaseDate || purchase.createdAt);
-  const totalAmount = Number(purchase.totalAmount || 0);
+  const dateStr = formatDate(purchase.purchaseDate || purchase.date || purchase.createdAt);
+  const totalAmount = Number(purchase.totalSale != null ? purchase.totalSale : purchase.totalAmount || 0);
   const totalBags = Number(purchase.totalBags || 0);
   const totalWeight = Number(purchase.totalWeight || 0);
 
-  const linesHtml = (purchase.lines || []).length === 0
+  const lines = purchase.lines || purchase.sales || [];
+  const linesHtml = lines.length === 0
     ? `<tr><td colspan="7" style="padding:18px; text-align:center; color:#94a3b8; font-size:13px;">No items in this purchase</td></tr>`
-    : (purchase.lines || []).map((line, idx) => {
-        const item = esc(line.materialName || '—');
+    : lines.map((line, idx) => {
+        const item = esc(line.materialName || line.material || '—');
         const typeLabel = line.purchaseType === 'by_bag' ? 'By Bag' : line.purchaseType === 'by_box' ? 'By Box' : 'By Weight';
         const bags = line.purchaseType === 'by_box' ? (line.boxes || line.bags || '—') : (line.bags != null && line.bags !== 0 ? line.bags : '—');
-        const weight = line.purchaseType === 'by_bag' ? '—' : `${Number(line.totalKg || 0).toFixed(1)} kg`;
-        const rateLabel = line.purchaseType === 'by_bag' ? `₹${line.ratePerKg}/bag` : `₹${line.ratePerKg}/kg`;
+        const weight = line.purchaseType === 'by_bag' ? '—' : `${Number(line.totalKg != null ? line.totalKg : line.weight || 0).toFixed(1)} kg`;
+        const rateVal = line.ratePerKg != null ? line.ratePerKg : line.rate || 0;
+        const rateLabel = line.purchaseType === 'by_bag' ? `₹${rateVal}/bag` : `₹${rateVal}/kg`;
         const amount = Number(line.amount || 0);
 
         return `
