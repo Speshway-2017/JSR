@@ -220,7 +220,7 @@ router.get('/report-2', async (req, res) => {
       .populate('customer', 'name nameTelugu')
       .populate('vendor', 'name nameTelugu')
       .populate('lines.material', 'name nameTelugu')
-      .sort({ createdAt: 1 })
+      .sort({ serialNo: 1, createdAt: 1 })
       .lean();
 
     const vendorsMap = new Map();
@@ -284,6 +284,8 @@ router.get('/report-2', async (req, res) => {
 
         matObj.entries.push({
           saleId: sale._id,
+          serialNo: sale.serialNo != null ? sale.serialNo : 0,
+          createdAt: sale.createdAt,
           customerId,
           name: customerName,
           bags: bagStrList,
@@ -340,9 +342,7 @@ router.get('/report-2', async (req, res) => {
               bagCount: mat.bagCount,
               totalKg: Number(mat.totalKg.toFixed(1)),
               totalAmount: Math.round(mat.totalAmount || 0),
-              entries: mat.entries
-                .slice()
-                .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base', numeric: true })),
+              entries: mat.entries,
             };
           }),
       }));
@@ -627,242 +627,248 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
 router.put('/:id', async (req, res) => {
-  try {
-    const existing = await Sale.findById(req.params.id);
-    if (!existing) return res.status(404).json({ message: 'Sale not found' });
-
-    const { customerId, loadId, vendorId, date, lines, handlingCharges, coolyRate, coolyPerBag, isPaid, paymentType, isCashSale, customerName } =
-      req.body;
-    if (!lines?.length) {
-      return res.status(400).json({ message: 'Sale lines are required' });
-    }
-
-    const isCash = isCashSale === true || customerId === 'cash' || String(customerId || '').toLowerCase() === 'cash' || customerName?.toLowerCase() === 'cash';
-
-    let customer = null;
-    if (!isCash) {
-      const nextCustomerId = customerId || (existing.customer ? existing.customer.toString() : null);
-      if (nextCustomerId && nextCustomerId !== 'cash') {
-        customer = await Customer.findById(nextCustomerId);
-      }
-      if (!customer) return res.status(404).json({ message: 'Customer not found' });
-    }
-
-    const saleDate = date || existing.createdAt.toISOString().slice(0, 10);
-    let load = null;
-    if (loadId) {
-      load = await Load.findById(loadId);
-      if (!load) return res.status(404).json({ message: 'Load not found' });
-    } else if (vendorId) {
-      load = await findOrCreateDayLoad(vendorId, saleDate);
-    } else {
-      load = await Load.findById(existing.load);
-      if (!load) return res.status(404).json({ message: 'Load not found' });
-    }
-
-    const vendor = await Vendor.findById(load.vendor);
-    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
-
-    const oldVendor = await Vendor.findById(existing.vendor);
-    const oldCustomer = existing.customer ? await Customer.findById(existing.customer) : null;
-
-    const stockMap = await getLoadStockMap(load._id);
-    const sameLoad = load._id.toString() === existing.load?.toString();
-    if (sameLoad) {
-      for (const line of existing.lines || []) {
-        const key = line.material?.toString();
-        if (!key) continue;
-        stockMap.set(key, (stockMap.get(key) || 0) + Number(line.totalKg || 0));
-      }
-    }
-
-    let processed;
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      processed = await processSaleLines(lines, load, { extraStockMap: stockMap });
-    } catch (err) {
-      return res.status(err.status || 500).json({ message: err.message });
-    }
-    const { processedLines, materialsTotal, totalBags, totalWeight } = processed;
+      const existing = await Sale.findById(req.params.id);
+      if (!existing) return res.status(404).json({ message: 'Sale not found' });
 
-    const { handlingAmount, coolyRate: savedCoolyRate, coolyPerBag: savedCoolyPerBag } =
-      resolveHandling({
-        customer,
-        handlingCharges,
-        coolyRate,
-        coolyPerBag,
-        totalBags,
-      });
-    const saleTotal = Number((materialsTotal + handlingAmount).toFixed(2));
-    const oldMaterialsTotal = Number(
-      (existing.lines || []).reduce((s, l) => s + (Number(l.totalAmount) || 0), 0).toFixed(2)
-    );
-    const oldSaleTotal = Number(existing.totalAmount || 0);
-
-    const wasPaid = existing.isCashSale || !existing.customer || !!existing.isPaid;
-    const nowPaid = isCash ? true : (isPaid !== undefined ? !!isPaid : wasPaid);
-    const paymentTypeVal = isCash ? 'Cash' : (paymentType || existing.paymentType || 'Cash');
-
-    existing.customer = isCash ? null : customer._id;
-    existing.isCashSale = isCash;
-    existing.customerName = isCash ? 'Cash' : (customer?.name || '');
-    existing.vendor = vendor._id;
-    existing.load = load._id;
-    existing.lines = processedLines;
-    existing.handlingCharges = handlingAmount;
-    existing.coolyRate = savedCoolyRate;
-    existing.coolyPerBag = savedCoolyPerBag;
-    existing.totalAmount = saleTotal;
-    existing.totalBags = totalBags;
-    existing.totalWeight = totalWeight;
-    existing.isPaid = nowPaid;
-    existing.paymentType = paymentTypeVal;
-    existing.paidAmount = nowPaid ? saleTotal : 0;
-    if (date) {
-      const parsedDate = new Date(date);
-      if (!isNaN(parsedDate.getTime())) {
-        existing.createdAt = parsedDate;
+      const { customerId, loadId, vendorId, date, lines, handlingCharges, coolyRate, coolyPerBag, isPaid, paymentType, isCashSale, customerName } =
+        req.body;
+      if (!lines?.length) {
+        return res.status(400).json({ message: 'Sale lines are required' });
       }
-    }
-    await existing.save();
 
-    if (oldCustomer && !isCash) {
-      if (oldCustomer._id.toString() === customer._id.toString()) {
-        if (!wasPaid && !nowPaid) {
-          oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal + saleTotal).toFixed(2)));
-        } else if (!wasPaid && nowPaid) {
-          oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal).toFixed(2)));
-        } else if (wasPaid && !nowPaid) {
-          oldCustomer.creditBalance = Number((oldCustomer.creditBalance + saleTotal).toFixed(2));
+      const isCash = isCashSale === true || customerId === 'cash' || String(customerId || '').toLowerCase() === 'cash' || customerName?.toLowerCase() === 'cash';
+
+      let customer = null;
+      if (!isCash) {
+        const nextCustomerId = customerId || (existing.customer ? existing.customer.toString() : null);
+        if (nextCustomerId && nextCustomerId !== 'cash') {
+          customer = await Customer.findById(nextCustomerId);
         }
-        await oldCustomer.save();
+        if (!customer) return res.status(404).json({ message: 'Customer not found' });
+      }
+
+      const saleDate = date || existing.createdAt.toISOString().slice(0, 10);
+      let load = null;
+      if (loadId) {
+        load = await Load.findById(loadId);
+        if (!load) return res.status(404).json({ message: 'Load not found' });
+      } else if (vendorId) {
+        load = await findOrCreateDayLoad(vendorId, saleDate);
       } else {
+        load = await Load.findById(existing.load);
+        if (!load) return res.status(404).json({ message: 'Load not found' });
+      }
+
+      const vendor = await Vendor.findById(load.vendor);
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+      const oldVendor = await Vendor.findById(existing.vendor);
+      const oldCustomer = existing.customer ? await Customer.findById(existing.customer) : null;
+
+      const stockMap = await getLoadStockMap(load._id);
+      const sameLoad = load._id.toString() === existing.load?.toString();
+      if (sameLoad) {
+        for (const line of existing.lines || []) {
+          const key = line.material?.toString();
+          if (!key) continue;
+          stockMap.set(key, (stockMap.get(key) || 0) + Number(line.totalKg || 0));
+        }
+      }
+
+      let processed;
+      try {
+        processed = await processSaleLines(lines, load, { extraStockMap: stockMap });
+      } catch (err) {
+        return res.status(err.status || 500).json({ message: err.message });
+      }
+      const { processedLines, materialsTotal, totalBags, totalWeight } = processed;
+
+      const { handlingAmount, coolyRate: savedCoolyRate, coolyPerBag: savedCoolyPerBag } =
+        resolveHandling({
+          customer,
+          handlingCharges,
+          coolyRate,
+          coolyPerBag,
+          totalBags,
+        });
+      const saleTotal = Number((materialsTotal + handlingAmount).toFixed(2));
+      const oldMaterialsTotal = Number(
+        (existing.lines || []).reduce((s, l) => s + (Number(l.totalAmount) || 0), 0).toFixed(2)
+      );
+      const oldSaleTotal = Number(existing.totalAmount || 0);
+
+      const wasPaid = existing.isCashSale || !existing.customer || !!existing.isPaid;
+      const nowPaid = isCash ? true : (isPaid !== undefined ? !!isPaid : wasPaid);
+      const paymentTypeVal = isCash ? 'Cash' : (paymentType || existing.paymentType || 'Cash');
+
+      existing.customer = isCash ? null : customer._id;
+      existing.isCashSale = isCash;
+      existing.customerName = isCash ? 'Cash' : (customer?.name || '');
+      existing.vendor = vendor._id;
+      existing.load = load._id;
+      existing.lines = processedLines;
+      existing.handlingCharges = handlingAmount;
+      existing.coolyRate = savedCoolyRate;
+      existing.coolyPerBag = savedCoolyPerBag;
+      existing.totalAmount = saleTotal;
+      existing.totalBags = totalBags;
+      existing.totalWeight = totalWeight;
+      existing.isPaid = nowPaid;
+      existing.paymentType = paymentTypeVal;
+      existing.paidAmount = nowPaid ? saleTotal : 0;
+      if (date) {
+        const parsedDate = new Date(date);
+        if (!isNaN(parsedDate.getTime())) {
+          existing.createdAt = parsedDate;
+        }
+      }
+      await existing.save();
+
+      if (oldCustomer && !isCash) {
+        if (oldCustomer._id.toString() === customer._id.toString()) {
+          if (!wasPaid && !nowPaid) {
+            oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal + saleTotal).toFixed(2)));
+          } else if (!wasPaid && nowPaid) {
+            oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal).toFixed(2)));
+          } else if (wasPaid && !nowPaid) {
+            oldCustomer.creditBalance = Number((oldCustomer.creditBalance + saleTotal).toFixed(2));
+          }
+          await oldCustomer.save();
+        } else {
+          if (!wasPaid) {
+            oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal).toFixed(2)));
+            await oldCustomer.save();
+          }
+          if (!nowPaid) {
+            customer.creditBalance = Number((customer.creditBalance + saleTotal).toFixed(2));
+            await customer.save();
+          }
+        }
+      } else if (oldCustomer && isCash) {
         if (!wasPaid) {
           oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal).toFixed(2)));
           await oldCustomer.save();
         }
-        if (!nowPaid) {
-          customer.creditBalance = Number((customer.creditBalance + saleTotal).toFixed(2));
-          await customer.save();
+      } else if (!isCash && !nowPaid) {
+        customer.creditBalance = Number((customer.creditBalance + saleTotal).toFixed(2));
+        await customer.save();
+      }
+
+      const refreshedCustomer = customer ? await Customer.findById(customer._id) : null;
+
+      if (oldVendor && oldVendor._id.toString() !== vendor._id.toString()) {
+        oldVendor.creditBalance = Math.max(0, Number((oldVendor.creditBalance - oldMaterialsTotal).toFixed(2)));
+        await oldVendor.save();
+        vendor.creditBalance = Number((vendor.creditBalance + materialsTotal).toFixed(2));
+        await vendor.save();
+      } else if (oldVendor) {
+        oldVendor.creditBalance = Math.max(0, Number((oldVendor.creditBalance - oldMaterialsTotal + materialsTotal).toFixed(2)));
+        await oldVendor.save();
+      } else {
+        vendor.creditBalance = Number((vendor.creditBalance + materialsTotal).toFixed(2));
+        await vendor.save();
+      }
+
+      if (isCash) {
+        await Transaction.deleteMany({ sale: existing._id, type: 'customer_credit' });
+        const existingPayTx = await Transaction.findOne({ sale: existing._id, type: 'customer_payment' });
+        if (existingPayTx) {
+          existingPayTx.customer = null;
+          existingPayTx.amount = saleTotal;
+          existingPayTx.cashSide = 'credit';
+          existingPayTx.paymentType = 'Cash';
+          existingPayTx.source = 'cash_entry';
+          existingPayTx.description = `Cash Sale — ${processedLines.map((l) => l.materialName).join(', ')}`;
+          existingPayTx.reason = 'Direct Cash Sale';
+          existingPayTx.entryDate = existing.createdAt;
+          existingPayTx.balanceAfter = 0;
+          await existingPayTx.save();
+        } else {
+          await Transaction.create({
+            type: 'customer_payment',
+            cashSide: 'credit',
+            amount: saleTotal,
+            paymentType: 'Cash',
+            source: 'cash_entry',
+            description: `Cash Sale — ${processedLines.map((l) => l.materialName).join(', ')}`,
+            reason: 'Direct Cash Sale',
+            sale: existing._id,
+            entryDate: existing.createdAt,
+          });
+        }
+      } else {
+        const desc = `Sale${nowPaid ? ' (Paid Direct)' : ''} - ${processedLines.map((l) => l.materialName).join(', ')}`;
+        await Transaction.updateMany(
+          { sale: existing._id, type: 'customer_credit' },
+          {
+            $set: {
+              customer: customer._id,
+              amount: saleTotal,
+              description: desc,
+              entryDate: existing.createdAt,
+              balanceAfter: refreshedCustomer?.creditBalance || 0,
+            },
+          }
+        );
+
+        if (nowPaid) {
+          const existingPayTx = await Transaction.findOne({ sale: existing._id, type: 'customer_payment' });
+          if (existingPayTx) {
+            existingPayTx.customer = customer._id;
+            existingPayTx.amount = saleTotal;
+            existingPayTx.paymentType = paymentTypeVal;
+            existingPayTx.entryDate = existing.createdAt;
+            existingPayTx.balanceAfter = refreshedCustomer?.creditBalance || 0;
+            await existingPayTx.save();
+          } else {
+            await Transaction.create({
+              customer: customer._id,
+              type: 'customer_payment',
+              amount: saleTotal,
+              paymentType: paymentTypeVal,
+              description: `Direct Payment for Sale - ${processedLines.map((l) => l.materialName).join(', ')}`,
+              sale: existing._id,
+              entryDate: existing.createdAt,
+              source: 'Direct Sale Payment',
+              balanceAfter: refreshedCustomer?.creditBalance || 0,
+            });
+          }
+        } else {
+          await Transaction.deleteMany({ sale: existing._id, type: 'customer_payment' });
         }
       }
-    } else if (oldCustomer && isCash) {
-      if (!wasPaid) {
-        oldCustomer.creditBalance = Math.max(0, Number((oldCustomer.creditBalance - oldSaleTotal).toFixed(2)));
-        await oldCustomer.save();
-      }
-    } else if (!isCash && !nowPaid) {
-      customer.creditBalance = Number((customer.creditBalance + saleTotal).toFixed(2));
-      await customer.save();
-    }
 
-    const refreshedCustomer = customer ? await Customer.findById(customer._id) : null;
-
-    if (oldVendor && oldVendor._id.toString() !== vendor._id.toString()) {
-      oldVendor.creditBalance = Math.max(0, Number((oldVendor.creditBalance - oldMaterialsTotal).toFixed(2)));
-      await oldVendor.save();
-      vendor.creditBalance = Number((vendor.creditBalance + materialsTotal).toFixed(2));
-      await vendor.save();
-    } else if (oldVendor) {
-      oldVendor.creditBalance = Math.max(0, Number((oldVendor.creditBalance - oldMaterialsTotal + materialsTotal).toFixed(2)));
-      await oldVendor.save();
-    } else {
-      vendor.creditBalance = Number((vendor.creditBalance + materialsTotal).toFixed(2));
-      await vendor.save();
-    }
-
-    if (isCash) {
-      await Transaction.deleteMany({ sale: existing._id, type: 'customer_credit' });
-      const existingPayTx = await Transaction.findOne({ sale: existing._id, type: 'customer_payment' });
-      if (existingPayTx) {
-        existingPayTx.customer = null;
-        existingPayTx.amount = saleTotal;
-        existingPayTx.cashSide = 'credit';
-        existingPayTx.paymentType = 'Cash';
-        existingPayTx.source = 'cash_entry';
-        existingPayTx.description = `Cash Sale — ${processedLines.map((l) => l.materialName).join(', ')}`;
-        existingPayTx.reason = 'Direct Cash Sale';
-        existingPayTx.entryDate = existing.createdAt;
-        existingPayTx.balanceAfter = 0;
-        await existingPayTx.save();
-      } else {
-        await Transaction.create({
-          type: 'customer_payment',
-          cashSide: 'credit',
-          amount: saleTotal,
-          paymentType: 'Cash',
-          source: 'cash_entry',
-          description: `Cash Sale — ${processedLines.map((l) => l.materialName).join(', ')}`,
-          reason: 'Direct Cash Sale',
-          sale: existing._id,
-          entryDate: existing.createdAt,
-        });
-      }
-    } else {
-      const desc = `Sale${nowPaid ? ' (Paid Direct)' : ''} - ${processedLines.map((l) => l.materialName).join(', ')}`;
+      const vendorNow = await Vendor.findById(vendor._id);
       await Transaction.updateMany(
-        { sale: existing._id, type: 'customer_credit' },
+        { sale: existing._id, type: 'vendor_credit' },
         {
           $set: {
-            customer: customer._id,
-            amount: saleTotal,
-            description: desc,
+            vendor: vendor._id,
+            amount: materialsTotal,
+            description: `Sale to ${isCash ? 'Cash' : customer.name} - ${processedLines.map((l) => l.materialName).join(', ')}`,
             entryDate: existing.createdAt,
-            balanceAfter: refreshedCustomer?.creditBalance || 0,
+            balanceAfter: vendorNow?.creditBalance || 0,
           },
         }
       );
 
-      if (nowPaid) {
-        const existingPayTx = await Transaction.findOne({ sale: existing._id, type: 'customer_payment' });
-        if (existingPayTx) {
-          existingPayTx.customer = customer._id;
-          existingPayTx.amount = saleTotal;
-          existingPayTx.paymentType = paymentTypeVal;
-          existingPayTx.entryDate = existing.createdAt;
-          existingPayTx.balanceAfter = refreshedCustomer?.creditBalance || 0;
-          await existingPayTx.save();
-        } else {
-          await Transaction.create({
-            customer: customer._id,
-            type: 'customer_payment',
-            amount: saleTotal,
-            paymentType: paymentTypeVal,
-            description: `Direct Payment for Sale - ${processedLines.map((l) => l.materialName).join(', ')}`,
-            sale: existing._id,
-            entryDate: existing.createdAt,
-            source: 'Direct Sale Payment',
-            balanceAfter: refreshedCustomer?.creditBalance || 0,
-          });
-        }
-      } else {
-        await Transaction.deleteMany({ sale: existing._id, type: 'customer_payment' });
+      const populated = await Sale.findById(existing._id)
+        .populate('customer', 'name nameTelugu city state mobile address creditBalance')
+        .populate('vendor', 'name nameTelugu city creditBalance')
+        .populate('load', 'createdAt totalWeight');
+
+      return res.json(populated);
+    } catch (error) {
+      if (error.name === 'VersionError' && attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 50 * attempt));
+        continue;
       }
+      return res.status(error.status || 400).json({ message: error.message });
     }
-
-    const vendorNow = await Vendor.findById(vendor._id);
-    await Transaction.updateMany(
-      { sale: existing._id, type: 'vendor_credit' },
-      {
-        $set: {
-          vendor: vendor._id,
-          amount: materialsTotal,
-          description: `Sale to ${isCash ? 'Cash' : customer.name} - ${processedLines.map((l) => l.materialName).join(', ')}`,
-          entryDate: existing.createdAt,
-          balanceAfter: vendorNow?.creditBalance || 0,
-        },
-      }
-    );
-
-    const populated = await Sale.findById(existing._id)
-      .populate('customer', 'name nameTelugu city state mobile address creditBalance')
-      .populate('vendor', 'name nameTelugu city creditBalance')
-      .populate('load', 'createdAt totalWeight');
-
-    res.json(populated);
-  } catch (error) {
-    res.status(error.status || 400).json({ message: error.message });
   }
 });
 

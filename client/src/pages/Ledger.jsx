@@ -47,7 +47,7 @@ export default function Ledger() {
   const suggestions = useMemo(() => {
     if (!nameQuery.trim()) return [];
     return parties
-      .filter((p) => matchesSearchFields(p, ['name', 'nameTelugu', 'mobile', 'city'], nameQuery))
+      .filter((p) => matchesSearchFields(p, ['name', 'nameTelugu'], nameQuery))
       .slice(0, 10);
   }, [parties, nameQuery]);
 
@@ -203,21 +203,21 @@ export default function Ledger() {
   };
 
   return (
-    <div className="space-y-2.5 max-w-3xl">
+    <div className="space-y-3 max-w-3xl">
       <div>
-        <h1 className="text-sm font-bold text-primary-800">Ledger</h1>
-        <p className="text-primary-400 text-[11px] mt-0.5">
+        <h1 className="page-title text-2xl font-bold text-primary-700">Ledger</h1>
+        <p className="text-xs text-primary-500 mt-1">
           Customer & Vendor transactions — sales, cash received/paid, running balance
         </p>
       </div>
 
-      <form onSubmit={loadLedger} className="card !p-3 space-y-2.5">
-        <div className="flex items-center gap-2.5 bg-primary-50/70 px-2.5 py-1.5 rounded-lg border border-primary-100 flex-wrap text-xs">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-600 shrink-0">Party Type:</span>
+      <form onSubmit={loadLedger} className="card !p-3.5 space-y-3">
+        <div className="flex items-center gap-2.5 bg-primary-50/70 px-3 py-1.5 rounded-lg border border-primary-100 flex-wrap text-sm">
+          <span className="text-xs font-semibold uppercase tracking-wide text-primary-600 shrink-0">Party Type:</span>
           <button
             type="button"
             onClick={() => setPartyType('customer')}
-            className={`px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer ${
+            className={`px-3 py-1 text-sm rounded-md font-semibold transition cursor-pointer ${
               partyType === 'customer'
                 ? 'bg-primary-600 text-white shadow-sm'
                 : 'text-primary-600 hover:bg-primary-100'
@@ -228,7 +228,7 @@ export default function Ledger() {
           <button
             type="button"
             onClick={() => setPartyType('vendor')}
-            className={`px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer ${
+            className={`px-3 py-1 text-sm rounded-md font-semibold transition cursor-pointer ${
               partyType === 'vendor'
                 ? 'bg-primary-600 text-white shadow-sm'
                 : 'text-primary-600 hover:bg-primary-100'
@@ -238,11 +238,11 @@ export default function Ledger() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div className="sm:col-span-2 relative">
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">{partyType === 'vendor' ? 'Vendor *' : 'Customer *'}</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">{partyType === 'vendor' ? 'Vendor *' : 'Customer *'}</label>
             <input
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={nameQuery}
               onChange={(e) => {
                 setNameQuery(e.target.value);
@@ -260,14 +260,14 @@ export default function Ledger() {
             {!partyId && suggestOpen && suggestions.length > 0 && (
               <ul
                 ref={listRef}
-                className="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-lg border border-primary-200 bg-surface shadow-card"
+                className="absolute z-20 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-primary-200 bg-surface shadow-card"
               >
                 {suggestions.map((p, idx) => (
                   <li key={p._id}>
                     <button
                       type="button"
                       data-idx={idx}
-                      className={`w-full text-left px-3 py-1.5 text-xs transition ${
+                      className={`w-full text-left px-3 py-2 text-sm transition ${
                         idx === highlight
                           ? 'bg-primary-100 font-semibold text-primary-900'
                           : 'hover:bg-primary-50 text-primary-800'
@@ -283,9 +283,9 @@ export default function Ledger() {
                     >
                       <span className="font-semibold">{p.name}</span>
                       {p.city ? (
-                        <span className="text-[11px] text-primary-400 ml-1.5">({p.city})</span>
+                        <span className="text-xs text-primary-400 ml-1.5">({p.city})</span>
                       ) : p.schedule?.name ? (
-                        <span className="text-[11px] text-primary-400 ml-1.5">({p.schedule.name})</span>
+                        <span className="text-xs text-primary-400 ml-1.5">({p.schedule.name})</span>
                       ) : null}
                     </button>
                   </li>
@@ -293,55 +293,55 @@ export default function Ledger() {
               </ul>
             )}
             {selected ? (
-              <p className="text-[11px] text-primary-500 mt-1 font-medium">
+              <p className="text-xs text-primary-500 mt-1 font-medium">
                 {selected.city || selected.schedule?.name || 'Party selected'} · Balance{' '}
                 <strong className="text-primary-800">{formatCurrency(selected.creditBalance)}</strong>
               </p>
             ) : null}
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">From *</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">From *</label>
             <input
               type="date"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               required
             />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">To *</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">To *</label>
             <input
               type="date"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               required
             />
           </div>
         </div>
-        <button type="submit" className="btn-primary !py-1.5 !px-4 !text-xs font-semibold flex items-center gap-1.5" disabled={loading}>
-          <BookOpen className="w-3.5 h-3.5" />
+        <button type="submit" className="btn-primary !py-2 !px-4 !text-sm font-semibold flex items-center gap-1.5" disabled={loading}>
+          <BookOpen className="w-4 h-4" />
           {loading ? 'Loading…' : 'Show ledger'}
         </button>
       </form>
 
       {data && (
         <div className="card !p-0 overflow-hidden border border-primary-200">
-          <div className="px-3 py-2 border-b border-primary-200 bg-surface flex items-center justify-between gap-2">
+          <div className="px-3.5 py-2.5 border-b border-primary-200 bg-surface flex items-center justify-between gap-2">
             <div>
-              <p className="font-bold text-primary-800 text-xs">{data.customer.name}</p>
-              <p className="text-[11px] text-primary-400">
+              <p className="font-bold text-primary-800 text-sm sm:text-base">{data.customer.name}</p>
+              <p className="text-xs text-primary-500">
                 {formatDateOnly(data.startDate)} — {formatDateOnly(data.endDate)}
               </p>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handlePrint}
-                className="btn-primary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs"
+                className="btn-primary !py-1.5 !px-3 !text-sm font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs"
               >
-                <Printer className="w-3 h-3" />
+                <Printer className="w-4 h-4" />
                 Print
               </button>
               {isOnline && (
@@ -349,16 +349,16 @@ export default function Ledger() {
                   type="button"
                   onClick={handleSendWhatsApp}
                   disabled={sendingWa}
-                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-2xs transition flex items-center gap-1 cursor-pointer disabled:opacity-50 shrink-0"
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold shadow-2xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
                 >
-                  <Send className="w-3 h-3" />
+                  <Send className="w-4 h-4" />
                   {sendingWa ? 'Sending...' : 'Send to WhatsApp'}
                 </button>
               )}
             </div>
           </div>
-          <div className="px-3 py-2 bg-primary-50/80 border-b border-primary-200 flex items-center justify-between gap-2 text-xs">
-            <span className="text-primary-500">Opening</span>
+          <div className="px-3.5 py-2 bg-primary-50/80 border-b border-primary-200 flex items-center justify-between gap-2 text-sm">
+            <span className="text-primary-600 font-medium">Opening</span>
             <span className="font-bold text-primary-800 tabular-nums">
               {formatCurrency(data.openingBalance)}
             </span>
@@ -368,18 +368,18 @@ export default function Ledger() {
             <table className="w-full text-xs table-fixed">
               <thead>
                 <tr className="bg-primary-50/80 text-left border-b border-primary-200">
-                  <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-[100px]">Date</th>
-                  <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">Particulars</th>
-                  <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[80px]">Sale</th>
-                  <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[80px]">Paid</th>
-                  <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[70px]">Less</th>
-                  <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[90px]">Balance</th>
+                  <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide w-[105px]">Date</th>
+                  <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide">Particulars</th>
+                  <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-right w-[95px]">Sale</th>
+                  <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-right w-[95px]">Paid</th>
+                  <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-right w-[85px]">Less</th>
+                  <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-right w-[105px]">Balance</th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-3 py-8 text-center text-primary-400 text-xs">
+                    <td colSpan={6} className="px-3 py-8 text-center text-primary-400 text-sm">
                       No transactions in this range
                     </td>
                   </tr>
@@ -392,8 +392,8 @@ export default function Ledger() {
                       onDoubleClick={() => openEntry(row)}
                       title="Click to open sale details"
                     >
-                      <td className="px-3 py-2 whitespace-nowrap text-primary-600">{formatDateOnly(row.date)}</td>
-                      <td className="px-3 py-2 text-primary-700 truncate">{row.particulars}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-primary-600 font-medium">{formatDateOnly(row.date)}</td>
+                      <td className="px-3 py-2 text-primary-700 font-medium truncate">{row.particulars}</td>
                       <td
                         className="px-3 py-2 text-right tabular-nums font-semibold text-primary-800 hover:text-accent-700 underline underline-offset-2 decoration-primary-200"
                         onClick={(e) => {
@@ -408,10 +408,10 @@ export default function Ledger() {
                       >
                         {row.sale ? formatCurrency(row.sale) : '—'}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-primary-600">
+                      <td className="px-3 py-2 text-right tabular-nums font-medium text-primary-600">
                         {row.paid ? formatCurrency(row.paid) : '—'}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-primary-400">
+                      <td className="px-3 py-2 text-right tabular-nums font-medium text-primary-400">
                         {row.less ? formatCurrency(row.less) : '—'}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-bold text-primary-800">
@@ -422,34 +422,34 @@ export default function Ledger() {
                 )}
               </tbody>
               <tfoot>
-                <tr className="bg-accent-50 border-t border-primary-200 font-semibold">
-                  <td className="px-3 py-2" colSpan={2}>
+                <tr className="bg-accent-50 border-t border-primary-200 font-semibold text-sm">
+                  <td className="px-3 py-2.5 font-bold text-primary-800" colSpan={2}>
                     Total
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td className="px-3 py-2.5 text-right tabular-nums font-bold text-primary-800">
                     {formatCurrency(data.totals.sale)}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td className="px-3 py-2.5 text-right tabular-nums font-bold text-primary-800">
                     {formatCurrency(data.totals.paid)}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-primary-500">
+                  <td className="px-3 py-2.5 text-right tabular-nums text-primary-600">
                     {formatCurrency(data.totals.less)}
-                    <span className="block text-[10px] font-normal text-primary-400">
+                    <span className="block text-[11px] font-normal text-primary-400">
                       record only
                     </span>
                   </td>
-                  <td className="px-3 py-2" />
+                  <td className="px-3 py-2.5" />
                 </tr>
               </tfoot>
             </table>
           </div>
-          <div className="px-3 py-2 bg-accent-50 border-t border-primary-200 flex items-center justify-between gap-2 text-xs">
-            <span className="text-primary-500">Closing</span>
-            <span className="font-bold text-accent-700 tabular-nums">
+          <div className="px-3.5 py-2.5 bg-accent-50 border-t border-primary-200 flex items-center justify-between gap-2 text-sm">
+            <span className="text-primary-600 font-semibold">Closing</span>
+            <span className="font-bold text-accent-700 text-base tabular-nums">
               {formatCurrency(data.closingBalance)}
             </span>
           </div>
-          <p className="px-3 py-1.5 text-[11px] text-primary-400">
+          <p className="px-3.5 py-2 text-xs text-primary-400">
             Less is shown as a record and is not included in total paid. Click a row to open that
             day's sales bill.
           </p>

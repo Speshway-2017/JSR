@@ -138,7 +138,7 @@ export default function Customers() {
       return true;
     });
     if (query.trim()) {
-      list = searchAndSortItems(list, ['name', 'nameTelugu', 'mobile'], query);
+      list = searchAndSortItems(list, ['name', 'nameTelugu'], query);
     }
     return list;
   }, [customers, query, scheduleFilter, coolyFilter]);
@@ -272,19 +272,19 @@ export default function Customers() {
       </MDIModalWindow>
 
       {customers.length > 0 && (
-        <div className="card !p-3 sm:!p-4">
+        <div className="card !p-3">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[12rem]">
               <Search className="w-4 h-4 text-primary-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
-                className="input-field !pl-9 !h-12"
+                className="h-9 w-full rounded-lg border border-primary-200 bg-surface pl-9 pr-2.5 py-1 text-sm font-medium text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name or mobile..."
               />
             </div>
             <select
-              className="input-field !h-12 !py-0 w-full sm:w-44"
+              className="h-9 w-full sm:w-44 rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition truncate"
               value={scheduleFilter}
               onChange={(e) => setScheduleFilter(e.target.value)}
             >
@@ -296,7 +296,7 @@ export default function Customers() {
               ))}
             </select>
             <select
-              className="input-field !h-12 !py-0 w-full sm:w-36"
+              className="h-9 w-full sm:w-36 rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition truncate"
               value={coolyFilter}
               onChange={(e) => setCoolyFilter(e.target.value)}
             >
@@ -309,55 +309,55 @@ export default function Customers() {
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-primary-400">Loading...</div>
+        <div className="text-center py-12 text-primary-400 text-sm">Loading...</div>
       ) : customers.length === 0 ? (
         <div className="card text-center py-12">
           <Users className="w-10 h-10 text-primary-300 mx-auto mb-2" />
           <p className="text-primary-400 text-sm">No customers yet</p>
         </div>
       ) : (
-        <div className="card !p-0 overflow-hidden">
+        <div className="card !p-0 overflow-hidden border border-primary-200">
           {filtered.length === 0 ? (
             <p className="px-4 py-10 text-center text-sm text-primary-400">No customers match this search</p>
           ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-primary-100 bg-primary-50/50">
-                  <th className="text-left px-4 py-3 font-semibold text-primary-500">Name</th>
-                  <th className="text-left px-4 py-3 font-semibold text-primary-500">Schedule</th>
-                  <th className="text-left px-4 py-3 font-semibold text-primary-500">Mobile</th>
-                  <th className="text-right px-4 py-3 font-semibold text-primary-500">Opening (Dr)</th>
-                  <th className="text-right px-4 py-3 font-semibold text-primary-500">Closing Balance</th>
-                  <th className="text-right px-4 py-3 font-semibold text-primary-500">Actions</th>
+                <tr className="border-b border-primary-100 bg-primary-50/80">
+                  <th className="text-left px-4 py-2.5 font-semibold text-primary-700 uppercase tracking-wide text-xs">Name</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-primary-700 uppercase tracking-wide text-xs">Schedule</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-primary-700 uppercase tracking-wide text-xs">Mobile</th>
+                  <th className="text-right px-4 py-2.5 font-semibold text-primary-700 uppercase tracking-wide text-xs">Opening (Dr)</th>
+                  <th className="text-right px-4 py-2.5 font-semibold text-primary-700 uppercase tracking-wide text-xs">Closing Balance</th>
+                  <th className="text-right px-4 py-2.5 font-semibold text-primary-700 uppercase tracking-wide text-xs">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {paged.map((c) => (
                   <tr key={c._id} className="border-b border-primary-50 hover:bg-primary-50/40">
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2.5">
                       <button
                         type="button"
                         onClick={() => openWindow({ path: `/customers/${c._id}`, title: `Customer: ${c.name}` })}
-                        className="font-medium text-primary-800 hover:text-primary-600 text-left cursor-pointer"
+                        className="font-semibold text-primary-800 hover:text-primary-600 text-left cursor-pointer text-xs"
                       >
                         {c.name}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-primary-600">{scheduleName(c)}</td>
-                    <td className="px-4 py-3 text-primary-500">{c.mobile || '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-primary-600">
+                    <td className="px-4 py-2.5 text-primary-600 text-xs font-medium">{scheduleName(c)}</td>
+                    <td className="px-4 py-2.5 text-primary-500 text-xs font-medium">{c.mobile || '—'}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-primary-600 text-xs font-medium">
                       {formatCurrency(c.openingDebit || 0)}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-accent-600">
+                    <td className="px-4 py-2.5 text-right tabular-nums font-bold text-accent-600 text-xs">
                       {formatCurrency(c.creditBalance || 0)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2.5">
                       <div className="flex justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={() => openEdit(c)}
-                          className="btn-secondary !py-1.5 !px-2.5 !text-xs"
+                          className="btn-secondary !py-1 !px-2.5 !text-xs font-semibold"
                           title="Edit"
                         >
                           <Pencil className="w-3.5 h-3.5" /> Edit
@@ -365,7 +365,7 @@ export default function Customers() {
                         <button
                           type="button"
                           onClick={() => handleDelete(c)}
-                          className="btn-secondary !py-1.5 !px-2.5 !text-xs text-red-600 hover:bg-red-50"
+                          className="btn-secondary !py-1 !px-2.5 !text-xs font-semibold text-red-600 hover:bg-red-50"
                           title="Delete"
                         >
                           <Trash2 className="w-3.5 h-3.5" /> Delete
@@ -379,8 +379,8 @@ export default function Customers() {
           </div>
           )}
           {filtered.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-primary-100 bg-primary-50/40">
-              <p className="text-xs text-primary-400">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-t border-primary-100 bg-primary-50/40">
+              <p className="text-xs text-primary-500 font-medium">
                 {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of{' '}
                 {filtered.length}
               </p>
@@ -402,8 +402,8 @@ export default function Customers() {
                       type="button"
                       className={
                         n === safePage
-                          ? 'btn-primary !py-1.5 !px-2.5 !text-xs min-w-[2rem] justify-center'
-                          : 'btn-secondary !py-1.5 !px-2.5 !text-xs min-w-[2rem] justify-center'
+                          ? 'btn-primary !py-1 !px-2.5 !text-xs min-w-[2rem] justify-center font-semibold'
+                          : 'btn-secondary !py-1 !px-2.5 !text-xs min-w-[2rem] justify-center font-semibold'
                       }
                       onClick={() => setPage(n)}
                     >

@@ -279,48 +279,48 @@ export default function HamaliReport({ path: windowPath }) {
   };
 
   return (
-    <div className="space-y-2.5 max-w-5xl">
+    <div className="space-y-3 max-w-5xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-sm font-bold text-primary-800 flex items-center gap-1.5">
-            <Calculator className="w-4 h-4 text-emerald-600" />
+          <h1 className="page-title text-2xl font-bold text-primary-700 flex items-center gap-2">
+            <Calculator className="w-5 h-5 text-emerald-600" />
             Hamali Report (కూలీ నివేదిక)
           </h1>
-          <p className="text-primary-400 text-[11px] mt-0.5">
+          <p className="text-xs text-primary-500 mt-1">
             Calculated Cooly / Hamali charges for sales on {formatDateOnly(date)}
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            className="btn-secondary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs"
+            className="btn-secondary !py-1.5 !px-3 !text-sm font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs"
             onClick={loadHamaliSales}
             disabled={loading}
           >
-            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
           <button
             type="button"
-            className="btn-primary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs"
+            className="btn-primary !py-1.5 !px-3 !text-sm font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs"
             onClick={handlePrint}
           >
-            <Printer className="w-3 h-3" /> Print / Save PDF
+            <Printer className="w-4 h-4" /> Print / Save PDF
           </button>
         </div>
       </div>
 
       {/* Filter Card */}
-      <div className="card !p-2.5">
+      <div className="card !p-3">
         <div className="flex items-center gap-2 max-w-xs">
           <div className="w-full">
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Date *
             </label>
             <input
               type="date"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
@@ -329,61 +329,61 @@ export default function HamaliReport({ path: windowPath }) {
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-        <div className="card !py-2 !px-2.5 flex flex-col justify-between border border-emerald-300 bg-emerald-50/50">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        <div className="card !py-2.5 !px-3 flex flex-col justify-between border border-emerald-300 bg-emerald-50/50">
+          <span className="text-xs font-bold uppercase tracking-wide text-emerald-800">
             Total Hamali
           </span>
-          <span className="text-sm font-bold text-emerald-900 tabular-nums my-0.5">
+          <span className="text-base font-bold text-emerald-900 tabular-nums my-1">
             {formatCurrency(hamaliCalc.totalHamali)}
           </span>
-          <span className="text-[9.5px] text-emerald-700 font-medium">Final calculated</span>
+          <span className="text-xs text-emerald-700 font-semibold">Final calculated</span>
         </div>
 
-        <div className="card !py-2 !px-2.5 flex flex-col justify-between border border-primary-200">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+        <div className="card !py-2.5 !px-3 flex flex-col justify-between border border-primary-200">
+          <span className="text-xs font-semibold uppercase tracking-wide text-primary-600">
             Weight (General)
           </span>
-          <span className="text-xs font-bold text-primary-800 tabular-nums my-0.5">
-            {hamaliCalc.byWeightBags} <span className="text-[10px] font-normal text-primary-500">bags</span>
+          <span className="text-sm font-bold text-primary-800 tabular-nums my-1">
+            {hamaliCalc.byWeightBags} <span className="text-xs font-normal text-primary-500">bags</span>
           </span>
-          <span className="text-[9.5px] font-semibold text-emerald-700 tabular-nums">
+          <span className="text-xs font-semibold text-emerald-700 tabular-nums">
             8 × {hamaliCalc.byWeightBags} = {formatCurrency(hamaliCalc.amtByWeight)}
           </span>
         </div>
 
-        <div className="card !py-2 !px-2.5 flex flex-col justify-between border border-primary-200">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+        <div className="card !py-2.5 !px-3 flex flex-col justify-between border border-primary-200">
+          <span className="text-xs font-semibold uppercase tracking-wide text-primary-600">
             By Bag (General)
           </span>
-          <span className="text-xs font-bold text-primary-800 tabular-nums my-0.5">
-            {hamaliCalc.byBagBags} <span className="text-[10px] font-normal text-primary-500">bags</span>
+          <span className="text-sm font-bold text-primary-800 tabular-nums my-1">
+            {hamaliCalc.byBagBags} <span className="text-xs font-normal text-primary-500">bags</span>
           </span>
-          <span className="text-[9.5px] font-semibold text-emerald-700 tabular-nums">
+          <span className="text-xs font-semibold text-emerald-700 tabular-nums">
             5 × {hamaliCalc.byBagBags} = {formatCurrency(hamaliCalc.amtByBag)}
           </span>
         </div>
 
-        <div className="card !py-2 !px-2.5 flex flex-col justify-between border border-primary-200">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+        <div className="card !py-2.5 !px-3 flex flex-col justify-between border border-primary-200">
+          <span className="text-xs font-semibold uppercase tracking-wide text-primary-600">
             Weight + Cooly
           </span>
-          <span className="text-xs font-bold text-primary-800 tabular-nums my-0.5">
-            {hamaliCalc.byWeightCoolyBags} <span className="text-[10px] font-normal text-primary-500">bags</span>
+          <span className="text-sm font-bold text-primary-800 tabular-nums my-1">
+            {hamaliCalc.byWeightCoolyBags} <span className="text-xs font-normal text-primary-500">bags</span>
           </span>
-          <span className="text-[9.5px] font-semibold text-emerald-700 tabular-nums">
+          <span className="text-xs font-semibold text-emerald-700 tabular-nums">
             15 × {hamaliCalc.byWeightCoolyBags} = {formatCurrency(hamaliCalc.amtByWeightCooly)}
           </span>
         </div>
 
-        <div className="card !py-2 !px-2.5 flex flex-col justify-between border border-primary-200">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-500">
+        <div className="card !py-2.5 !px-3 flex flex-col justify-between border border-primary-200">
+          <span className="text-xs font-semibold uppercase tracking-wide text-primary-600">
             Bag + Cooly
           </span>
-          <span className="text-xs font-bold text-primary-800 tabular-nums my-0.5">
-            {hamaliCalc.byBagCoolyBags} <span className="text-[10px] font-normal text-primary-500">bags</span>
+          <span className="text-sm font-bold text-primary-800 tabular-nums my-1">
+            {hamaliCalc.byBagCoolyBags} <span className="text-xs font-normal text-primary-500">bags</span>
           </span>
-          <span className="text-[9.5px] font-semibold text-emerald-700 tabular-nums">
+          <span className="text-xs font-semibold text-emerald-700 tabular-nums">
             6 × {hamaliCalc.byBagCoolyBags} = {formatCurrency(hamaliCalc.amtByBagCooly)}
           </span>
         </div>
@@ -391,11 +391,11 @@ export default function HamaliReport({ path: windowPath }) {
 
       {/* Formula Calculation Breakdown Table */}
       <div className="card !p-0 overflow-hidden border border-primary-200">
-        <div className="px-3 py-1.5 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between">
-          <h2 className="font-bold text-primary-800 text-xs flex items-center gap-1.5">
-            <Layers className="w-3.5 h-3.5 text-emerald-600" /> Formula Calculation Breakdown
+        <div className="px-3.5 py-2 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between">
+          <h2 className="font-bold text-primary-800 text-sm flex items-center gap-1.5">
+            <Layers className="w-4 h-4 text-emerald-600" /> Formula Calculation Breakdown
           </h2>
-          <span className="text-[10.5px] text-primary-500 font-medium">
+          <span className="text-xs text-primary-500 font-medium">
             Date: {formatDateOnly(date)}
           </span>
         </div>
@@ -404,94 +404,94 @@ export default function HamaliReport({ path: windowPath }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-primary-50/80 text-left border-b border-primary-200">
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide">
                   Formula Component Description
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-24">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide w-28">
                   Sale Type
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-36">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide w-40">
                   Cooly Applied
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-24">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-right w-28">
                   No. of Bags
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-20">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-right w-24">
                   Rate / Bag
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-28">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-right w-32">
                   Calculated Total
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr className="border-b border-primary-100 hover:bg-primary-50/40 transition">
-                <td className="px-3 py-2 font-semibold text-primary-800">
+                <td className="px-3 py-2 font-semibold text-primary-800 text-xs">
                   8 × (number of bags sales happened by weight)
                 </td>
-                <td className="px-3 py-2 text-primary-600">By Weight</td>
-                <td className="px-3 py-2 text-primary-500">All</td>
-                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums">
+                <td className="px-3 py-2 text-primary-600 text-xs font-medium">By Weight</td>
+                <td className="px-3 py-2 text-primary-500 text-xs font-medium">All</td>
+                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums text-xs">
                   {hamaliCalc.byWeightBags}
                 </td>
-                <td className="px-3 py-2 text-right text-primary-600">₹8</td>
-                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums">
+                <td className="px-3 py-2 text-right text-primary-600 text-xs font-medium">₹8</td>
+                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums text-xs">
                   {formatCurrency(hamaliCalc.amtByWeight)}
                 </td>
               </tr>
               <tr className="border-b border-primary-100 hover:bg-primary-50/40 transition">
-                <td className="px-3 py-2 font-semibold text-primary-800">
+                <td className="px-3 py-2 font-semibold text-primary-800 text-xs">
                   5 × (number of bags sales happened by bags)
                 </td>
-                <td className="px-3 py-2 text-primary-600">By Bag</td>
-                <td className="px-3 py-2 text-primary-500">All</td>
-                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums">
+                <td className="px-3 py-2 text-primary-600 text-xs font-medium">By Bag</td>
+                <td className="px-3 py-2 text-primary-500 text-xs font-medium">All</td>
+                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums text-xs">
                   {hamaliCalc.byBagBags}
                 </td>
-                <td className="px-3 py-2 text-right text-primary-600">₹5</td>
-                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums">
+                <td className="px-3 py-2 text-right text-primary-600 text-xs font-medium">₹5</td>
+                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums text-xs">
                   {formatCurrency(hamaliCalc.amtByBag)}
                 </td>
               </tr>
               <tr className="border-b border-primary-100 hover:bg-primary-50/40 transition">
-                <td className="px-3 py-2 font-semibold text-primary-800">
+                <td className="px-3 py-2 font-semibold text-primary-800 text-xs">
                   15 × (number of bags sold to customer by weight with cooly)
                 </td>
-                <td className="px-3 py-2 text-primary-600">By Weight</td>
-                <td className="px-3 py-2 font-semibold text-emerald-700">Yes (Cooly Checked)</td>
-                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums">
+                <td className="px-3 py-2 text-primary-600 text-xs font-medium">By Weight</td>
+                <td className="px-3 py-2 font-semibold text-emerald-700 text-xs">Yes (Cooly Checked)</td>
+                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums text-xs">
                   {hamaliCalc.byWeightCoolyBags}
                 </td>
-                <td className="px-3 py-2 text-right text-primary-600">₹15</td>
-                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums">
+                <td className="px-3 py-2 text-right text-primary-600 text-xs font-medium">₹15</td>
+                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums text-xs">
                   {formatCurrency(hamaliCalc.amtByWeightCooly)}
                 </td>
               </tr>
               <tr className="border-b border-primary-100 hover:bg-primary-50/40 transition">
-                <td className="px-3 py-2 font-semibold text-primary-800">
+                <td className="px-3 py-2 font-semibold text-primary-800 text-xs">
                   6 × (number of bags sold to customer by bags with cooly)
                 </td>
-                <td className="px-3 py-2 text-primary-600">By Bag</td>
-                <td className="px-3 py-2 font-semibold text-emerald-700">Yes (Cooly Checked)</td>
-                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums">
+                <td className="px-3 py-2 text-primary-600 text-xs font-medium">By Bag</td>
+                <td className="px-3 py-2 font-semibold text-emerald-700 text-xs">Yes (Cooly Checked)</td>
+                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums text-xs">
                   {hamaliCalc.byBagCoolyBags}
                 </td>
-                <td className="px-3 py-2 text-right text-primary-600">₹6</td>
-                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums">
+                <td className="px-3 py-2 text-right text-primary-600 text-xs font-medium">₹6</td>
+                <td className="px-3 py-2 text-right font-bold text-emerald-700 tabular-nums text-xs">
                   {formatCurrency(hamaliCalc.amtByBagCooly)}
                 </td>
               </tr>
             </tbody>
             <tfoot>
-              <tr className="bg-accent-50 border-t-2 border-primary-200 font-bold text-xs">
-                <td colSpan={3} className="px-3 py-2 text-primary-800 font-bold uppercase tracking-wide">
+              <tr className="bg-accent-50 border-t-2 border-primary-200 font-bold text-sm">
+                <td colSpan={3} className="px-3 py-2.5 text-primary-800 font-bold uppercase tracking-wide">
                   TOTAL HAMALI / COOLY PRICE
                 </td>
-                <td className="px-3 py-2 text-right font-bold text-primary-900 tabular-nums">
+                <td className="px-3 py-2.5 text-right font-bold text-primary-900 tabular-nums">
                   {hamaliCalc.totalSaleBags} bags
                 </td>
-                <td className="px-3 py-2 text-right text-primary-400">—</td>
-                <td className="px-3 py-2 text-right font-bold text-accent-700 tabular-nums text-xs">
+                <td className="px-3 py-2.5 text-right text-primary-400">—</td>
+                <td className="px-3 py-2.5 text-right font-bold text-accent-700 tabular-nums text-sm">
                   {formatCurrency(hamaliCalc.totalHamali)}
                 </td>
               </tr>
@@ -502,8 +502,8 @@ export default function HamaliReport({ path: windowPath }) {
 
       {/* Itemized Sales Table */}
       <div className="card !p-0 overflow-hidden border border-primary-200">
-        <div className="px-3 py-1.5 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between">
-          <h3 className="font-bold text-primary-800 text-xs">
+        <div className="px-3.5 py-2 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between">
+          <h3 className="font-bold text-primary-800 text-sm">
             Itemized Sales Entries ({hamaliCalc.rowDetails.length})
           </h3>
         </div>
@@ -512,28 +512,28 @@ export default function HamaliReport({ path: windowPath }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-primary-50/80 text-left border-b border-primary-200">
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-12">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide w-12">
                   #
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide">
                   Customer
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide">
                   Vendor
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide">
                   Product
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-center w-24">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-center w-28">
                   Sale Type
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-center w-24">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-center w-28">
                   Cooly
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-20">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-right w-24">
                   Bags
                 </th>
-                <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-28">
+                <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-right w-32">
                   Hamali Amount
                 </th>
               </tr>
@@ -541,30 +541,30 @@ export default function HamaliReport({ path: windowPath }) {
             <tbody>
               {hamaliCalc.rowDetails.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-primary-400 text-xs">
+                  <td colSpan={8} className="px-3 py-8 text-center text-primary-400 text-sm">
                     No sales records found for {formatDateOnly(date)}
                   </td>
                 </tr>
               ) : (
                 hamaliCalc.rowDetails.map((row, idx) => (
                   <tr key={`${row.saleId}-${idx}`} className="border-b border-primary-100 hover:bg-primary-50/40 transition">
-                    <td className="px-3 py-2 text-primary-400 font-mono text-[10px]">{idx + 1}</td>
+                    <td className="px-3 py-2 text-primary-400 font-mono text-xs">{idx + 1}</td>
                     <td className="px-3 py-2 font-semibold text-primary-800 text-xs">{row.customerName}</td>
-                    <td className="px-3 py-2 text-primary-600 text-xs">{row.vendorName}</td>
-                    <td className="px-3 py-2 text-primary-700 text-xs">{row.materialName}</td>
+                    <td className="px-3 py-2 text-primary-600 text-xs font-medium">{row.vendorName}</td>
+                    <td className="px-3 py-2 text-primary-700 text-xs font-medium">{row.materialName}</td>
                     <td className="px-3 py-2 text-center">
-                      <span className="inline-block px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-primary-100/70 text-primary-700">
+                      <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-primary-100/70 text-primary-700">
                         {row.saleType}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-center">
                       {row.isCooly ? (
-                        <span className="inline-flex items-center gap-0.5 text-emerald-700 font-semibold text-[10.5px]">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Yes
+                        <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold text-xs">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Yes
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-0.5 text-primary-400 text-[10.5px]">
-                          <XCircle className="w-3 h-3 text-primary-300" /> No
+                        <span className="inline-flex items-center gap-1 text-primary-400 text-xs font-medium">
+                          <XCircle className="w-3.5 h-3.5 text-primary-300" /> No
                         </span>
                       )}
                     </td>

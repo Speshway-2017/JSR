@@ -84,59 +84,59 @@ export function SalesBagReportsList() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="page-title">Previous Reports</h1>
-          <p className="text-primary-400 text-sm mt-0.5">View, edit, or delete saved bag order sheets</p>
+          <h1 className="page-title text-2xl font-bold text-primary-700">Previous Reports</h1>
+          <p className="text-xs text-primary-500 mt-1">View, edit, or delete saved bag order sheets</p>
         </div>
         <button
           type="button"
           onClick={() => handleOpenReport('/sales-orders', 'New Report')}
-          className="btn-primary !py-2 !px-4 !text-sm cursor-pointer"
+          className="btn-primary !py-1.5 !px-3.5 !text-sm font-semibold flex items-center gap-1.5 cursor-pointer"
         >
           <FilePlus className="w-4 h-4" /> New report
         </button>
       </div>
 
       {loading ? (
-        <div className="text-center py-20 text-primary-400">Loading reports...</div>
+        <div className="text-center py-20 text-primary-400 text-xs">Loading reports...</div>
       ) : reports.length === 0 ? (
         <div className="card text-center py-16">
-          <p className="text-primary-400 text-sm">No saved reports yet.</p>
+          <p className="text-primary-500 text-sm">No saved reports yet.</p>
           <button
             type="button"
             onClick={() => handleOpenReport('/sales-orders', 'New Report')}
-            className="btn-primary inline-flex items-center gap-2 mt-4 cursor-pointer"
+            className="btn-primary inline-flex items-center gap-1.5 mt-3 !py-1.5 !px-3.5 !text-sm font-semibold cursor-pointer"
           >
             <FilePlus className="w-4 h-4" /> Create first report
           </button>
         </div>
       ) : (
-        <div className="card !p-0 overflow-hidden">
+        <div className="card !p-0 overflow-hidden border border-primary-200">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-left table-fixed">
               <thead>
-                <tr className="border-b border-primary-100 bg-primary-50/50 text-left text-xs font-semibold text-primary-500 uppercase tracking-wider">
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Updated</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                <tr className="border-b border-primary-200 bg-primary-50/80 text-xs font-semibold text-primary-700">
+                  <th className="px-4 py-2.5">Title</th>
+                  <th className="px-4 py-2.5 w-[160px]">Updated</th>
+                  <th className="px-4 py-2.5 text-right w-[180px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-primary-100">
                 {reports.map((r) => (
-                  <tr key={r._id} className="hover:bg-primary-50/40">
-                    <td className="px-4 py-3 font-medium text-primary-800">
+                  <tr key={r._id} className="hover:bg-primary-50/40 transition">
+                    <td className="px-4 py-2.5 font-bold text-primary-800 text-sm truncate">
                       {r.title || 'Untitled report'}
                     </td>
-                    <td className="px-4 py-3 text-primary-400 text-xs">
+                    <td className="px-4 py-2.5 text-primary-500 text-xs whitespace-nowrap">
                       {formatDate(r.updatedAt || r.createdAt)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2.5">
                       <div className="flex justify-end gap-1.5">
                         <button
                           type="button"
-                          className="btn-secondary !py-1.5 !px-2.5 !text-xs cursor-pointer"
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold cursor-pointer"
                           onClick={() => handleOpenReport(`/sales-orders/${r._id}?mode=view`, `View: ${r.title || 'Report'}`)}
                           title="View"
                         >
@@ -144,7 +144,7 @@ export function SalesBagReportsList() {
                         </button>
                         <button
                           type="button"
-                          className="btn-secondary !py-1.5 !px-2.5 !text-xs cursor-pointer"
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold cursor-pointer"
                           onClick={() => handleOpenReport(`/sales-orders/${r._id}`, `Edit: ${r.title || 'Report'}`)}
                           title="Edit"
                         >
@@ -152,7 +152,7 @@ export function SalesBagReportsList() {
                         </button>
                         <button
                           type="button"
-                          className="btn-secondary !py-1.5 !px-2.5 !text-xs !text-red-600 hover:!bg-red-50"
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold !text-red-600 hover:!bg-red-50 cursor-pointer"
                           onClick={() => handleDelete(r._id, r.title)}
                           title="Delete"
                         >
@@ -687,23 +687,23 @@ export default function SalesOrders({ path: windowPath }) {
               <button
                 type="button"
                 onClick={() => navigate('/sales-orders/previous')}
-                className="p-1.5 rounded-lg text-primary-500 hover:bg-primary-50"
+                className="p-1.5 rounded-lg text-primary-500 hover:bg-primary-50 transition cursor-pointer"
                 title="Back to reports"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
             )}
-            <h1 className="page-title">
+            <h1 className="page-title text-2xl font-bold text-primary-700">
               {viewOnly ? 'View Report' : reportId ? 'Edit Report' : 'Sales Orders'}
             </h1>
             {!viewOnly && saveLabel && (
               <span
-                className={`text-xs font-medium ${
+                className={`text-xs font-semibold ${
                   saveStatus === 'error'
                     ? 'text-red-500'
                     : saveStatus === 'saving'
                       ? 'text-primary-400'
-                      : 'text-primary-500'
+                      : 'text-primary-600'
                 }`}
               >
                 {saveLabel}
@@ -712,21 +712,21 @@ export default function SalesOrders({ path: windowPath }) {
           </div>
           {!viewOnly ? (
             <input
-              className="input-field max-w-md !py-2 text-sm"
+              className="h-9 w-full max-w-md rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
               placeholder="Report title (optional)"
             />
           ) : (
-            <p className="text-primary-600 font-medium">{title || 'Untitled report'}</p>
+            <p className="text-primary-700 font-bold text-base">{title || 'Untitled report'}</p>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link to="/sales-orders/previous" className="btn-secondary !py-2 !px-4 !text-sm">
+          <Link to="/sales-orders/previous" className="btn-secondary !py-1.5 !px-3.5 !text-sm font-semibold flex items-center gap-1.5">
             <History className="w-4 h-4" /> Previous reports
           </Link>
           {entries.length > 0 && !viewOnly && (
-            <button type="button" onClick={clearAll} className="btn-secondary !py-2 !px-4 !text-sm">
+            <button type="button" onClick={clearAll} className="btn-secondary !py-1.5 !px-3.5 !text-sm font-semibold cursor-pointer">
               Clear
             </button>
           )}
@@ -734,7 +734,7 @@ export default function SalesOrders({ path: windowPath }) {
             <button
               type="button"
               onClick={() => navigate(`/sales-orders/${reportId}`)}
-              className="btn-secondary !py-2 !px-4 !text-sm"
+              className="btn-secondary !py-1.5 !px-3.5 !text-sm font-semibold flex items-center gap-1.5 cursor-pointer"
             >
               <Pencil className="w-4 h-4" /> Edit
             </button>
@@ -743,7 +743,7 @@ export default function SalesOrders({ path: windowPath }) {
             type="button"
             onClick={openSheetExport}
             disabled={filteredEntries.length === 0 || exporting}
-            className="btn-primary !py-2 !px-4 !text-sm disabled:opacity-50"
+            className="btn-primary !py-1.5 !px-3.5 !text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
           >
             <Download className="w-4 h-4" />
             {exporting ? 'Exporting…' : 'Bag order'}
@@ -752,7 +752,7 @@ export default function SalesOrders({ path: windowPath }) {
             type="button"
             onClick={openIndividualExport}
             disabled={filteredEntries.length === 0 || exporting}
-            className="btn-secondary !py-2 !px-4 !text-sm disabled:opacity-50"
+            className="btn-secondary !py-1.5 !px-3.5 !text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
           >
             <FileText className="w-4 h-4" />
             Individual
@@ -931,16 +931,16 @@ export default function SalesOrders({ path: windowPath }) {
       )}
 
       {!viewOnly && (
-        <form onSubmit={addEntry} className="card space-y-3 shrink-0 !p-4" autoComplete="off">
+        <form onSubmit={addEntry} className="card space-y-3 shrink-0 !p-3.5" autoComplete="off">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <label className="label !mb-0">Name *</label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="text-xs font-semibold text-primary-600 mb-0 block">Name *</label>
                 {personName.trim() !== '' && (
                   <button
                     type="button"
                     onClick={nextPerson}
-                    className="text-xs font-semibold text-primary-600 hover:text-primary-800"
+                    className="text-xs font-bold text-primary-600 hover:text-primary-800 cursor-pointer"
                   >
                     Next person
                   </button>
@@ -965,19 +965,19 @@ export default function SalesOrders({ path: windowPath }) {
               onPick={() => quantityInputRef.current?.focus()}
             />
             <div>
-              <label className="label">Quantity (bags) *</label>
+              <label className="text-xs font-semibold text-primary-600 mb-1 block">Quantity (bags) *</label>
               <input
                 ref={quantityInputRef}
                 type="text"
                 inputMode="numeric"
-                className="input-field"
+                className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value.replace(/[^\d]/g, ''))}
                 placeholder="e.g. 10"
               />
             </div>
           </div>
-          <button type="submit" className="btn-primary !py-2.5 !px-4">
+          <button type="submit" className="btn-primary !py-2 !px-4 !text-sm font-semibold flex items-center gap-1.5 cursor-pointer">
             <Plus className="w-4 h-4" /> Add to list
           </button>
         </form>
@@ -986,7 +986,7 @@ export default function SalesOrders({ path: windowPath }) {
       {entries.length === 0 ? (
         <div className="card text-center py-12 text-primary-400 shrink-0">
           <Package className="w-10 h-10 mx-auto mb-2 text-primary-300" />
-          No lines yet. Type a name, material, and quantity to start.
+          <p className="text-primary-500 text-sm">No lines yet. Type a name, material, and quantity to start.</p>
         </div>
       ) : (
         <div className="card !p-0 overflow-hidden border border-primary-200 flex-1 min-h-0 flex flex-col">
@@ -1003,12 +1003,12 @@ export default function SalesOrders({ path: windowPath }) {
             {BRAND.tagline} · {dateStr}
           </div>
 
-          <div className="shrink-0 px-4 py-2.5 border-b border-primary-100 flex flex-col sm:flex-row gap-2 sm:items-center bg-surface">
-            <span className="text-xs font-semibold text-primary-500 uppercase tracking-wide shrink-0">
+          <div className="shrink-0 px-4 py-2.5 border-b border-primary-100 flex flex-col sm:flex-row gap-2.5 sm:items-center bg-surface">
+            <span className="text-xs font-semibold text-primary-600 uppercase tracking-wide shrink-0">
               Filter / Export
             </span>
             <select
-              className="input-field !py-1.5 !text-sm flex-1 min-w-0"
+              className="h-9 rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition flex-1 min-w-0"
               value={filterName}
               onChange={(e) => setFilterName(e.target.value)}
             >
@@ -1020,7 +1020,7 @@ export default function SalesOrders({ path: windowPath }) {
               ))}
             </select>
             <select
-              className="input-field !py-1.5 !text-sm flex-1 min-w-0"
+              className="h-9 rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition flex-1 min-w-0"
               value={filterMaterial}
               onChange={(e) => setFilterMaterial(e.target.value)}
             >
@@ -1034,7 +1034,7 @@ export default function SalesOrders({ path: windowPath }) {
             {(filterName || filterMaterial) && (
               <button
                 type="button"
-                className="text-xs font-semibold text-primary-600 hover:text-primary-800 shrink-0"
+                className="text-xs font-semibold text-primary-600 hover:text-primary-800 shrink-0 cursor-pointer"
                 onClick={() => {
                   setFilterName('');
                   setFilterMaterial('');
@@ -1207,10 +1207,10 @@ function SuggestInput({
 
   return (
     <div className="relative">
-      {!hideLabel && label ? <label className="label">{label}</label> : null}
+      {!hideLabel && label ? <label className="text-xs font-semibold text-primary-600 mb-1 block">{label}</label> : null}
       <input
         ref={inputRef}
-        className="input-field disabled:bg-primary-50/60"
+        className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition disabled:bg-primary-50/60"
         value={value}
         disabled={disabled}
         onChange={(e) => {
@@ -1237,7 +1237,7 @@ function SuggestInput({
       {showList && (
         <ul
           ref={listRef}
-          className="absolute z-20 left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-xl border border-primary-200 bg-surface shadow-card"
+          className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl border border-primary-200 bg-surface shadow-card"
           role="listbox"
         >
           {suggestions.map((item, idx) => (
@@ -1246,9 +1246,9 @@ function SuggestInput({
                 type="button"
                 id={`suggest-opt-${idx}`}
                 data-idx={idx}
-                className={`w-full text-left px-4 py-2.5 text-sm ${
+                className={`w-full text-left px-3.5 py-2 text-sm ${
                   idx === highlight
-                    ? 'bg-primary-100 text-primary-900 font-medium'
+                    ? 'bg-primary-100 text-primary-900 font-semibold'
                     : 'text-primary-700 hover:bg-primary-50'
                 }`}
                 onMouseDown={(e) => e.preventDefault()}

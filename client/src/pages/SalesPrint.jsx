@@ -515,11 +515,11 @@ export default function SalesPrint({ path: windowPath }) {
   const hasFilters = !!(filterCustomer || filterVendor || filterItem);
 
   return (
-    <div className="space-y-2.5 flex flex-col h-full overflow-hidden">
+    <div className="space-y-3 flex flex-col h-full overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 shrink-0">
         <div>
-          <h1 className="text-sm font-bold text-primary-800">Sales Print</h1>
-          <p className="text-primary-400 text-[11px] mt-0.5">
+          <h1 className="page-title text-2xl font-bold text-primary-700">Sales Print</h1>
+          <p className="text-xs text-primary-500 mt-1">
             Filter, preview, and print customer sales bills for active sales entries
           </p>
         </div>
@@ -528,34 +528,34 @@ export default function SalesPrint({ path: windowPath }) {
           {isOnline && (
             <button
               type="button"
-              className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
+              className="btn-secondary !py-1.5 !px-3 !text-sm font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
               onClick={handleSendWhatsApp}
               disabled={!selectedStatements.length}
             >
-              <Send className="w-3.5 h-3.5 text-emerald-600" /> Send WhatsApp
+              <Send className="w-4 h-4 text-emerald-600" /> Send WhatsApp
             </button>
           )}
           <button
             type="button"
-            className="btn-primary !py-1.5 !px-3 !text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
+            className="btn-primary !py-1.5 !px-3.5 !text-sm font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
             onClick={handlePrintPDF}
             disabled={!selectedStatements.length || printing}
           >
-            <Printer className="w-3.5 h-3.5" /> {printing ? 'Opening PDF...' : 'Print / Save PDF'}
+            <Printer className="w-4 h-4" /> {printing ? 'Opening PDF...' : 'Print / Save PDF'}
           </button>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="card !p-1.5 shrink-0">
-        <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap">
-          <div className="flex items-center gap-1 h-7 px-2 rounded-lg bg-primary-100/70 border border-primary-200 text-[11px] font-bold text-primary-800 shrink-0">
-            <Calendar className="w-3 h-3 text-primary-600" />
+      <div className="card !p-2 shrink-0">
+        <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap">
+          <div className="flex items-center gap-1.5 h-9 px-3 rounded-lg bg-primary-100 border border-primary-200 text-xs font-bold text-primary-800 shrink-0">
+            <Calendar className="w-3.5 h-3.5 text-primary-600" />
             <span>Date: {formatDateOnly(startDate)}</span>
           </div>
 
           <select
-            className="h-7 min-w-[110px] max-w-[140px] rounded-lg border border-primary-200 bg-surface px-2 py-0.5 text-[11px] text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate shrink-0"
+            className="h-9 min-w-[130px] max-w-[160px] rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition truncate shrink-0"
             value={filterCustomer}
             onChange={(e) => setFilterCustomer(e.target.value)}
           >
@@ -568,7 +568,7 @@ export default function SalesPrint({ path: windowPath }) {
           </select>
 
           <select
-            className="h-7 min-w-[105px] max-w-[130px] rounded-lg border border-primary-200 bg-surface px-2 py-0.5 text-[11px] text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate shrink-0"
+            className="h-9 min-w-[120px] max-w-[150px] rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition truncate shrink-0"
             value={filterVendor}
             onChange={(e) => setFilterVendor(e.target.value)}
           >
@@ -581,7 +581,7 @@ export default function SalesPrint({ path: windowPath }) {
           </select>
 
           <select
-            className="h-7 min-w-[105px] max-w-[130px] rounded-lg border border-primary-200 bg-surface px-2 py-0.5 text-[11px] text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate shrink-0"
+            className="h-9 min-w-[120px] max-w-[150px] rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition truncate shrink-0"
             value={filterItem}
             onChange={(e) => setFilterItem(e.target.value)}
           >
@@ -596,7 +596,7 @@ export default function SalesPrint({ path: windowPath }) {
           {hasFilters && (
             <button
               type="button"
-              className="text-[11px] font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg px-2 h-7 flex items-center gap-1 transition cursor-pointer shrink-0"
+              className="text-xs font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg px-2.5 h-9 flex items-center gap-1 transition cursor-pointer shrink-0"
               onClick={() => {
                 setFilterCustomer('');
                 setFilterVendor('');
@@ -604,17 +604,17 @@ export default function SalesPrint({ path: windowPath }) {
               }}
               title="Clear active filters"
             >
-              <X className="w-3 h-3" /> Clear
+              <X className="w-3.5 h-3.5" /> Clear
             </button>
           )}
 
           <button
             type="button"
-            className="btn-secondary !h-7 !py-0.5 !px-2 !text-[11px] font-semibold rounded-lg flex items-center gap-1 ml-auto shrink-0 cursor-pointer"
+            className="btn-secondary !h-9 !py-1 !px-3 !text-xs font-semibold rounded-lg flex items-center gap-1.5 ml-auto shrink-0 cursor-pointer"
             onClick={fetchSalesBills}
             disabled={loading}
           >
-            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
         </div>
       </div>
@@ -833,170 +833,266 @@ export default function SalesPrint({ path: windowPath }) {
                                   <td className="px-1.5 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
                                   <td className="px-1.5 py-0.5 text-right font-semibold tabular-nums text-primary-800">{formatCurrency(st.opening || 0)}</td>
                                 </tr>
-                                {(st.sales || []).map((s, idx) => {
-                                  const rIdx = globalRowIdx++;
-                                  const rowKey = `${st.customerId}_${s.saleId || idx}_${idx}`;
-                                  const baseAmount = Number(s.amount) || 0;
-                                  const coolyAmt = Number(s.cooly) || Number(s.handlingCharges) || 0;
-                                  const lineTotal = baseAmount + coolyAmt;
+                                {(() => {
+                                  const rawEntries = (st.entries && st.entries.length)
+                                    ? st.entries
+                                    : [
+                                        ...(st.sales || []).map((s) => ({ ...s, isPayment: false })),
+                                        ...(st.payments || []).map((p) => ({
+                                          ...p,
+                                          isPayment: true,
+                                          material: p.description || 'Paid',
+                                        })),
+                                      ].sort(
+                                        (a, b) =>
+                                          new Date(a.date || a.createdAt || 0).getTime() -
+                                          new Date(b.date || b.createdAt || 0).getTime()
+                                      );
 
-                                  const selectedMatId =
-                                    materials.find(
-                                      (m) =>
-                                        String(m._id) === String(s.materialId || '') ||
-                                        m.name.toLowerCase() === String(s.material || '').trim().toLowerCase()
-                                    )?._id || s.materialId || '';
-
-                                  return (
-                                    <tr
-                                      key={rowKey}
-                                      className={
-                                        idx % 2 === 0
-                                          ? 'bg-surface hover:bg-primary-50/40'
-                                          : 'bg-primary-50/20 hover:bg-primary-50/50'
-                                      }
-                                    >
-                                      <td className="px-1.5 py-0.5 text-primary-600 text-center whitespace-nowrap tabular-nums text-[10.5px]">
-                                        {formatShortDate(s.date)}
-                                      </td>
-                                      <td className="px-1 py-0.5 min-w-[5.5rem]">
-                                        <select
-                                          key={`${s.saleId}-mat-${s.materialId || s.material}`}
-                                          data-print-row={rIdx}
-                                          data-print-col={0}
-                                          onKeyDown={(e) => handleGridKeyDown(e, rIdx, 0)}
-                                          className={`${cellStyle} font-semibold text-primary-800 cursor-pointer text-[11px] py-0.5`}
-                                          defaultValue={selectedMatId}
-                                          onChange={(e) => {
-                                            const newMatId = e.target.value;
-                                            if (!newMatId) return;
-                                            const mat = materials.find((m) => String(m._id) === newMatId);
-                                            const newRate =
-                                              mat?.sellingPricePerKg != null && mat.sellingPricePerKg > 0
-                                                ? mat.sellingPricePerKg
-                                                : s.ratePerKg;
-                                            persistSaleLine(st, s, { materialId: newMatId, ratePerKg: newRate });
-                                          }}
-                                        >
-                                          {!materials.some((m) => String(m._id) === String(selectedMatId)) && s.material && (
-                                            <option value="">{s.material}</option>
-                                          )}
-                                          {materials.map((m) => (
-                                            <option key={m._id} value={m._id}>
-                                              {m.name}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </td>
-                                      <td className="px-1 py-0.5 text-right w-10">
-                                        <input
-                                          key={`${s.saleId}-bags-${s.bags}`}
-                                          data-print-row={rIdx}
-                                          data-print-col={1}
-                                          type="text"
-                                          inputMode="numeric"
-                                          autoComplete="off"
-                                          defaultValue={s.bags || 1}
-                                          className={`${cellStyle} text-right font-semibold tabular-nums text-primary-800 text-[11px] py-0.5`}
-                                          onBlur={(e) => {
-                                            const newBags = Math.max(1, Math.floor(Number(e.target.value)) || 1);
-                                            if (newBags === Number(s.bags)) return;
-                                            persistSaleLine(st, s, { bags: newBags });
-                                          }}
-                                          onKeyDown={(e) => {
-                                            handleGridKeyDown(e, rIdx, 1);
-                                            if (e.key === 'Enter') {
-                                              e.preventDefault();
-                                              e.currentTarget.blur();
-                                            }
-                                          }}
-                                        />
-                                      </td>
-                                      <td className="px-1 py-0.5 text-right w-14">
-                                        {s.saleType === 'by_bag' ? (
-                                          <span
-                                            tabIndex={0}
-                                            data-print-row={rIdx}
-                                            data-print-col={2}
-                                            onKeyDown={(e) => handleGridKeyDown(e, rIdx, 2)}
-                                            className="text-primary-400 font-medium py-0.5 px-1 block text-center outline-none cursor-default text-[10px]"
-                                          >
-                                            —
-                                          </span>
-                                        ) : (
-                                          <input
-                                            key={`${s.saleId}-weight-${s.weight}`}
-                                            data-print-row={rIdx}
-                                            data-print-col={2}
-                                            type="text"
-                                            inputMode="decimal"
-                                            autoComplete="off"
-                                            defaultValue={s.weight != null ? s.weight : ''}
-                                            className={`${cellStyle} text-right font-medium tabular-nums text-primary-700 text-[11px] py-0.5`}
-                                            onBlur={(e) => {
-                                              const newWeight = Number(e.target.value) || 0;
-                                              if (newWeight === Number(s.weight)) return;
-                                              persistSaleLine(st, s, { weight: newWeight });
-                                            }}
-                                            onKeyDown={(e) => {
-                                              handleGridKeyDown(e, rIdx, 2);
-                                              if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                e.currentTarget.blur();
-                                              }
-                                            }}
-                                          />
-                                        )}
-                                      </td>
-                                      <td className="px-1 py-0.5 text-right w-14">
-                                        <div className="flex items-center justify-end gap-0.5">
-                                          <input
-                                            key={`${s.saleId}-rate-${s.ratePerKg}`}
-                                            data-print-row={rIdx}
-                                            data-print-col={3}
-                                            type="text"
-                                            inputMode="decimal"
-                                            autoComplete="off"
-                                            defaultValue={s.ratePerKg != null ? s.ratePerKg : ''}
-                                            className={`${cellStyle} text-right font-medium tabular-nums text-primary-700 text-[11px] py-0.5`}
-                                            onBlur={(e) => {
-                                              const newRate = Number(e.target.value) || 0;
-                                              if (newRate === Number(s.ratePerKg)) return;
-                                              persistSaleLine(st, s, { ratePerKg: newRate });
-                                            }}
-                                            onKeyDown={(e) => {
-                                              handleGridKeyDown(e, rIdx, 3);
-                                              if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                e.currentTarget.blur();
-                                              }
-                                            }}
-                                          />
-                                          {s.saleType === 'by_bag' && (
-                                            <span className="text-[8px] font-bold px-1 rounded bg-amber-100 text-amber-800 leading-tight whitespace-nowrap">
-                                              bag
-                                            </span>
-                                          )}
-                                        </div>
-                                      </td>
-                                      <td className="px-1.5 py-0.5 text-right font-bold text-primary-900 whitespace-nowrap tabular-nums text-[11px]">
-                                        {formatCurrency(lineTotal)}
-                                        {coolyAmt > 0 ? (
-                                          <span className="text-[9px] text-emerald-700 block font-normal leading-tight">
-                                            (incl. ₹{coolyAmt} cooly)
-                                          </span>
-                                        ) : null}
-                                      </td>
-                                    </tr>
+                                  const validEntries = rawEntries.filter(
+                                    (entry) => String(entry.material || '').toLowerCase() !== 'cooly' && !entry.isCoolyLine
                                   );
-                                })}
-                                {(st.payments || []).map((p, pIdx) => (
-                                  <tr key={`payment-${pIdx}`} className="text-emerald-800 bg-emerald-50/40 text-[11px]">
-                                    <td className="px-1.5 py-0.5 text-center whitespace-nowrap text-[10.5px]">{formatShortDate(p.date)}</td>
-                                    <td className="px-1.5 py-0.5 font-semibold" colSpan={4}>Paid</td>
-                                    <td className="px-1.5 py-0.5 text-right font-bold tabular-nums text-[11px]">- {formatCurrency(p.amount)}</td>
-                                  </tr>
-                                ))}
+
+                                  const renderedRows = [];
+                                  let runningBalance = Number(st.opening || 0);
+
+                                  for (let i = 0; i < validEntries.length; i++) {
+                                    const entry = validEntries[i];
+
+                                    if (entry.isPayment || entry.type === 'payment') {
+                                      const payGroup = [entry];
+                                      while (
+                                        i + 1 < validEntries.length &&
+                                        (validEntries[i + 1].isPayment || validEntries[i + 1].type === 'payment')
+                                      ) {
+                                        i++;
+                                        payGroup.push(validEntries[i]);
+                                      }
+
+                                      // 1. Intermediate Subtotal before payment group
+                                      renderedRows.push(
+                                        <tr
+                                          key={`subtotal-${i}`}
+                                          className="bg-primary-100/70 font-semibold text-[10.5px] border-t border-primary-200"
+                                        >
+                                          <td className="px-1.5 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
+                                          <td className="px-1.5 py-0.5 font-bold text-primary-800" colSpan={4}>
+                                            మొత్తం (Subtotal)
+                                          </td>
+                                          <td className="px-1.5 py-0.5 text-right font-bold tabular-nums text-primary-900">
+                                            {formatCurrency(runningBalance)}
+                                          </td>
+                                        </tr>
+                                      );
+
+                                      // 2. Payment rows
+                                      payGroup.forEach((p, pIdx) => {
+                                        const pAmt = Number(p.amount) || 0;
+                                        runningBalance -= pAmt;
+                                        renderedRows.push(
+                                          <tr
+                                            key={`pay-${i}-${pIdx}`}
+                                            className="text-emerald-800 bg-emerald-50/60 text-[11px] font-medium"
+                                          >
+                                            <td className="px-1.5 py-0.5 text-center whitespace-nowrap tabular-nums text-[10.5px]">
+                                              {formatShortDate(p.date)}
+                                            </td>
+                                            <td className="px-1.5 py-0.5 font-semibold text-emerald-800" colSpan={4}>
+                                              <div className="flex items-center gap-1">
+                                                <span>Paid</span>
+                                                <span className="text-[9.5px] text-emerald-600 font-normal">(చెల్లింపు)</span>
+                                              </div>
+                                            </td>
+                                            <td className="px-1.5 py-0.5 text-right font-bold text-emerald-800 whitespace-nowrap tabular-nums text-[11px]">
+                                              - {formatCurrency(pAmt)}
+                                            </td>
+                                          </tr>
+                                        );
+                                      });
+
+                                      // 3. Intermediate Balance Tally row
+                                      renderedRows.push(
+                                        <tr
+                                          key={`tally-${i}`}
+                                          className="bg-amber-50/80 font-bold text-[11px] text-primary-900 border-t border-b border-dashed border-amber-300"
+                                        >
+                                          <td className="px-1.5 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
+                                          <td className="px-1.5 py-0.5 font-bold text-primary-900" colSpan={4}>
+                                            <div className="flex items-center gap-1">
+                                              <span>బాకీ</span>
+                                              <span className="text-[9.5px] text-primary-600 font-normal">(Balance)</span>
+                                            </div>
+                                          </td>
+                                          <td className="px-1.5 py-0.5 text-right font-bold tabular-nums text-primary-900">
+                                            {formatCurrency(runningBalance)}
+                                          </td>
+                                        </tr>
+                                      );
+
+                                      continue;
+                                    }
+
+                                    const s = entry;
+                                    const rIdx = globalRowIdx++;
+                                    const rowKey = `${st.customerId}_${s.saleId || i}_${i}`;
+                                    const baseAmount = Number(s.amount) || 0;
+                                    const coolyAmt = Number(s.cooly) || Number(s.handlingCharges) || 0;
+                                    const lineTotal = baseAmount + coolyAmt;
+                                    runningBalance += lineTotal;
+
+                                    const selectedMatId =
+                                      materials.find(
+                                        (m) =>
+                                          String(m._id) === String(s.materialId || '') ||
+                                          m.name.toLowerCase() === String(s.material || '').trim().toLowerCase()
+                                      )?._id || s.materialId || '';
+
+                                    renderedRows.push(
+                                      <tr
+                                        key={rowKey}
+                                        className={
+                                          renderedRows.length % 2 === 0
+                                            ? 'bg-surface hover:bg-primary-50/40'
+                                            : 'bg-primary-50/20 hover:bg-primary-50/50'
+                                        }
+                                      >
+                                        <td className="px-1.5 py-0.5 text-primary-600 text-center whitespace-nowrap tabular-nums text-[10.5px]">
+                                          {formatShortDate(s.date)}
+                                        </td>
+                                        <td className="px-1 py-0.5 min-w-[5.5rem]">
+                                          <select
+                                            key={`${s.saleId}-mat-${s.materialId || s.material}`}
+                                            data-print-row={rIdx}
+                                            data-print-col={0}
+                                            onKeyDown={(e) => handleGridKeyDown(e, rIdx, 0)}
+                                            className={`${cellStyle} font-semibold text-primary-800 cursor-pointer text-[11px] py-0.5`}
+                                            defaultValue={selectedMatId}
+                                            onChange={(e) => {
+                                              const newMatId = e.target.value;
+                                              if (!newMatId) return;
+                                              const mat = materials.find((m) => String(m._id) === newMatId);
+                                              const newRate =
+                                                mat?.sellingPricePerKg != null && mat.sellingPricePerKg > 0
+                                                  ? mat.sellingPricePerKg
+                                                  : s.ratePerKg;
+                                              persistSaleLine(st, s, { materialId: newMatId, ratePerKg: newRate });
+                                            }}
+                                          >
+                                            {!materials.some((m) => String(m._id) === String(selectedMatId)) && s.material && (
+                                              <option value="">{s.material}</option>
+                                            )}
+                                            {materials.map((m) => (
+                                              <option key={m._id} value={m._id}>
+                                                {m.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </td>
+                                        <td className="px-1 py-0.5 text-right w-10">
+                                          <input
+                                            key={`${s.saleId}-bags-${s.bags}`}
+                                            data-print-row={rIdx}
+                                            data-print-col={1}
+                                            type="text"
+                                            inputMode="numeric"
+                                            autoComplete="off"
+                                            defaultValue={s.bags || 1}
+                                            className={`${cellStyle} text-right font-semibold tabular-nums text-primary-800 text-[11px] py-0.5`}
+                                            onBlur={(e) => {
+                                              const newBags = Math.max(1, Math.floor(Number(e.target.value)) || 1);
+                                              if (newBags === Number(s.bags)) return;
+                                              persistSaleLine(st, s, { bags: newBags });
+                                            }}
+                                            onKeyDown={(e) => {
+                                              handleGridKeyDown(e, rIdx, 1);
+                                              if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                e.currentTarget.blur();
+                                              }
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="px-1 py-0.5 text-right w-14">
+                                          {s.saleType === 'by_bag' ? (
+                                            <span
+                                              tabIndex={0}
+                                              data-print-row={rIdx}
+                                              data-print-col={2}
+                                              onKeyDown={(e) => handleGridKeyDown(e, rIdx, 2)}
+                                              className="text-primary-400 font-medium py-0.5 px-1 block text-center outline-none cursor-default text-[10px]"
+                                            >
+                                              —
+                                            </span>
+                                          ) : (
+                                            <input
+                                              key={`${s.saleId}-weight-${s.weight}`}
+                                              data-print-row={rIdx}
+                                              data-print-col={2}
+                                              type="text"
+                                              inputMode="decimal"
+                                              autoComplete="off"
+                                              defaultValue={s.weight != null ? s.weight : ''}
+                                              className={`${cellStyle} text-right font-medium tabular-nums text-primary-700 text-[11px] py-0.5`}
+                                              onBlur={(e) => {
+                                                const newWeight = Number(e.target.value) || 0;
+                                                if (newWeight === Number(s.weight)) return;
+                                                persistSaleLine(st, s, { weight: newWeight });
+                                              }}
+                                              onKeyDown={(e) => {
+                                                handleGridKeyDown(e, rIdx, 2);
+                                                if (e.key === 'Enter') {
+                                                  e.preventDefault();
+                                                  e.currentTarget.blur();
+                                                }
+                                              }}
+                                            />
+                                          )}
+                                        </td>
+                                        <td className="px-1 py-0.5 text-right w-14">
+                                          <div className="flex items-center justify-end gap-0.5">
+                                            <input
+                                              key={`${s.saleId}-rate-${s.ratePerKg}`}
+                                              data-print-row={rIdx}
+                                              data-print-col={3}
+                                              type="text"
+                                              inputMode="decimal"
+                                              autoComplete="off"
+                                              defaultValue={s.ratePerKg != null ? s.ratePerKg : ''}
+                                              className={`${cellStyle} text-right font-medium tabular-nums text-primary-700 text-[11px] py-0.5`}
+                                              onBlur={(e) => {
+                                                const newRate = Number(e.target.value) || 0;
+                                                if (newRate === Number(s.ratePerKg)) return;
+                                                persistSaleLine(st, s, { ratePerKg: newRate });
+                                              }}
+                                              onKeyDown={(e) => {
+                                                handleGridKeyDown(e, rIdx, 3);
+                                                if (e.key === 'Enter') {
+                                                  e.preventDefault();
+                                                  e.currentTarget.blur();
+                                                }
+                                              }}
+                                            />
+                                            {s.saleType === 'by_bag' && (
+                                              <span className="text-[8px] font-bold px-1 rounded bg-amber-100 text-amber-800 leading-tight whitespace-nowrap">
+                                                bag
+                                              </span>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="px-1.5 py-0.5 text-right font-bold text-primary-900 whitespace-nowrap tabular-nums text-[11px]">
+                                          {formatCurrency(lineTotal)}
+                                          {coolyAmt > 0 ? (
+                                            <span className="text-[9px] text-emerald-700 block font-normal leading-tight">
+                                              (incl. ₹{coolyAmt} cooly)
+                                            </span>
+                                          ) : null}
+                                        </td>
+                                      </tr>
+                                    );
+                                  }
+
+                                  return renderedRows;
+                                })()}
                               </tbody>
                               <tfoot className="border-t-2 border-primary-300 bg-accent-200">
                                 <tr className="bg-accent-200 text-accent-900 font-bold whitespace-nowrap text-[11px]">

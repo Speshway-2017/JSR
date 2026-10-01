@@ -192,67 +192,67 @@ export default function LessChecklist() {
   const hasRows = !loading && !dateError && filteredEntries.length > 0;
 
   return (
-    <div className="space-y-2.5 max-w-4xl">
+    <div className="space-y-3 max-w-4xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-sm font-bold text-primary-800">Less Checklist</h1>
-          <p className="text-primary-400 text-[11px] mt-0.5">
+          <h1 className="page-title text-2xl font-bold text-primary-700">Less Checklist</h1>
+          <p className="text-xs text-primary-500 mt-1">
             Filter discount & less entries by party, date range or side
           </p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handlePrint}
             disabled={!filteredEntries.length}
-            className="btn-primary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
+            className="btn-primary !py-1.5 !px-3 !text-sm font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
           >
-            <Printer className="w-3 h-3" /> Print
+            <Printer className="w-4 h-4" /> Print
           </button>
           <button
             type="button"
             onClick={exportExcel}
             disabled={!filteredEntries.length}
-            className="btn-secondary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
+            className="btn-secondary !py-1.5 !px-3 !text-sm font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
           >
-            <Download className="w-3 h-3 text-primary-600" /> Export Excel
+            <Download className="w-4 h-4 text-primary-600" /> Export Excel
           </button>
         </div>
       </div>
 
       {/* Filter Card */}
-      <div className="card !p-2.5 space-y-2">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="card !p-3.5 space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               From *
             </label>
             <input
               type="date"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               To *
             </label>
             <input
               type="date"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={endDate}
               min={startDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Party
             </label>
             <select
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition truncate"
               value={partyId}
               onChange={(e) => setPartyId(e.target.value)}
               title="Name wise"
@@ -266,11 +266,11 @@ export default function LessChecklist() {
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Side
             </label>
             <select
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition truncate"
               value={cashSideFilter}
               onChange={(e) => setCashSideFilter(e.target.value)}
               title="Side wise"
@@ -288,14 +288,14 @@ export default function LessChecklist() {
 
       {/* Summary KPI Strip */}
       {hasRows && (
-        <div className="grid grid-cols-2 gap-2">
-          <div className="card !py-2 !px-3 flex items-center justify-between border border-primary-200">
-            <span className="text-[11px] font-medium text-primary-500">Total Entries</span>
-            <span className="font-bold text-primary-800 text-xs tabular-nums">{summary.count}</span>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="card !py-2.5 !px-3.5 flex items-center justify-between border border-primary-200">
+            <span className="text-xs font-semibold text-primary-600">Total Entries</span>
+            <span className="font-bold text-primary-800 text-sm tabular-nums">{summary.count}</span>
           </div>
-          <div className="card !py-2 !px-3 flex items-center justify-between border border-primary-200">
-            <span className="text-[11px] font-medium text-primary-500">Total Less Amount</span>
-            <span className="font-bold text-amber-700 text-xs tabular-nums">
+          <div className="card !py-2.5 !px-3.5 flex items-center justify-between border border-primary-200">
+            <span className="text-xs font-semibold text-primary-600">Total Less Amount</span>
+            <span className="font-bold text-amber-700 text-base tabular-nums">
               {formatCurrency(summary.totalLess)}
             </span>
           </div>
@@ -305,42 +305,42 @@ export default function LessChecklist() {
       {/* Main Table */}
       <div className="card !p-0 overflow-hidden border border-primary-200">
         {loading ? (
-          <div className="text-center py-12 text-primary-400 text-xs">Loading less entries...</div>
+          <div className="text-center py-12 text-primary-400 text-sm">Loading less entries...</div>
         ) : dateError ? (
-          <div className="text-center py-12 text-red-500 text-xs">Fix the date range</div>
+          <div className="text-center py-12 text-red-500 text-sm">Fix the date range</div>
         ) : !filteredEntries.length ? (
           <div className="text-center py-12">
             <FileBarChart className="w-8 h-8 text-primary-300 mx-auto mb-1.5" />
-            <p className="text-primary-400 text-xs">No less entries for this filter</p>
+            <p className="text-primary-400 text-sm">No less entries for this filter</p>
           </div>
         ) : (
           <>
             {/* Mobile Cards */}
-            <div className="md:hidden divide-y divide-primary-100 text-xs">
+            <div className="md:hidden divide-y divide-primary-100 text-sm">
               {filteredEntries.map((row) => (
-                <div key={row.id} className="px-3 py-2.5 hover:bg-primary-50/40 transition">
+                <div key={row.id} className="px-3.5 py-3 hover:bg-primary-50/40 transition">
                   <div className="flex justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-primary-800 text-xs">
+                      <p className="font-semibold text-primary-800 text-sm">
                         {row.partyName}
                         {row.partyNameTelugu && (
-                          <span className="text-[10.5px] text-primary-400 font-normal ml-1">
+                          <span className="text-xs text-primary-400 font-normal ml-1">
                             ({row.partyNameTelugu})
                           </span>
                         )}
                       </p>
-                      <p className="text-[10.5px] text-primary-400 mt-0.5">{formatDate(row.date)}</p>
-                      <p className="text-[11px] text-primary-500 mt-1">
+                      <p className="text-xs text-primary-400 mt-0.5">{formatDate(row.date)}</p>
+                      <p className="text-xs text-primary-500 mt-1">
                         {row.partyType} · {row.cashSide === 'credit' ? 'Credit' : 'Debit'}
                       </p>
                     </div>
-                    <p className="font-bold text-amber-700 text-xs shrink-0 tabular-nums">
+                    <p className="font-bold text-amber-700 text-sm shrink-0 tabular-nums">
                       {formatCurrency(row.lessAmount)}
                     </p>
                   </div>
                 </div>
               ))}
-              <div className="px-3 py-2 bg-accent-50 border-t border-primary-200 flex justify-between text-xs font-semibold text-primary-800">
+              <div className="px-3.5 py-2.5 bg-accent-50 border-t border-primary-200 flex justify-between text-sm font-semibold text-primary-800">
                 <span>Total</span>
                 <span className="font-bold tabular-nums text-amber-700">
                   {formatCurrency(summary.totalLess)}
@@ -353,16 +353,16 @@ export default function LessChecklist() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-primary-50/80 text-left border-b border-primary-200">
-                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide whitespace-nowrap">
+                    <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide whitespace-nowrap">
                       Date & Time
                     </th>
-                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                    <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide">
                       Name
                     </th>
-                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-36">
+                    <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide w-40">
                       Type / Side
                     </th>
-                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-28">
+                    <th className="px-3 py-2 text-xs font-semibold text-primary-700 uppercase tracking-wide text-right w-36">
                       Less Amount
                     </th>
                   </tr>
@@ -370,18 +370,18 @@ export default function LessChecklist() {
                 <tbody>
                   {filteredEntries.map((row) => (
                     <tr key={row.id} className="border-b border-primary-100 hover:bg-primary-50/40 transition">
-                      <td className="px-3 py-2 text-primary-600 whitespace-nowrap text-xs">
+                      <td className="px-3 py-2 text-primary-600 whitespace-nowrap text-xs font-medium">
                         {formatDate(row.date)}
                       </td>
                       <td className="px-3 py-2 font-semibold text-primary-800 text-xs">
                         {row.partyName}
                         {row.partyNameTelugu && (
-                          <span className="text-[10px] text-primary-400 font-normal ml-1">
+                          <span className="text-xs text-primary-400 font-normal ml-1">
                             ({row.partyNameTelugu})
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-primary-600 text-xs">
+                      <td className="px-3 py-2 text-primary-600 text-xs font-medium">
                         {row.partyType} · {row.cashSide === 'credit' ? 'Credit' : 'Debit'}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-amber-700 font-bold text-xs">
@@ -391,11 +391,11 @@ export default function LessChecklist() {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-accent-50 border-t border-primary-200 font-semibold text-xs">
-                    <td colSpan={3} className="px-3 py-2 text-primary-800 font-bold">
+                  <tr className="bg-accent-50 border-t border-primary-200 font-semibold text-sm">
+                    <td colSpan={3} className="px-3 py-2.5 text-primary-800 font-bold">
                       Total ({summary.count} records)
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums font-bold text-amber-700">
+                    <td className="px-3 py-2.5 text-right tabular-nums font-bold text-amber-700 text-sm">
                       {formatCurrency(summary.totalLess)}
                     </td>
                   </tr>

@@ -81,7 +81,7 @@ export default function CashEntry() {
     if (!nameQuery.trim()) return [];
 
     const custHits = customers
-      .filter((c) => matchesSearchFields(c, ['name', 'nameTelugu', 'mobile'], nameQuery))
+      .filter((c) => matchesSearchFields(c, ['name', 'nameTelugu'], nameQuery))
       .map((c) => ({
         id: c._id,
         kind: 'customer',
@@ -92,7 +92,7 @@ export default function CashEntry() {
       }));
 
     const vendorHits = vendors
-      .filter((v) => matchesSearchFields(v, ['name', 'nameTelugu', 'city', 'mobile'], nameQuery))
+      .filter((v) => matchesSearchFields(v, ['name', 'nameTelugu'], nameQuery))
       .map((v) => ({
         id: v._id,
         kind: 'vendor',
@@ -518,36 +518,36 @@ export default function CashEntry() {
   }, [entries]);
 
   return (
-    <div className="space-y-3 max-w-4xl">
+    <div className="space-y-3 max-w-5xl">
       <div>
-        <h1 className="text-sm font-bold text-primary-800">Cash Entry</h1>
-        <p className="text-primary-400 text-[11px] mt-0.5">
+        <h1 className="page-title text-2xl font-bold text-primary-700">Cash Entry</h1>
+        <p className="text-xs text-primary-500 mt-1">
           Customer receipts (Credit) or vendor payments (Debit) — type can still be changed manually
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="card !p-3 space-y-2.5">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+      <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="card !p-3.5 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Date *
             </label>
             <input
               ref={dateRef}
               type="date"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={entryDate}
               onChange={(e) => setEntryDate(e.target.value)}
               required
             />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Type *
             </label>
             <select
               ref={typeRef}
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={cashSide}
               onChange={(e) => setCashSide(e.target.value)}
             >
@@ -556,11 +556,11 @@ export default function CashEntry() {
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Type of Payment *
             </label>
             <select
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={paymentType}
               onChange={(e) => setPaymentType(e.target.value)}
             >
@@ -575,12 +575,12 @@ export default function CashEntry() {
         </div>
 
         <div className="relative">
-          <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+          <label className="text-xs font-semibold text-primary-600 mb-1 block">
             Name *
           </label>
           <input
             ref={nameRef}
-            className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+            className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
             value={nameQuery}
             placeholder="Type customer or vendor name…"
             autoComplete="off"
@@ -600,14 +600,14 @@ export default function CashEntry() {
           {suggestOpen && suggestions.length > 0 && (
             <ul
               ref={listRef}
-              className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-primary-200 bg-surface shadow-card"
+              className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl border border-primary-200 bg-surface shadow-card"
             >
               {suggestions.map((item, idx) => (
                 <li key={`${item.kind}-${item.id}`}>
                   <button
                     type="button"
                     data-idx={idx}
-                    className={`w-full text-left px-3 py-1.5 text-xs ${
+                    className={`w-full text-left px-3 py-2 text-sm ${
                       idx === highlight
                         ? 'bg-primary-100 text-primary-900 font-medium'
                         : 'text-primary-700 hover:bg-primary-50'
@@ -618,16 +618,16 @@ export default function CashEntry() {
                   >
                     <span className="font-semibold">{item.name}</span>
                     <span
-                      className={`ml-2 text-[10px] font-semibold uppercase tracking-wide ${
+                      className={`ml-2 text-xs font-semibold uppercase tracking-wide ${
                         item.kind === 'vendor' ? 'text-accent-600' : 'text-primary-500'
                       }`}
                     >
                       {item.label}
                     </span>
                     {item.nameTelugu ? (
-                      <span className="text-primary-400 ml-2 text-[11px]">{item.nameTelugu}</span>
+                      <span className="text-primary-400 ml-2 text-xs">{item.nameTelugu}</span>
                     ) : null}
-                    <span className="block text-[11px] text-primary-400 mt-0.5">
+                    <span className="block text-xs text-primary-400 mt-0.5">
                       Balance {formatCurrency(item.creditBalance || 0)}
                     </span>
                   </button>
@@ -638,10 +638,10 @@ export default function CashEntry() {
         </div>
 
         {selectedParty && (
-          <div className="rounded-lg bg-primary-50/90 border border-primary-100 px-3 py-1.5 text-xs text-primary-700 flex flex-wrap items-center justify-between gap-2">
+          <div className="rounded-xl bg-primary-50/90 border border-primary-100 px-3 py-2 text-sm text-primary-700 flex flex-wrap items-center justify-between gap-2">
             <span>
               Selected:{' '}
-              <strong className="text-primary-900">
+              <strong className="text-primary-900 font-bold">
                 {selectedParty.name}
               </strong>
               <span className="text-primary-400">
@@ -649,12 +649,12 @@ export default function CashEntry() {
                 ({partyType === 'vendor' ? 'Vendor' : 'Customer'})
               </span>
               {' · '}
-              Balance <strong className="text-primary-900">{formatCurrency(selectedParty.creditBalance || 0)}</strong>
+              Balance <strong className="text-primary-900 font-bold">{formatCurrency(selectedParty.creditBalance || 0)}</strong>
             </span>
             {lessEnabled && remainingAfterAmount > 0 && (
               <button
                 type="button"
-                className="text-[11px] font-semibold text-primary-600 hover:text-primary-800 underline underline-offset-2"
+                className="text-xs font-semibold text-primary-600 hover:text-primary-800 underline underline-offset-2"
                 onClick={fillLessWithRemaining}
               >
                 Fill Less with remaining ({formatCurrency(remainingAfterAmount)})
@@ -663,14 +663,14 @@ export default function CashEntry() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Amount *
             </label>
             <input
               ref={amountRef}
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs font-semibold text-primary-800 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-bold text-primary-800 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition"
               type="text"
               inputMode="decimal"
               autoComplete="off"
@@ -680,12 +680,12 @@ export default function CashEntry() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Less
             </label>
             <input
               ref={lessRef}
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs font-semibold text-red-600 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition disabled:opacity-50"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-bold text-red-600 text-right focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 tabular-nums transition disabled:opacity-50"
               type="text"
               inputMode="decimal"
               autoComplete="off"
@@ -694,32 +694,32 @@ export default function CashEntry() {
               onChange={(e) => setLess(e.target.value.replace(/[^\d.]/g, ''))}
               disabled={!lessEnabled}
             />
-            <p className="text-[10px] text-primary-400 mt-0.5">
+            <p className="text-xs text-primary-400 mt-0.5">
               Optional. Remaining balance also marked as paid (added with amount).
             </p>
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Reason / Remarks
             </label>
             <input
               ref={reasonRef}
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-800 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm text-primary-800 placeholder:text-primary-300 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               type="text"
               autoComplete="off"
               placeholder="e.g. Advance, Old balance..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
-            <p className="text-[10px] text-primary-400 mt-0.5">
+            <p className="text-xs text-primary-400 mt-0.5">
               Optional. Reason / description for entry.
             </p>
           </div>
         </div>
 
         {lessEnabled && (Number(amount) > 0 || Number(less) > 0) && (
-          <div className="inline-flex items-center gap-1.5 rounded-md bg-accent-100/80 text-accent-800 px-2.5 py-1 text-xs font-medium">
-            <Banknote className="w-3.5 h-3.5 shrink-0" />
+          <div className="inline-flex items-center gap-1.5 rounded-lg bg-accent-100/90 text-accent-800 px-3 py-1.5 text-sm font-semibold">
+            <Banknote className="w-4 h-4 shrink-0" />
             Total paid:{' '}
             <strong className="font-bold">
               {formatCurrency((Number(amount) || 0) + (Number(less) || 0))}
@@ -731,7 +731,7 @@ export default function CashEntry() {
           <button
             ref={saveRef}
             type="submit"
-            className="btn-primary !py-1.5 !px-6 !text-xs font-semibold shadow-xs"
+            className="btn-primary !py-2 !px-6 !text-sm font-semibold shadow-xs"
             disabled={saving}
           >
             {saving ? 'Saving…' : 'Save'}
@@ -740,16 +740,16 @@ export default function CashEntry() {
       </form>
 
       <div className="card !p-0 overflow-hidden border border-primary-200">
-        <div className="px-3 py-2 border-b border-primary-200 bg-surface flex items-center justify-between">
-          <span className="font-semibold text-xs text-primary-800">
+        <div className="px-3.5 py-2.5 border-b border-primary-200 bg-surface flex items-center justify-between">
+          <span className="font-bold text-sm text-primary-800">
             Entries for {formatDate(entryDate)}
           </span>
-          <span className="text-[11px] text-primary-400 font-medium">
+          <span className="text-xs text-primary-400 font-medium">
             {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
           </span>
         </div>
         {entries.length === 0 ? (
-          <p className="text-center py-8 text-primary-400 text-xs">No cash entries for this date</p>
+          <p className="text-center py-8 text-primary-400 text-sm">No cash entries for this date</p>
         ) : (
           <>
             <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
@@ -788,7 +788,7 @@ export default function CashEntry() {
 
                     return (
                       <tr key={tx._id} className="hover:bg-primary-50/40">
-                        <td className="px-1.5 py-1 min-w-[10rem]">
+                        <td className="px-2 py-1 min-w-[10rem]">
                           <select
                             data-table-row={i}
                             data-table-col={0}
@@ -876,7 +876,7 @@ export default function CashEntry() {
                           </select>
                         </td>
 
-                        <td className="px-1.5 py-1 min-w-[7.5rem]">
+                        <td className="px-2 py-1 min-w-[7.5rem]">
                           <select
                             data-table-row={i}
                             data-table-col={1}
@@ -933,7 +933,7 @@ export default function CashEntry() {
                           </select>
                         </td>
 
-                        <td className="px-1.5 py-1 min-w-[8rem]">
+                        <td className="px-2 py-1 min-w-[8rem]">
                           <input
                             data-table-row={i}
                             data-table-col={2}
@@ -992,7 +992,7 @@ export default function CashEntry() {
                           />
                         </td>
 
-                        <td className="px-1.5 py-1 w-28">
+                        <td className="px-2 py-1 w-28">
                           <input
                             data-table-row={i}
                             data-table-col={3}
@@ -1002,7 +1002,7 @@ export default function CashEntry() {
                             disabled={busy}
                             defaultValue={cur.credit || ''}
                             key={`${tx._id}-credit-${cur.credit}`}
-                            className="grid-input text-right tabular-nums text-primary-800 text-xs font-medium"
+                            className="grid-input text-right tabular-nums text-primary-800 text-xs font-semibold"
                             onFocus={(e) => {
                               cancelEditRef.current = false;
                               originalCellRef.current = { row: i, col: 3, val: cur.credit || '' };
@@ -1051,7 +1051,7 @@ export default function CashEntry() {
                           />
                         </td>
 
-                        <td className="px-1.5 py-1 w-28">
+                        <td className="px-2 py-1 w-28">
                           <input
                             data-table-row={i}
                             data-table-col={4}
@@ -1061,7 +1061,7 @@ export default function CashEntry() {
                             disabled={busy}
                             defaultValue={cur.debit || ''}
                             key={`${tx._id}-debit-${cur.debit}`}
-                            className="grid-input text-right tabular-nums text-primary-800 text-xs font-medium"
+                            className="grid-input text-right tabular-nums text-primary-800 text-xs font-semibold"
                             onFocus={(e) => {
                               cancelEditRef.current = false;
                               originalCellRef.current = { row: i, col: 4, val: cur.debit || '' };
@@ -1110,7 +1110,7 @@ export default function CashEntry() {
                           />
                         </td>
 
-                        <td className="px-1.5 py-1 w-28">
+                        <td className="px-2 py-1 w-28">
                           {lessAllowed ? (
                             <input
                               data-table-row={i}
@@ -1121,7 +1121,7 @@ export default function CashEntry() {
                               disabled={busy}
                               defaultValue={cur.lessAmt || ''}
                               key={`${tx._id}-less-${cur.lessAmt}`}
-                              className="grid-input text-right tabular-nums text-red-600 font-semibold text-xs"
+                              className="grid-input text-right tabular-nums text-red-600 font-bold text-xs"
                               onFocus={(e) => {
                                 cancelEditRef.current = false;
                                 originalCellRef.current = { row: i, col: 5, val: cur.lessAmt || '' };
@@ -1207,26 +1207,26 @@ export default function CashEntry() {
                     );
                   })}
                 </tbody>
-                <tfoot className="sticky bottom-0 z-20 bg-accent-200 text-accent-900 font-semibold text-xs">
+                <tfoot className="sticky bottom-0 z-20 bg-accent-200 text-accent-900 font-bold text-xs">
                   <tr className="bg-accent-200 text-accent-900">
-                    <td colSpan={3} className="px-2 py-1.5 text-right font-bold uppercase text-[10px] tracking-wider">
+                    <td colSpan={3} className="px-2 py-2 text-right font-bold uppercase text-xs tracking-wider">
                       Total
                     </td>
-                    <td className="px-2 py-1.5 text-right tabular-nums font-bold">
+                    <td className="px-2 py-2 text-right tabular-nums font-bold text-xs">
                       {formatCurrency(totals.credit)}
                     </td>
-                    <td className="px-2 py-1.5 text-right tabular-nums font-bold">
+                    <td className="px-2 py-2 text-right tabular-nums font-bold text-xs">
                       {formatCurrency(totals.debit)}
                     </td>
-                    <td className="px-2 py-1.5 text-right tabular-nums font-bold text-red-600">
+                    <td className="px-2 py-2 text-right tabular-nums font-bold text-red-600 text-xs">
                       {formatCurrency(totals.less)}
                     </td>
-                    <td className="px-1 py-1.5"></td>
+                    <td className="px-1 py-2"></td>
                   </tr>
                 </tfoot>
               </table>
             </div>
-            <p className="text-[11px] text-primary-400 px-3 py-1.5 border-t border-primary-100 bg-surface">
+            <p className="text-xs text-primary-500 px-3 py-2 border-t border-primary-100 bg-surface">
               Edit name, type of payment, reason, credit, debit or less in the table — Enter or click away to save.
             </p>
           </>

@@ -85,8 +85,8 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
     <td class="num">${esc(fmtMoney(opening))}</td>
   </tr>`;
 
-  // 2. Entries rows (Sales and Payments interleaved in chronological order)
-  const entries = summaryRow.entries && summaryRow.entries.length
+  // 2. Entries rows (Sales and Payments interleaved with intermediate Subtotal and Balance tallies)
+  const rawEntries = summaryRow.entries && summaryRow.entries.length
     ? summaryRow.entries
     : [
         ...sales.map((s) => ({ ...s, isPayment: false })),
@@ -101,24 +101,60 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
           new Date(b.date || b.createdAt || 0).getTime()
       );
 
-  entries.forEach((entry) => {
+  const entries = rawEntries.filter((entry) => {
+    const raw = String(entry.material || entry.materialName || '').toLowerCase();
+    return raw !== 'cooly' && !entry.isCoolyLine;
+  });
+
+  let runningBalance = opening;
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+
     if (entry.isPayment || entry.type === 'payment') {
-      const payAmtStr = `-${fmtMoney(entry.amount)}`;
-      const payDateStr = formatDateShort(entry.date || entry.createdAt || summaryRow.date || summaryRow.startDate);
-      rowsHtml += `<tr class="payment-row">
-        <td class="date">${esc(payDateStr)}</td>
-        <td class="item" style="font-weight:600;color:#047857;">Paid</td>
-        <td class="num"></td>
-        <td class="num"></td>
-        <td class="num"></td>
-        <td class="num" style="font-weight:700;color:#047857;">${esc(payAmtStr)}</td>
+      // Collect consecutive payments in this payment group
+      const payGroup = [entry];
+      while (i + 1 < entries.length && (entries[i + 1].isPayment || entries[i + 1].type === 'payment')) {
+        i++;
+        payGroup.push(entries[i]);
+      }
+
+      // Intermediate subtotal row before deducting payment group
+      rowsHtml += `<tr class="subtotal-row">
+        <td class="date"></td>
+        <td class="item" style="font-weight:700;">మొత్తం (Subtotal)</td>
+        <td class="num" colspan="3"></td>
+        <td class="num" style="font-weight:700;">${esc(fmtMoney(runningBalance))}</td>
       </tr>`;
-      return;
+
+      // Render each payment in the group
+      for (const p of payGroup) {
+        const payAmt = Number(p.amount) || 0;
+        runningBalance -= payAmt;
+        const payAmtStr = `-${fmtMoney(payAmt)}`;
+        const payDateStr = formatDateShort(p.date || p.createdAt || summaryRow.date || summaryRow.startDate);
+        rowsHtml += `<tr class="payment-row">
+          <td class="date">${esc(payDateStr)}</td>
+          <td class="item" style="font-weight:600;color:#047857;">Paid (చెల్లింపు)</td>
+          <td class="num"></td>
+          <td class="num"></td>
+          <td class="num"></td>
+          <td class="num" style="font-weight:700;color:#047857;">${esc(payAmtStr)}</td>
+        </tr>`;
+      }
+
+      // Intermediate balance (బాకీ) tally row after deducting payment group
+      rowsHtml += `<tr class="tally-row">
+        <td class="date"></td>
+        <td class="item" style="font-weight:700;">బాకీ (Balance)</td>
+        <td class="num" colspan="3"></td>
+        <td class="num" style="font-weight:700;">${esc(fmtMoney(runningBalance))}</td>
+      </tr>`;
+
+      continue;
     }
 
     const rawName = entry.material || entry.materialName || '—';
-    if (String(rawName).toLowerCase() === 'cooly' || entry.isCoolyLine) return;
-
     const teName = entry.materialNameTelugu || (teluguMap?.get ? teluguMap.get(String(rawName).trim().toLowerCase()) : teluguMap?.[String(rawName).trim().toLowerCase()]);
     const matName = teName && teName.trim() && teName.trim().toLowerCase() !== String(rawName).trim().toLowerCase()
       ? `${rawName} (${teName.trim()})`
@@ -133,6 +169,7 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
     const rateStr = Number(rateVal) > 0 ? fmtNum(rateVal) : '';
 
     const lineTotal = (Number(entry.amount) || 0) + (Number(entry.cooly) || 0);
+    runningBalance += lineTotal;
     const amtStr = fmtMoney(lineTotal);
     const itemDateStr = formatDateShort(entry.date || summaryRow.date || summaryRow.startDate);
 
@@ -144,7 +181,7 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
       <td class="num">${esc(rateStr)}</td>
       <td class="num">${esc(amtStr)}</td>
     </tr>`;
-  });
+  }
 
   // 4. Total row
   rowsHtml += `<tr class="rule">
@@ -334,6 +371,9 @@ table.lines td.date { width: 1%; white-space: nowrap; color: #000000; }
 table.lines td.item { width: 100%; color: #000000; }
 table.lines td.num { width: 1%; white-space: nowrap; text-align: right; padding-left: 6px; color: #000000; }
 table.lines tr.rule td { border-top: 1px solid #000000; font-weight: 700; padding-top: 3px; color: #000000; }
+table.lines tr.subtotal-row td { border-top: 1px solid #000000; font-weight: 700; padding-top: 2px; color: #000000; }
+table.lines tr.payment-row td { color: #047857; }
+table.lines tr.tally-row td { border-top: 1px dashed #000000; border-bottom: 1px dashed #000000; font-weight: 700; padding: 2px 3px; color: #000000; }
 @media print {
   .preview-toolbar { display: none !important; }
   body.bill-preview { background: #ffffff; }

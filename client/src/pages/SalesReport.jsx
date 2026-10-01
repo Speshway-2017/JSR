@@ -159,67 +159,67 @@ export default function SalesReport() {
   const hasRows = !loading && !dateError && rows.length > 0;
 
   return (
-    <div className="space-y-2.5 max-w-4xl">
+    <div className="space-y-4 max-w-4xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-sm font-bold text-primary-800">Sales Checklist</h1>
-          <p className="text-primary-400 text-[11px] mt-0.5">
+          <h1 className="page-title">Sales Checklist</h1>
+          <p className="text-xs text-primary-500 mt-0.5">
             Filter sales by name, item, or rate
           </p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handlePrint}
             disabled={!rows.length}
-            className="btn-primary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
+            className="btn-primary !py-1.5 !px-3 !text-sm flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
           >
-            <Printer className="w-3 h-3" /> Print
+            <Printer className="w-4 h-4" /> Print
           </button>
           <button
             type="button"
             onClick={exportExcel}
             disabled={!rows.length}
-            className="btn-secondary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
+            className="btn-secondary !py-1.5 !px-3 !text-sm flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
           >
-            <Download className="w-3 h-3 text-primary-600" /> Export Excel
+            <Download className="w-4 h-4 text-primary-600" /> Export Excel
           </button>
         </div>
       </div>
 
       {/* Filter Card */}
-      <div className="card !p-2.5 space-y-2">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="card !p-3 space-y-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               From *
             </label>
             <input
               type="date"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               To *
             </label>
             <input
               type="date"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={endDate}
               min={startDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Customer
             </label>
             <select
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
               title="Name wise"
@@ -233,11 +233,11 @@ export default function SalesReport() {
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Item
             </label>
             <select
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
               value={materialId}
               onChange={(e) => setMaterialId(e.target.value)}
               title="Item wise"
@@ -251,11 +251,11 @@ export default function SalesReport() {
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Rate
             </label>
             <select
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
               value={rate}
               onChange={(e) => setRate(e.target.value)}
               title="Rate wise"
@@ -276,20 +276,20 @@ export default function SalesReport() {
 
       {/* Summary KPI Strip */}
       {hasRows && (
-        <div className="grid grid-cols-3 gap-2">
-          <div className="card !py-2 !px-3 flex items-center justify-between border border-primary-200">
-            <span className="text-[11px] font-medium text-primary-500">Bags</span>
-            <span className="font-bold text-primary-800 text-xs tabular-nums">{summary.totalBags}</span>
+        <div className="grid grid-cols-3 gap-2.5">
+          <div className="card !py-2.5 !px-3.5 flex items-center justify-between border border-primary-200">
+            <span className="text-xs font-medium text-primary-500">Bags</span>
+            <span className="font-bold text-primary-800 text-sm tabular-nums">{summary.totalBags}</span>
           </div>
-          <div className="card !py-2 !px-3 flex items-center justify-between border border-primary-200">
-            <span className="text-[11px] font-medium text-primary-500">Weight</span>
-            <span className="font-bold text-primary-800 text-xs tabular-nums">
+          <div className="card !py-2.5 !px-3.5 flex items-center justify-between border border-primary-200">
+            <span className="text-xs font-medium text-primary-500">Weight</span>
+            <span className="font-bold text-primary-800 text-sm tabular-nums">
               {formatWeight(summary.totalWeight)}
             </span>
           </div>
-          <div className="card !py-2 !px-3 flex items-center justify-between border border-primary-200">
-            <span className="text-[11px] font-medium text-primary-500">Amount</span>
-            <span className="font-bold text-accent-700 text-xs tabular-nums">
+          <div className="card !py-2.5 !px-3.5 flex items-center justify-between border border-primary-200">
+            <span className="text-xs font-medium text-primary-500">Amount</span>
+            <span className="font-bold text-accent-700 text-sm tabular-nums">
               {formatCurrency(summary.totalAmount)}
             </span>
           </div>
@@ -305,7 +305,7 @@ export default function SalesReport() {
         ) : !rows.length ? (
           <div className="text-center py-12">
             <FileBarChart className="w-8 h-8 text-primary-300 mx-auto mb-1.5" />
-            <p className="text-primary-400 text-xs">No sales for this filter</p>
+            <p className="text-primary-400 text-sm">No sales for this filter</p>
           </div>
         ) : (
           <>
@@ -316,15 +316,15 @@ export default function SalesReport() {
                 return (
                   <div
                     key={row.id}
-                    className="px-3 py-2.5 hover:bg-primary-50/40 cursor-pointer transition"
+                    className="px-3.5 py-2.5 hover:bg-primary-50/40 cursor-pointer transition"
                     onClick={() => openSaleEntry(row)}
                   >
                     <div className="flex justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-primary-800 text-xs">{row.materialName}</p>
-                        <p className="text-[11px] text-primary-500">{row.customerName}</p>
-                        <p className="text-[10.5px] text-primary-400 mt-0.5">{formatDate(row.date)}</p>
-                        <div className="flex items-center gap-1.5 text-[11px] text-primary-600 mt-1 flex-wrap">
+                        <p className="font-semibold text-primary-800 text-sm">{row.materialName}</p>
+                        <p className="text-xs text-primary-500">{row.customerName}</p>
+                        <p className="text-xs text-primary-400 mt-0.5">{formatDate(row.date)}</p>
+                        <div className="flex items-center gap-1.5 text-xs text-primary-600 mt-1 flex-wrap">
                           <span>
                             {row.bagCount} bags · Rate ₹{row.ratePerKg} · {formatWeight(row.totalWeight)}
                           </span>
@@ -336,21 +336,21 @@ export default function SalesReport() {
                                 setSelectedBagRecord(row);
                               }}
                               title="View individual bag weights"
-                              className="p-0.5 rounded border border-primary-200 bg-surface hover:bg-primary-100 text-primary-600 cursor-pointer"
+                              className="p-1 rounded border border-primary-200 bg-surface hover:bg-primary-100 text-primary-600 cursor-pointer"
                             >
-                              <Eye className="w-3 h-3" />
+                              <Eye className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>
                       </div>
-                      <p className="font-bold text-primary-800 text-xs shrink-0 tabular-nums">
+                      <p className="font-bold text-primary-800 text-sm shrink-0 tabular-nums">
                         {formatCurrency(row.totalAmount)}
                       </p>
                     </div>
                   </div>
                 );
               })}
-              <div className="px-3 py-2 bg-accent-50 border-t border-primary-200 flex justify-between text-xs font-semibold text-primary-800">
+              <div className="px-3.5 py-2.5 bg-accent-50 border-t border-primary-200 flex justify-between text-sm font-semibold text-primary-800">
                 <span>Total</span>
                 <span className="font-bold tabular-nums text-accent-700">
                   {formatCurrency(summary.totalAmount)}
@@ -363,25 +363,25 @@ export default function SalesReport() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-primary-50/80 text-left border-b border-primary-200">
-                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide whitespace-nowrap">
+                    <th className="px-3 py-2 text-xs font-semibold text-primary-600 uppercase tracking-wide whitespace-nowrap">
                       Date & Time
                     </th>
-                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                    <th className="px-3 py-2 text-xs font-semibold text-primary-600 uppercase tracking-wide">
                       Name
                     </th>
-                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">
+                    <th className="px-3 py-2 text-xs font-semibold text-primary-600 uppercase tracking-wide">
                       Item
                     </th>
-                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-16">
+                    <th className="px-3 py-2 text-xs font-semibold text-primary-600 uppercase tracking-wide text-right w-16">
                       Bags
                     </th>
-                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-16">
+                    <th className="px-3 py-2 text-xs font-semibold text-primary-600 uppercase tracking-wide text-right w-16">
                       Rate
                     </th>
-                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-28">
+                    <th className="px-3 py-2 text-xs font-semibold text-primary-600 uppercase tracking-wide text-right w-28">
                       Weight
                     </th>
-                    <th className="px-3 py-2 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-24">
+                    <th className="px-3 py-2 text-xs font-semibold text-primary-600 uppercase tracking-wide text-right w-28">
                       Total Price
                     </th>
                   </tr>
@@ -392,7 +392,7 @@ export default function SalesReport() {
                     return (
                       <tr
                         key={row.id}
-                        className="border-b border-primary-100 hover:bg-primary-50/40 cursor-pointer transition"
+                        className="border-b border-primary-100 hover:bg-primary-50/40 cursor-pointer transition text-xs"
                         onClick={() => openSaleEntry(row)}
                         title="Click to view sales entry"
                       >
@@ -423,9 +423,9 @@ export default function SalesReport() {
                                     setSelectedBagRecord(row);
                                   }}
                                   title="View individual bag weights"
-                                  className="p-0.5 rounded border border-primary-200 bg-surface hover:bg-primary-100 text-primary-600 cursor-pointer"
+                                  className="p-1 rounded border border-primary-200 bg-surface hover:bg-primary-100 text-primary-600 cursor-pointer"
                                 >
-                                  <Eye className="w-3 h-3" />
+                                  <Eye className="w-3.5 h-3.5" />
                                 </button>
                               )}
                             </div>
@@ -440,17 +440,17 @@ export default function SalesReport() {
                 </tbody>
                 <tfoot>
                   <tr className="bg-accent-50 border-t border-primary-200 font-semibold text-xs">
-                    <td colSpan={3} className="px-3 py-2 text-primary-800 font-bold">
+                    <td colSpan={3} className="px-3 py-2.5 text-primary-800 font-bold">
                       Total
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums font-bold text-primary-800">
+                    <td className="px-3 py-2.5 text-right tabular-nums font-bold text-primary-800">
                       {summary.totalBags}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-primary-500"></td>
-                    <td className="px-3 py-2 text-right tabular-nums font-bold text-primary-800">
+                    <td className="px-3 py-2.5 text-right tabular-nums text-primary-500"></td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-bold text-primary-800">
                       {formatWeight(summary.totalWeight)}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums font-bold text-accent-700">
+                    <td className="px-3 py-2.5 text-right tabular-nums font-bold text-accent-700">
                       {formatCurrency(summary.totalAmount)}
                     </td>
                   </tr>

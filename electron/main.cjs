@@ -18,6 +18,11 @@ if (!app) {
   process.exit(1);
 }
 
+if (app) {
+  app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication,Autofill');
+  app.commandLine.appendSwitch('log-level', '3');
+}
+
 if (process.platform === 'win32') {
   app.setAppUserModelId('com.jsr.app');
 }

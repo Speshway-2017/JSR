@@ -78,34 +78,34 @@ export default function CashSalesReport() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-sm font-bold text-primary-800">Day wise cash sale report</h1>
-          <p className="text-primary-400 text-[11px] mt-0.5">
+          <h1 className="page-title text-2xl font-bold text-primary-700">Day wise cash sale report</h1>
+          <p className="text-xs text-primary-500 mt-1">
             Vendor columns — vegetable sections with cash customer bag weights & rates
           </p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
-            className="btn-primary !py-1 !px-2.5 !text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
+            className="btn-primary !py-1.5 !px-3 !text-sm font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
             disabled={!hasCols || printing}
             onClick={printReport}
           >
-            <Printer className="w-3 h-3" />
+            <Printer className="w-4 h-4" />
             Print
           </button>
         </div>
       </div>
 
       {/* Filter Card */}
-      <div className="card !p-2.5">
+      <div className="card !p-3">
         <div className="flex items-center gap-2 max-w-xs">
           <div className="w-full">
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">
               Date *
             </label>
             <input
               type="date"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />

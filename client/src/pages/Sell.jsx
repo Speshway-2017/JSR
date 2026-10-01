@@ -124,6 +124,7 @@ export default function Sell({ path: windowPath }) {
   const cancelEditRef = useRef(false);
   const editingSaleIdRef = useRef(editingSaleId);
   editingSaleIdRef.current = editingSaleId;
+  const inFlightUpdatesRef = useRef(new Set());
 
   // Restore focus to pending cell immediately after React commits DOM mutations
   useLayoutEffect(() => {
@@ -174,7 +175,7 @@ export default function Sell({ path: windowPath }) {
   const suggestions = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
     if (!q) return [];
-    const list = searchAndSortItems(customers, ['name', 'nameTelugu', 'mobile'], nameQuery).slice(0, 8);
+    const list = searchAndSortItems(customers, ['name', 'nameTelugu'], nameQuery).slice(0, 8);
     if ('cash'.startsWith(q) || 'నగదు'.startsWith(q) || q.includes('cash')) {
       list.unshift({
         _id: 'cash',
@@ -425,51 +426,6 @@ export default function Sell({ path: windowPath }) {
     setSortDir('asc');
   };
 
-  const handleGridKeyDown = (e, rowIdx, colIdx) => {
-    const { key } = e;
-    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) return;
-
-    let targetRow = rowIdx;
-    let targetCol = colIdx;
-
-    if (key === 'ArrowDown') {
-      targetRow = rowIdx + 1;
-    } else if (key === 'ArrowUp') {
-      targetRow = rowIdx - 1;
-    } else if (key === 'ArrowRight') {
-      targetCol = colIdx + 1;
-    } else if (key === 'ArrowLeft') {
-      targetCol = colIdx - 1;
-    }
-
-    const targetEl = document.querySelector(`[data-table-row="${targetRow}"][data-table-col="${targetCol}"]`);
-    if (targetEl) {
-      e.preventDefault();
-      targetEl.focus();
-      if (typeof targetEl.select === 'function') {
-        setTimeout(() => {
-          try { targetEl.select(); } catch (_) {}
-        }, 0);
-      }
-    } else if (key === 'ArrowDown' || key === 'ArrowUp') {
-      const rowCells = document.querySelectorAll(`[data-table-row="${targetRow}"]`);
-      if (rowCells.length > 0) {
-        e.preventDefault();
-        const closestCell = Array.from(rowCells).reduce((prev, curr) => {
-          const prevCol = parseInt(prev.getAttribute('data-table-col') || '0', 10);
-          const currCol = parseInt(curr.getAttribute('data-table-col') || '0', 10);
-          return Math.abs(currCol - colIdx) < Math.abs(prevCol - colIdx) ? curr : prev;
-        });
-        closestCell.focus();
-        if (typeof closestCell.select === 'function') {
-          setTimeout(() => {
-            try { closestCell.select(); } catch (_) {}
-          }, 0);
-        }
-      }
-    }
-  };
-
   const SortLabel = ({ column, children, align = 'left' }) => {
     const active = sortKey === column;
     const Icon = active ? (sortDir === 'desc' ? ArrowDown : ArrowUp) : ArrowUpDown;
@@ -711,17 +667,17 @@ export default function Sell({ path: windowPath }) {
   }, [nameQuery, suggestions]);
 
   useEffect(() => {
-    if (fillingRef.current) return;
+    if (fillingRef.current || editingSaleId) return;
     if (material) {
       const p = Number(material.sellingPricePerKg) || 0;
       setRate(p > 0 ? String(p) : '');
     } else {
       setRate('');
     }
-  }, [materialId, material]);
+  }, [materialId, material, editingSaleId]);
 
   useEffect(() => {
-    if (fillingRef.current) return;
+    if (fillingRef.current || editingSaleId) return;
     const hasCooly = customerCoolyDefault;
     setCoolyOn(hasCooly);
     if (hasCooly) {
@@ -729,14 +685,14 @@ export default function Sell({ path: windowPath }) {
     } else {
       setCooly('0');
     }
-  }, [customerId, customerCoolyDefault, salesCoolyRate]);
+  }, [customerId, customerCoolyDefault, salesCoolyRate, editingSaleId]);
 
   useEffect(() => {
-    if (fillingRef.current) return;
+    if (fillingRef.current || editingSaleId) return;
     if (coolyOn) {
       setCooly(salesCoolyRate);
     }
-  }, [saleType, salesCoolyRate]);
+  }, [saleType, salesCoolyRate, coolyOn, editingSaleId]);
 
   useEffect(() => {
     if (focusBagIdx == null) return;
@@ -775,6 +731,7 @@ export default function Sell({ path: windowPath }) {
   const clearEntry = ({ clearFocus = true, focusName = true } = {}) => {
     editingSaleIdRef.current = '';
     setEditingSaleId('');
+    setEditAuthorized(false);
     setEditingLineIndex(0);
     if (clearFocus) {
       setFocusSaleId('');
@@ -924,6 +881,7 @@ export default function Sell({ path: windowPath }) {
       if (editingSaleId) {
         await api.put(`/sales/${editingSaleId}`, payload);
         toast.success('Sale updated');
+        setEditAuthorized(false);
       } else {
         const res = await api.post('/sales', payload);
         savedSaleId = res.data?._id;
@@ -953,11 +911,18 @@ export default function Sell({ path: windowPath }) {
       requestEditSale(row.sale, row.lineIndex, true);
       return;
     }
+    const updateKey = `${row.saleId}-${row.lineIndex}-${JSON.stringify(patch)}`;
+    if (inFlightUpdatesRef.current.has(updateKey)) {
+      return;
+    }
+    inFlightUpdatesRef.current.add(updateKey);
     try {
       await persistTableRow(row, patch);
       toast.success('Sale updated');
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Failed to update');
+    } finally {
+      inFlightUpdatesRef.current.delete(updateKey);
     }
   };
 
@@ -1714,47 +1679,37 @@ export default function Sell({ path: windowPath }) {
                   e.preventDefault();
                   e.stopPropagation();
 
-                  // If moving to a different row, commit any modified value on the current cell first!
-                  if (targetRow !== i && editAuthorized) {
-                    if (colIdx === 6) {
-                      const val = Number(el.value);
-                      const dbRate = Number(r.line?.ratePerKg);
-                      if (!isNaN(val) && val >= 0 && val !== dbRate) {
-                        commitCellEdit(r, { rate: val });
-                      }
-                    } else if (colIdx === 4) {
-                      const val = Math.floor(Number(el.value));
-                      const dbBags = Math.floor(Number(r.line?.bagCount));
-                      if (val > 0 && val !== dbBags) {
-                        commitCellEdit(r, { bags: val });
-                      }
-                    } else if (colIdx === 5) {
-                      const val = Number(el.value);
-                      const dbQty = Number(r.line?.totalKg);
-                      if (!isNaN(val) && val > 0 && val !== dbQty) {
-                        commitCellEdit(r, { qty: val });
-                      }
-                    } else if (colIdx === 2) {
-                      const val = el.value;
-                      const dbMatId = r.line?.material?._id || r.line?.material || r.materialId;
-                      if (val && val !== dbMatId) {
-                        commitCellEdit(r, { materialId: val });
-                      }
-                    } else if (colIdx === 3) {
-                      const val = el.value;
-                      const dbCustId = r.sale?.customer?._id || r.sale?.customer || r.customerId;
-                      if (val && val !== dbCustId) {
-                        commitCellEdit(r, { customerId: val });
-                      }
+                  // Cancel / revert any uncommitted edit in current cell before navigating away
+                  cancelEditRef.current = true;
+                  if (isInput) {
+                    const origVal = originalCellRef.current?.val ?? (r.line?.ratePerKg != null ? String(r.line.ratePerKg) : (r.rate != null ? String(r.rate) : ''));
+                    el.value = origVal;
+                    if (r.isLiveEditing && colIdx === 6) {
+                      setRate(origVal);
                     }
-
-                    const targetRowData = displayedRows[targetRow];
-                    if (targetRowData) {
-                      requestEditSale(targetRowData.sale, targetRowData.lineIndex);
+                  } else if (isSelect) {
+                    const origVal = originalCellRef.current?.val;
+                    if (origVal !== undefined) {
+                      el.value = origVal;
+                      if (r.isLiveEditing) {
+                        if (colIdx === 2) setMaterialId(origVal);
+                        if (colIdx === 3) {
+                          setCustomerId(origVal);
+                          const match = customers.find((c) => c._id === origVal);
+                          if (match) setNameQuery(match.name);
+                        }
+                      }
                     }
                   }
 
-                  // For inputs, blur first to trigger any onBlur save handlers
+                  // If moving to a different row while authorized, switch edit focus cleanly
+                  if (targetRow !== i && editAuthorized) {
+                    const targetRowData = displayedRows[targetRow];
+                    if (targetRowData) {
+                      fillFromSale(targetRowData.sale, targetRowData.lineIndex);
+                    }
+                  }
+
                   if (isInput || isSelect) {
                     el.blur();
                   }
@@ -1798,6 +1753,9 @@ export default function Sell({ path: windowPath }) {
                   <tr
                     key={`${r.saleId}-${r.lineIndex}`}
                     ref={r.saleId === focusSaleId ? focusRowRef : null}
+                    onClick={() => {
+                      requestEditSale(r.sale, r.lineIndex);
+                    }}
                     className={
                       r.saleId === focusSaleId || r.saleId === editingSaleId
                         ? 'bg-amber-100/90 font-bold border-l-4 border-l-amber-500 shadow-sm transition-all duration-300 ring-1 ring-amber-300'
@@ -1810,7 +1768,15 @@ export default function Sell({ path: windowPath }) {
                       tabIndex={0}
                       data-table-row={i}
                       data-table-col={0}
-                      onKeyDown={(e) => handleGridKeyDown(e, 0)}
+                      onClick={() => requestEditSale(r.sale, r.lineIndex)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          requestEditSale(r.sale, r.lineIndex);
+                          return;
+                        }
+                        handleGridKeyDown(e, 0);
+                      }}
                       className="px-1.5 py-1 text-primary-500 outline-none cursor-pointer text-center"
                     >
                       {r.serial}
@@ -1819,7 +1785,15 @@ export default function Sell({ path: windowPath }) {
                       tabIndex={0}
                       data-table-row={i}
                       data-table-col={1}
-                      onKeyDown={(e) => handleGridKeyDown(e, 1)}
+                      onClick={() => requestEditSale(r.sale, r.lineIndex)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          requestEditSale(r.sale, r.lineIndex);
+                          return;
+                        }
+                        handleGridKeyDown(e, 1);
+                      }}
                       className="px-1.5 py-1 text-primary-700 whitespace-nowrap font-medium outline-none cursor-pointer"
                     >
                       {r.vendor}
@@ -1842,7 +1816,7 @@ export default function Sell({ path: windowPath }) {
                               col: 2,
                               val: r.line?.material?._id || r.line?.material || r.materialId
                             };
-                            if (!r.isLiveEditing) requestEditSale(r.sale, r.lineIndex);
+                            if (!r.isLiveEditing) fillFromSale(r.sale, r.lineIndex);
                           }
                         }}
                         onKeyDown={(e) => {
@@ -1861,6 +1835,9 @@ export default function Sell({ path: windowPath }) {
                             cancelEditRef.current = false;
                             const matId = e.currentTarget.value;
                             const dbMatId = r.line?.material?._id || r.line?.material || r.materialId;
+                            if (originalCellRef.current) {
+                              originalCellRef.current.val = matId;
+                            }
                             if (matId && matId !== dbMatId) {
                               commitCellEdit(r, { materialId: matId });
                             }
@@ -1872,15 +1849,13 @@ export default function Sell({ path: windowPath }) {
                         }}
                         onBlur={(e) => {
                           if (!editAuthorized) return;
-                          if (cancelEditRef.current) {
-                            cancelEditRef.current = false;
-                            return;
+                          // If blurred without pressing Enter or if cancelled, revert value
+                          const orig = originalCellRef.current?.val ?? (r.line?.material?._id || r.line?.material || r.materialId);
+                          if (e.target.value !== orig) {
+                            e.target.value = orig;
+                            if (r.isLiveEditing) setMaterialId(orig);
                           }
-                          const matId = e.target.value;
-                          const dbMatId = r.line?.material?._id || r.line?.material || r.materialId;
-                          if (matId && matId !== dbMatId) {
-                            commitCellEdit(r, { materialId: matId });
-                          }
+                          cancelEditRef.current = false;
                         }}
                         className={`${cell} font-medium text-primary-700 text-xs cursor-pointer`}
                         value={r.isLiveEditing ? materialId : r.materialId}
@@ -1893,9 +1868,6 @@ export default function Sell({ path: windowPath }) {
                           }
                           if (r.isLiveEditing) {
                             setMaterialId(val);
-                          } else {
-                            if (val === r.materialId) return;
-                            commitCellEdit(r, { materialId: val });
                           }
                         }}
                       >
@@ -1927,7 +1899,7 @@ export default function Sell({ path: windowPath }) {
                               col: 3,
                               val: r.sale?.customer?._id || r.sale?.customer || r.customerId
                             };
-                            if (!r.isLiveEditing) requestEditSale(r.sale, r.lineIndex);
+                            if (!r.isLiveEditing) fillFromSale(r.sale, r.lineIndex);
                           }
                         }}
                         onKeyDown={(e) => {
@@ -1950,6 +1922,9 @@ export default function Sell({ path: windowPath }) {
                             cancelEditRef.current = false;
                             const custId = e.currentTarget.value;
                             const dbCustId = r.sale?.customer?._id || r.sale?.customer || r.customerId;
+                            if (originalCellRef.current) {
+                              originalCellRef.current.val = custId;
+                            }
                             if (custId && custId !== dbCustId) {
                               commitCellEdit(r, { customerId: custId });
                             }
@@ -1961,15 +1936,17 @@ export default function Sell({ path: windowPath }) {
                         }}
                         onBlur={(e) => {
                           if (!editAuthorized) return;
-                          if (cancelEditRef.current) {
-                            cancelEditRef.current = false;
-                            return;
+                          // If blurred without pressing Enter or if cancelled, revert value
+                          const orig = originalCellRef.current?.val ?? (r.sale?.customer?._id || r.sale?.customer || r.customerId);
+                          if (e.target.value !== orig) {
+                            e.target.value = orig;
+                            if (r.isLiveEditing) {
+                              setCustomerId(orig);
+                              const match = customers.find((c) => c._id === orig);
+                              if (match) setNameQuery(match.name);
+                            }
                           }
-                          const custId = e.target.value;
-                          const dbCustId = r.sale?.customer?._id || r.sale?.customer || r.customerId;
-                          if (custId && custId !== dbCustId) {
-                            commitCellEdit(r, { customerId: custId });
-                          }
+                          cancelEditRef.current = false;
                         }}
                         className={`${cell} text-primary-700 text-xs cursor-pointer`}
                         value={r.isLiveEditing ? customerId : r.customerId}
@@ -1984,9 +1961,6 @@ export default function Sell({ path: windowPath }) {
                             setCustomerId(val);
                             const match = customers.find((c) => c._id === val);
                             if (match) setNameQuery(match.name);
-                          } else {
-                            if (val === r.customerId) return;
-                            commitCellEdit(r, { customerId: val });
                           }
                         }}
                       >
@@ -2001,229 +1975,46 @@ export default function Sell({ path: windowPath }) {
                         ))}
                       </select>
                     </td>
-                    <td className="px-1 py-0.5 w-12">
-                      <input
-                        data-table-row={i}
-                        data-table-col={4}
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="off"
-                        value={
-                          r.isLiveEditing
-                            ? (r.isByBag ? directBagCount : (bagCount != null && bagCount !== '' ? String(bagCount) : ''))
-                            : (r.bags != null ? String(r.bags) : '')
+                    <td
+                      tabIndex={0}
+                      data-table-row={i}
+                      data-table-col={4}
+                      onClick={() => requestEditSale(r.sale, r.lineIndex)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          requestEditSale(r.sale, r.lineIndex);
+                          return;
                         }
-                        className={`${cell} text-right`}
-                        onMouseDown={(e) => {
-                          if (!editAuthorized) {
-                            e.preventDefault();
-                            requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 4 });
-                          }
-                        }}
-                        onFocus={(e) => {
-                          if (!editAuthorized) {
-                            e.target.blur();
-                            requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 4 });
-                          } else {
-                            cancelEditRef.current = false;
-                            originalCellRef.current = {
-                              row: i,
-                              col: 4,
-                              val: r.line?.bagCount != null ? String(r.line.bagCount) : String(r.bags || '')
-                            };
-                            if (!r.isLiveEditing) requestEditSale(r.sale, r.lineIndex);
-                            if (typeof e.target.select === 'function') {
-                              setTimeout(() => {
-                                try { e.target.select(); } catch (_) {}
-                              }, 0);
-                            }
-                          }
-                        }}
-                        onChange={(e) => {
-                          if (!editAuthorized) return;
-                          const val = e.target.value.replace(/[^\d]/g, '');
-                          if (r.isLiveEditing) {
-                            if (r.isByBag) {
-                              setDirectBagCount(val);
-                            } else {
-                              const num = Math.floor(Number(val));
-                              if (num > 0) {
-                                setBagWeights((prev) => {
-                                  const arr = [...prev];
-                                  if (num > arr.length) {
-                                    while (arr.length < num) arr.push('');
-                                  } else if (num < arr.length) {
-                                    arr.length = num;
-                                  }
-                                  return arr;
-                                });
-                              }
-                            }
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            cancelEditRef.current = true;
-                            const orig = originalCellRef.current?.val ?? (r.line?.bagCount != null ? String(r.line.bagCount) : '');
-                            e.currentTarget.value = orig;
-                            if (r.isLiveEditing) {
-                              if (r.isByBag) setDirectBagCount(orig);
-                              else {
-                                const num = Math.floor(Number(orig));
-                                if (num > 0) setBagWeights(Array.from({ length: num }, () => ''));
-                              }
-                            }
-                            pendingFocusCell.current = { row: i, col: 4 };
-                            e.currentTarget.focus();
-                            if (typeof e.currentTarget.select === 'function') e.currentTarget.select();
-                            return;
-                          }
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            cancelEditRef.current = false;
-                            const bags = Math.floor(Number(e.currentTarget.value));
-                            const dbBags = Math.floor(Number(r.line?.bagCount));
-                            if (bags > 0 && bags !== dbBags) {
-                              commitCellEdit(r, { bags });
-                            }
-                            pendingFocusCell.current = { row: i, col: 4 };
-                            e.currentTarget.focus();
-                            if (typeof e.currentTarget.select === 'function') {
-                              e.currentTarget.select();
-                            }
-                            return;
-                          }
-                          handleGridKeyDown(e, 4);
-                        }}
-                        onBlur={(e) => {
-                          if (!editAuthorized) return;
-                          if (cancelEditRef.current) {
-                            cancelEditRef.current = false;
-                            return;
-                          }
-                          const bags = Math.floor(Number(e.target.value));
-                          const dbBags = Math.floor(Number(r.line?.bagCount));
-                          if (bags > 0 && bags !== dbBags) {
-                            commitCellEdit(r, { bags });
-                          }
-                        }}
-                      />
+                        handleGridKeyDown(e, 4);
+                      }}
+                      className="px-1.5 py-1 text-right tabular-nums font-semibold text-primary-700 whitespace-nowrap outline-none cursor-pointer w-12"
+                    >
+                      {r.isLiveEditing
+                        ? (r.isByBag ? directBagCount || '0' : (bagCount != null && bagCount !== '' ? String(bagCount) : '0'))
+                        : (r.bags != null ? String(r.bags) : '0')}
                     </td>
-                    <td className="px-1 py-0.5 w-14">
+                    <td
+                      tabIndex={0}
+                      data-table-row={i}
+                      data-table-col={5}
+                      onClick={() => requestEditSale(r.sale, r.lineIndex)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          requestEditSale(r.sale, r.lineIndex);
+                          return;
+                        }
+                        handleGridKeyDown(e, 5);
+                      }}
+                      className="px-1.5 py-1 text-right tabular-nums font-semibold text-primary-700 whitespace-nowrap outline-none cursor-pointer w-14"
+                    >
                       {r.isByBag ? (
-                        <div
-                          tabIndex={0}
-                          data-table-row={i}
-                          data-table-col={5}
-                          onKeyDown={(e) => handleGridKeyDown(e, 5)}
-                          className="text-right text-primary-400 font-medium py-0.5 outline-none cursor-pointer"
-                        >
-                          —
-                        </div>
+                        <span className="text-primary-400 font-medium">—</span>
                       ) : (
-                        <input
-                          data-table-row={i}
-                          data-table-col={5}
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          value={
-                            r.isLiveEditing
-                              ? (qty ? Number(qty).toFixed(1) : '')
-                              : (r.qty != null ? Number(r.qty).toFixed(1) : '')
-                          }
-                          className={`${cell} text-right`}
-                          onMouseDown={(e) => {
-                            if (!editAuthorized) {
-                              e.preventDefault();
-                              requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 5 });
-                            }
-                          }}
-                          onFocus={(e) => {
-                            if (!editAuthorized) {
-                              e.target.blur();
-                              requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 5 });
-                            } else {
-                              cancelEditRef.current = false;
-                              originalCellRef.current = {
-                                row: i,
-                                col: 5,
-                                val: r.line?.totalKg != null ? Number(r.line.totalKg).toFixed(1) : (r.qty != null ? Number(r.qty).toFixed(1) : '')
-                              };
-                              if (!r.isLiveEditing) requestEditSale(r.sale, r.lineIndex);
-                              if (typeof e.target.select === 'function') {
-                                setTimeout(() => {
-                                  try { e.target.select(); } catch (_) {}
-                                }, 0);
-                              }
-                            }
-                          }}
-                          onChange={(e) => {
-                            if (!editAuthorized) return;
-                            const val = e.target.value.replace(/[^\d.]/g, '');
-                            if (r.isLiveEditing) {
-                              const total = Number(val);
-                              if (!isNaN(total) && total > 0) {
-                                const count = Math.max(1, bagCount || 1);
-                                const avg = Number((total / count).toFixed(1));
-                                const rem = Number((total - avg * (count - 1)).toFixed(1));
-                                setBagWeights(Array.from({ length: count }, (_, idx) => String(idx === count - 1 ? rem : avg)));
-                              }
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Escape') {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              cancelEditRef.current = true;
-                              const orig = originalCellRef.current?.val ?? (r.line?.totalKg != null ? Number(r.line.totalKg).toFixed(1) : '');
-                              e.currentTarget.value = orig;
-                              if (r.isLiveEditing) {
-                                const total = Number(orig);
-                                if (!isNaN(total) && total > 0) {
-                                  const count = Math.max(1, bagCount || 1);
-                                  const avg = Number((total / count).toFixed(1));
-                                  const rem = Number((total - avg * (count - 1)).toFixed(1));
-                                  setBagWeights(Array.from({ length: count }, (_, idx) => String(idx === count - 1 ? rem : avg)));
-                                }
-                              }
-                              pendingFocusCell.current = { row: i, col: 5 };
-                              e.currentTarget.focus();
-                              if (typeof e.currentTarget.select === 'function') e.currentTarget.select();
-                              return;
-                            }
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              cancelEditRef.current = false;
-                              const qtyVal = Number(e.currentTarget.value);
-                              const dbQty = Number(r.line?.totalKg);
-                              if (!isNaN(qtyVal) && qtyVal > 0 && qtyVal !== dbQty) {
-                                commitCellEdit(r, { qty: qtyVal });
-                              }
-                              pendingFocusCell.current = { row: i, col: 5 };
-                              e.currentTarget.focus();
-                              if (typeof e.currentTarget.select === 'function') {
-                                e.currentTarget.select();
-                              }
-                              return;
-                            }
-                            handleGridKeyDown(e, 5);
-                          }}
-                          onBlur={(e) => {
-                            if (!editAuthorized) return;
-                            if (cancelEditRef.current) {
-                              cancelEditRef.current = false;
-                              return;
-                            }
-                            const qtyVal = Number(e.target.value);
-                            const dbQty = Number(r.line?.totalKg);
-                            if (!isNaN(qtyVal) && qtyVal > 0 && qtyVal !== dbQty) {
-                              commitCellEdit(r, { qty: qtyVal });
-                            }
-                          }}
-                        />
+                        r.isLiveEditing
+                          ? (qty ? Number(qty).toFixed(1) : '—')
+                          : (r.qty != null && Number(r.qty) > 0 ? Number(r.qty).toFixed(1) : '—')
                       )}
                     </td>
                     <td className="px-1 py-0.5 w-14">
@@ -2248,12 +2039,13 @@ export default function Sell({ path: windowPath }) {
                               requestEditSale(r.sale, r.lineIndex, true, { row: i, col: 6 });
                             } else {
                               cancelEditRef.current = false;
+                              const origVal = r.line?.ratePerKg != null ? String(r.line.ratePerKg) : (r.rate != null ? String(r.rate) : '');
                               originalCellRef.current = {
                                 row: i,
                                 col: 6,
-                                val: r.line?.ratePerKg != null ? String(r.line.ratePerKg) : (r.rate != null ? String(r.rate) : '')
+                                val: origVal
                               };
-                              if (!r.isLiveEditing) requestEditSale(r.sale, r.lineIndex);
+                              if (!r.isLiveEditing) fillFromSale(r.sale, r.lineIndex);
                               if (typeof e.target.select === 'function') {
                                 setTimeout(() => {
                                   try { e.target.select(); } catch (_) {}
@@ -2287,7 +2079,10 @@ export default function Sell({ path: windowPath }) {
                               e.preventDefault();
                               cancelEditRef.current = false;
                               const rateVal = Number(e.currentTarget.value);
-                              const dbRate = Number(r.line?.ratePerKg);
+                              const dbRate = Number(r.line?.ratePerKg != null ? r.line.ratePerKg : r.rate);
+                              if (originalCellRef.current) {
+                                originalCellRef.current.val = String(rateVal);
+                              }
                               if (!isNaN(rateVal) && rateVal >= 0 && rateVal !== dbRate) {
                                 commitCellEdit(r, { rate: rateVal });
                               }
@@ -2302,15 +2097,15 @@ export default function Sell({ path: windowPath }) {
                           }}
                           onBlur={(e) => {
                             if (!editAuthorized) return;
-                            if (cancelEditRef.current) {
-                              cancelEditRef.current = false;
-                              return;
+                            // If blurred without pressing Enter or if cancelled, revert value
+                            const orig = originalCellRef.current?.val ?? (r.line?.ratePerKg != null ? String(r.line.ratePerKg) : (r.rate != null ? String(r.rate) : ''));
+                            if (e.target.value !== orig) {
+                              e.target.value = orig;
+                              if (r.isLiveEditing) {
+                                setRate(orig);
+                              }
                             }
-                            const rateVal = Number(e.target.value);
-                            const dbRate = Number(r.line?.ratePerKg);
-                            if (!isNaN(rateVal) && rateVal >= 0 && rateVal !== dbRate) {
-                              commitCellEdit(r, { rate: rateVal });
-                            }
+                            cancelEditRef.current = false;
                           }}
                         />
                         {r.isByBag && (
@@ -2324,7 +2119,15 @@ export default function Sell({ path: windowPath }) {
                       tabIndex={0}
                       data-table-row={i}
                       data-table-col={7}
-                      onKeyDown={(e) => handleGridKeyDown(e, 7)}
+                      onClick={() => requestEditSale(r.sale, r.lineIndex)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          requestEditSale(r.sale, r.lineIndex);
+                          return;
+                        }
+                        handleGridKeyDown(e, 7);
+                      }}
                       className="px-1 py-1 text-right tabular-nums font-medium text-primary-700 whitespace-nowrap outline-none cursor-pointer w-14"
                     >
                       {r.cooly ? formatCurrency(r.cooly) : '—'}
@@ -2333,7 +2136,15 @@ export default function Sell({ path: windowPath }) {
                       tabIndex={0}
                       data-table-row={i}
                       data-table-col={8}
-                      onKeyDown={(e) => handleGridKeyDown(e, 8)}
+                      onClick={() => requestEditSale(r.sale, r.lineIndex)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          requestEditSale(r.sale, r.lineIndex);
+                          return;
+                        }
+                        handleGridKeyDown(e, 8);
+                      }}
                       className="px-1.5 py-1 text-right tabular-nums font-medium text-primary-800 outline-none cursor-pointer w-18"
                     >
                       {formatCurrency(r.amount)}
@@ -2342,7 +2153,15 @@ export default function Sell({ path: windowPath }) {
                       tabIndex={0}
                       data-table-row={i}
                       data-table-col={9}
-                      onKeyDown={(e) => handleGridKeyDown(e, 9)}
+                      onClick={() => requestEditSale(r.sale, r.lineIndex)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          requestEditSale(r.sale, r.lineIndex);
+                          return;
+                        }
+                        handleGridKeyDown(e, 9);
+                      }}
                       className="px-1.5 py-1 text-[10px] text-primary-500 whitespace-nowrap text-right tabular-nums leading-tight outline-none cursor-pointer w-28"
                     >
                       {(() => {

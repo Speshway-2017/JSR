@@ -93,16 +93,16 @@ export default function SalesMaterials() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="page-title">Sales Materials</h1>
-          <p className="text-primary-500 mt-1">
+          <h1 className="page-title text-2xl font-bold text-primary-700">Sales Materials</h1>
+          <p className="text-xs text-primary-500 mt-1">
             Materials used when creating sales bag orders
           </p>
         </div>
-        <button type="button" onClick={openAdd} className="btn-primary">
-          <Plus className="w-5 h-5" /> Add Material
+        <button type="button" onClick={openAdd} className="btn-primary !py-1.5 !px-3.5 !text-sm font-semibold flex items-center gap-1.5">
+          <Plus className="w-4 h-4" /> Add Material
         </button>
       </div>
 
@@ -114,9 +114,9 @@ export default function SalesMaterials() {
       >
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="label">Material Name *</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Material Name *</label>
             <input
-              className="input-field"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               placeholder="e.g. Mirchi"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -125,10 +125,10 @@ export default function SalesMaterials() {
             />
           </div>
           <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex gap-3 mt-2 z-10">
-            <button type="button" onClick={closeForm} className="btn-secondary flex-1">
+            <button type="button" onClick={closeForm} className="btn-secondary !py-2 !px-4 !text-sm font-semibold flex-1">
               Cancel
             </button>
-            <button type="submit" className="btn-primary flex-1" disabled={saving}>
+            <button type="submit" className="btn-primary !py-2 !px-4 !text-sm font-semibold flex-1" disabled={saving}>
               {saving ? 'Saving...' : editing ? 'Update' : 'Save'}
             </button>
           </div>
@@ -136,30 +136,30 @@ export default function SalesMaterials() {
       </MDIModalWindow>
 
       {loading ? (
-        <div className="text-center py-20 text-primary-400">Loading materials...</div>
+        <div className="text-center py-20 text-primary-400 text-xs">Loading materials...</div>
       ) : materials.length === 0 ? (
         <div className="card text-center py-16">
           <Package className="w-12 h-12 text-primary-300 mx-auto mb-3" />
-          <p className="text-primary-500 text-lg">No sales materials yet</p>
-          <p className="text-primary-400 mt-2">
+          <p className="text-primary-700 text-base font-semibold">No sales materials yet</p>
+          <p className="text-primary-400 text-xs mt-1">
             Add materials here, then pick them while creating sales orders
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {materials.map((mat) => (
-            <div key={mat._id} className="card flex items-center gap-4">
-              <div className="w-11 h-11 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
+            <div key={mat._id} className="card !p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center shrink-0 border border-primary-200">
                 <Package className="w-5 h-5 text-primary-600" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-primary-800 text-lg truncate">{mat.name}</h3>
+                <h3 className="font-bold text-primary-800 text-sm truncate">{mat.name}</h3>
               </div>
               <div className="flex gap-1 shrink-0">
                 <button
                   type="button"
                   onClick={() => openEdit(mat)}
-                  className="p-2 rounded-lg text-primary-500 hover:bg-primary-50"
+                  className="p-1.5 rounded-lg text-primary-600 hover:bg-primary-50 transition cursor-pointer"
                   title="Edit"
                 >
                   <Pencil className="w-4 h-4" />
@@ -167,7 +167,7 @@ export default function SalesMaterials() {
                 <button
                   type="button"
                   onClick={() => handleDelete(mat)}
-                  className="p-2 rounded-lg text-red-500 hover:bg-red-50"
+                  className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition cursor-pointer"
                   title="Delete"
                 >
                   <Trash2 className="w-4 h-4" />

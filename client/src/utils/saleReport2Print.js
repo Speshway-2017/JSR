@@ -184,8 +184,6 @@ export function saleReport2InnerHtml(data) {
               const matTe = mat.materialNameTelugu ? `<span class="mat-te"> (${esc(mat.materialNameTelugu)})</span>` : '';
 
               const lines = (mat.entries || [])
-                .slice()
-                .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base', numeric: true }))
                 .map((e) => {
                   const bagsText = esc(fmtBags(e.bags));
                   const rateVal = e.rate != null ? e.rate : (e.amount != null ? e.amount : 0);

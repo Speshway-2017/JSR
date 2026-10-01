@@ -83,20 +83,20 @@ export default function AddLoad() {
   };
 
   return (
-    <div className="space-y-4 max-w-2xl">
+    <div className="space-y-3 max-w-2xl">
       <div>
-        <h1 className="page-title">Add Load</h1>
-        <p className="text-primary-400 text-sm mt-0.5">
+        <h1 className="page-title text-2xl font-bold text-primary-700">Add Load</h1>
+        <p className="text-xs text-primary-500 mt-1">
           Record that a vendor brought a load on a date (for Sale Patty). Not a purchase.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="card space-y-4">
+      <form onSubmit={handleSubmit} className="card space-y-3 !p-4">
         <div>
-          <label className="label">Date *</label>
+          <label className="text-xs font-semibold text-primary-600 mb-1 block">Date *</label>
           <input
             type="date"
-            className="input-field"
+            className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
             value={loadDate}
             onChange={(e) => setLoadDate(e.target.value)}
             required
@@ -104,9 +104,9 @@ export default function AddLoad() {
         </div>
 
         <div className="relative">
-          <label className="label">Vendor *</label>
+          <label className="text-xs font-semibold text-primary-600 mb-1 block">Vendor *</label>
           <input
-            className="input-field"
+            className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
             value={vendorQuery}
             placeholder="Type vendor name…"
             autoComplete="off"
@@ -142,54 +142,54 @@ export default function AddLoad() {
                 <li key={v._id}>
                   <button
                     type="button"
-                    className={`w-full text-left px-4 py-2.5 text-sm ${
+                    className={`w-full text-left px-3.5 py-2 text-sm ${
                       idx === highlight
-                        ? 'bg-primary-100 text-primary-900 font-medium'
+                        ? 'bg-primary-100 text-primary-900 font-semibold'
                         : 'text-primary-700 hover:bg-primary-50'
                     }`}
                     onMouseDown={(e) => e.preventDefault()}
                     onMouseEnter={() => setHighlight(idx)}
                     onClick={() => pickVendor(v)}
                   >
-                    {v.name}
-                    {v.city ? <span className="text-primary-400 ml-2 text-xs">{v.city}</span> : null}
+                    <span className="font-semibold">{v.name}</span>
+                    {v.city ? <span className="text-primary-500 ml-2 text-xs">({v.city})</span> : null}
                   </button>
                 </li>
               ))}
             </ul>
           )}
           {selected && (
-            <p className="text-xs text-primary-500 mt-1">Selected: {selected.name}</p>
+            <p className="text-xs text-primary-600 font-medium mt-1">Selected: <span className="font-bold text-primary-800">{selected.name}</span></p>
           )}
         </div>
 
         <div>
-          <label className="label">Notes</label>
+          <label className="text-xs font-semibold text-primary-600 mb-1 block">Notes</label>
           <input
-            className="input-field"
+            className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional"
+            placeholder="Optional notes…"
           />
         </div>
 
-        <button type="submit" className="btn-primary w-full" disabled={saving}>
+        <button type="submit" className="btn-primary w-full !py-2 !text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-2xs" disabled={saving}>
           <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save Load'}
         </button>
       </form>
 
-      <div className="card !p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-primary-100 font-semibold text-primary-700">
+      <div className="card !p-0 overflow-hidden border border-primary-200">
+        <div className="px-4 py-2.5 border-b border-primary-200 bg-primary-50/80 font-bold text-xs text-primary-700 uppercase tracking-wide">
           Recent loads
         </div>
         {recent.length === 0 ? (
-          <p className="text-center py-8 text-primary-400 text-sm">No loads yet</p>
+          <p className="text-center py-8 text-primary-400 text-xs">No loads yet</p>
         ) : (
-          <ul className="divide-y divide-primary-50">
+          <ul className="divide-y divide-primary-100">
             {recent.map((load) => (
-              <li key={load._id} className="px-4 py-3 text-sm flex justify-between gap-3">
-                <span className="font-medium text-primary-800">{load.vendor?.name || '—'}</span>
-                <span className="text-primary-500">
+              <li key={load._id} className="px-4 py-2.5 text-xs flex justify-between items-center hover:bg-primary-50/30 transition">
+                <span className="font-bold text-primary-800 text-sm">{load.vendor?.name || '—'}</span>
+                <span className="text-primary-500 font-medium">
                   {formatDate(load.loadDate || load.createdAt)}
                 </span>
               </li>

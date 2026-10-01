@@ -31,51 +31,51 @@ export default function VendorBill() {
   const d = bill?.summary?.deductions;
 
   return (
-    <div className="space-y-4 max-w-3xl">
-      <Link to={`/vendors/${id}`} className="inline-flex items-center gap-2 text-primary-500 hover:text-primary-700 font-medium text-sm">
-        <ArrowLeft className="w-4 h-4" /> Back to Vendor
+    <div className="space-y-3 max-w-3xl">
+      <Link to={`/vendors/${id}`} className="inline-flex items-center gap-1.5 text-primary-600 hover:text-primary-800 font-semibold text-xs transition">
+        <ArrowLeft className="w-3.5 h-3.5" /> Back to Vendor
       </Link>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="page-title flex items-center gap-2">
-            <FileText className="w-7 h-7 text-primary-500" /> Vendor Bill
+          <h1 className="page-title text-2xl font-bold text-primary-700 flex items-center gap-2">
+            <FileText className="w-6 h-6 text-primary-600" /> Vendor Bill
           </h1>
-          {bill && <p className="text-primary-400 text-sm mt-0.5">{bill.vendor.name} — {bill.vendor.city}</p>}
+          {bill && <p className="text-xs text-primary-500 mt-1"><span className="font-semibold text-primary-700">{bill.vendor.name}</span> — {bill.vendor.city}</p>}
         </div>
       </div>
 
-      <div className="card !p-3 flex flex-wrap items-end gap-3">
+      <div className="card !p-3 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <label className="text-xs text-primary-400">From</label>
-          <input type="date" className="input-field !py-2 !text-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <label className="text-xs font-semibold text-primary-600">From</label>
+          <input type="date" className="h-9 rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-xs text-primary-400">To</label>
-          <input type="date" className="input-field !py-2 !text-sm" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <label className="text-xs font-semibold text-primary-600">To</label>
+          <input type="date" className="h-9 rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
-        <button type="button" onClick={fetchBill} className="btn-primary !py-2 !px-4 !text-sm">Apply</button>
+        <button type="button" onClick={fetchBill} className="btn-primary !py-1.5 !px-3.5 !text-sm font-semibold cursor-pointer shadow-2xs">Apply</button>
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-primary-400">Loading bill...</div>
+        <div className="text-center py-12 text-primary-400 text-xs">Loading bill...</div>
       ) : !bill ? (
-        <div className="card text-center py-12 text-primary-400">Could not load bill</div>
+        <div className="card text-center py-12 text-primary-400 text-xs">Could not load bill</div>
       ) : (
-        <div className="card space-y-6">
+        <div className="card space-y-4 !p-4 border border-primary-200">
           {bill.materials.length === 0 ? (
-            <p className="text-center text-primary-400 py-8">No sales in this period</p>
+            <p className="text-center text-primary-400 py-8 text-xs">No sales in this period</p>
           ) : (
             bill.materials.map((mat) => (
-              <div key={mat.materialName}>
-                <h2 className="font-bold text-primary-700 text-lg mb-2">{mat.materialName}</h2>
-                <div className="space-y-1.5">
+              <div key={mat.materialName} className="space-y-1.5">
+                <h2 className="font-bold text-primary-800 text-sm">{mat.materialName}</h2>
+                <div className="space-y-1">
                   {mat.lines.map((line, i) => (
-                    <div key={i} className="flex justify-between gap-3 text-sm text-primary-600 border-b border-primary-50 pb-1.5">
+                    <div key={i} className="flex justify-between gap-3 text-xs text-primary-700 border-b border-primary-100 pb-1">
                       <span>
                         {line.bagCount} bags — {formatKg(line.totalKg)} — {formatCurrency(line.ratePerKg)}/kg
                       </span>
-                      <span className="font-semibold text-primary-700 shrink-0">{formatCurrency(line.totalAmount)}</span>
+                      <span className="font-bold text-primary-800 shrink-0">{formatCurrency(line.totalAmount)}</span>
                     </div>
                   ))}
                 </div>
@@ -83,41 +83,41 @@ export default function VendorBill() {
             ))
           )}
 
-          <div className="border-t border-primary-200 pt-4 space-y-2">
-            <div className="flex justify-between font-semibold text-primary-700">
+          <div className="border-t border-primary-200 pt-3 space-y-2">
+            <div className="flex justify-between font-bold text-sm text-primary-800">
               <span>Total Amount</span>
               <span>{formatCurrency(bill.summary.grossTotal)}</span>
             </div>
 
-            <p className="text-xs font-semibold text-primary-400 uppercase tracking-wide pt-3">Deductions</p>
-            <div className="flex justify-between text-sm text-primary-600">
+            <p className="text-xs font-bold text-primary-700 uppercase tracking-wide pt-2">Deductions</p>
+            <div className="flex justify-between text-xs font-medium text-primary-600">
               <span>Handling Charges</span>
               <span>-{formatCurrency(d.handlingCharges)}</span>
             </div>
-            <div className="flex justify-between text-sm text-primary-600">
+            <div className="flex justify-between text-xs font-medium text-primary-600">
               <span>Labour ({bill.summary.totalBags} × {formatCurrency(d.perBagRates.labour)})</span>
               <span>-{formatCurrency(d.labour)}</span>
             </div>
-            <div className="flex justify-between text-sm text-primary-600">
+            <div className="flex justify-between text-xs font-medium text-primary-600">
               <span>Aaseelu ({bill.summary.totalBags} × {formatCurrency(d.perBagRates.aaseelu)})</span>
               <span>-{formatCurrency(d.aaseelu)}</span>
             </div>
-            <div className="flex justify-between text-sm text-primary-600">
+            <div className="flex justify-between text-xs font-medium text-primary-600">
               <span>Bill ({bill.summary.totalBags} × {formatCurrency(d.perBagRates.bill)})</span>
               <span>-{formatCurrency(d.bill)}</span>
             </div>
-            <div className="flex justify-between text-sm text-primary-600">
+            <div className="flex justify-between text-xs font-medium text-primary-600">
               <span>Union Charges ({bill.summary.totalBags} × {formatCurrency(d.perBagRates.unionCharges)})</span>
               <span>-{formatCurrency(d.unionCharges)}</span>
             </div>
-            <div className="flex justify-between text-sm text-primary-600">
+            <div className="flex justify-between text-xs font-medium text-primary-600">
               <span>Commission ({d.commissionPercent || 0}%)</span>
               <span>-{formatCurrency(d.commission || 0)}</span>
             </div>
 
-            <div className="flex justify-between items-center bg-primary-50 rounded-xl px-4 py-3 mt-4">
-              <span className="font-bold text-primary-700">Total Receivable</span>
-              <span className="text-2xl font-bold text-accent-600">{formatCurrency(bill.summary.receivable)}</span>
+            <div className="flex justify-between items-center bg-accent-50/80 border border-accent-200 rounded-xl px-4 py-3 mt-3">
+              <span className="font-bold text-primary-800 text-sm">Total Receivable</span>
+              <span className="text-2xl font-bold text-accent-700">{formatCurrency(bill.summary.receivable)}</span>
             </div>
           </div>
         </div>

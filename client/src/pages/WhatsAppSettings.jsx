@@ -97,57 +97,57 @@ export default function WhatsAppSettings() {
   const isConnected = config?.isConfigured;
 
   return (
-    <div className="space-y-2.5 max-w-3xl">
+    <div className="space-y-3 max-w-3xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-sm font-bold text-primary-800 flex items-center gap-1.5">
-            <MessageSquare className="w-4 h-4 text-emerald-600" /> Meta WhatsApp Cloud API Settings
+          <h1 className="page-title text-2xl font-bold text-primary-700 flex items-center gap-2">
+            <MessageSquare className="w-6 h-6 text-primary-600" /> Meta WhatsApp Cloud API Settings
           </h1>
-          <p className="text-primary-400 text-[11px] mt-0.5">
+          <p className="text-xs text-primary-500 mt-1">
             Official Meta WhatsApp Cloud API credentials for 1-click PDF bill & report delivery
           </p>
         </div>
       </div>
 
       {/* Status Card */}
-      <div className={`card !p-3 border-l-4 ${isConnected ? 'border-emerald-500' : 'border-amber-500'} bg-white space-y-2.5`}>
+      <div className={`card !p-4 border-l-4 ${isConnected ? 'border-emerald-500' : 'border-amber-500'} bg-white space-y-3`}>
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <div className={`p-2 rounded-xl ${isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-              {isConnected ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl ${isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              {isConnected ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
             </div>
             <div>
-              <h2 className="font-bold text-slate-800 text-xs">
+              <h2 className="font-bold text-slate-800 text-sm">
                 {isConnected ? 'Meta WhatsApp API Configured' : 'WhatsApp API Credentials Needed'}
               </h2>
-              <p className="text-[10.5px] text-slate-500">Sender Number: {config?.senderNumber || '+91 89774 81054'}</p>
+              <p className="text-xs text-slate-500 mt-0.5">Sender Number: <span className="font-semibold text-slate-700">{config?.senderNumber || '+91 89774 81054'}</span></p>
             </div>
           </div>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${isConnected ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'}`}>
+          <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase border ${isConnected ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'}`}>
             {isConnected ? 'Active' : 'Attention Required'}
           </span>
         </div>
 
         {/* Current Credentials Details */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 text-xs border-t border-slate-100">
-          <div className="p-2 rounded-lg bg-slate-50 border border-slate-200/80 space-y-0.5">
-            <span className="text-slate-400 font-semibold uppercase text-[9.5px] flex items-center gap-1">
-              <Phone className="w-3 h-3 text-emerald-600" /> Phone Number ID
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 text-xs border-t border-slate-100">
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <span className="text-slate-500 font-semibold uppercase text-xs flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-primary-600" /> Phone Number ID
             </span>
-            <p className="font-mono font-bold text-slate-800 text-xs">{config?.phoneNumberId || 'Not Set'}</p>
+            <p className="font-mono font-bold text-slate-800 text-sm">{config?.phoneNumberId || 'Not Set'}</p>
           </div>
 
-          <div className="p-2 rounded-lg bg-slate-50 border border-slate-200/80 space-y-0.5">
-            <span className="text-slate-400 font-semibold uppercase text-[9.5px] flex items-center gap-1">
-              <Building className="w-3 h-3 text-emerald-600" /> WABA Account ID
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <span className="text-slate-500 font-semibold uppercase text-xs flex items-center gap-1.5">
+              <Building className="w-3.5 h-3.5 text-primary-600" /> WABA Account ID
             </span>
-            <p className="font-mono font-bold text-slate-800 text-xs">{config?.wabaId || 'Not Set'}</p>
+            <p className="font-mono font-bold text-slate-800 text-sm">{config?.wabaId || 'Not Set'}</p>
           </div>
 
-          <div className="sm:col-span-2 p-2 rounded-lg bg-slate-50 border border-slate-200/80 space-y-0.5">
-            <span className="text-slate-400 font-semibold uppercase text-[9.5px] flex items-center gap-1">
-              <Key className="w-3 h-3 text-emerald-600" /> Permanent Access Token
+          <div className="sm:col-span-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <span className="text-slate-500 font-semibold uppercase text-xs flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-primary-600" /> Permanent Access Token
             </span>
             <p className="font-mono text-slate-700 truncate text-xs">{config?.maskedToken || 'Not Set'}</p>
           </div>
@@ -155,20 +155,20 @@ export default function WhatsAppSettings() {
       </div>
 
       {/* Edit Configuration Form */}
-      <form onSubmit={handleSaveConfig} className="card !p-3 space-y-2.5">
-        <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-          <Key className="w-3.5 h-3.5 text-emerald-600" /> Update API Credentials
+      <form onSubmit={handleSaveConfig} className="card !p-4 space-y-3">
+        <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+          <Key className="w-4 h-4 text-primary-600" /> Update API Credentials
         </h3>
-        <p className="text-[11px] text-slate-500">
+        <p className="text-xs text-slate-500">
           Obtain your <strong>Phone Number ID</strong> and <strong>Permanent System User Access Token</strong> from your Meta WhatsApp Developer App dashboard and save them below:
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Phone Number ID *</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Phone Number ID *</label>
             <input
               type="text"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs font-mono text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-mono text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               placeholder="e.g. 105938472819401"
               value={form.phoneNumberId}
               onChange={(e) => setForm({ ...form, phoneNumberId: e.target.value })}
@@ -177,10 +177,10 @@ export default function WhatsAppSettings() {
           </div>
 
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">WABA Account ID</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">WABA Account ID</label>
             <input
               type="text"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs font-mono text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-mono text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               placeholder="e.g. 1962348571140826"
               value={form.wabaId}
               onChange={(e) => setForm({ ...form, wabaId: e.target.value })}
@@ -188,10 +188,10 @@ export default function WhatsAppSettings() {
           </div>
 
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Sender Phone Number</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Sender Phone Number</label>
             <input
               type="text"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs font-mono text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-mono text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               placeholder="e.g. +918977481054"
               value={form.senderNumber}
               onChange={(e) => setForm({ ...form, senderNumber: e.target.value })}
@@ -199,10 +199,10 @@ export default function WhatsAppSettings() {
           </div>
 
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Access Token (Leave empty to keep current)</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Access Token (Leave empty to keep current)</label>
             <input
               type="password"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs font-mono text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-mono text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               placeholder="Paste Meta Permanent Access Token..."
               value={form.accessToken}
               onChange={(e) => setForm({ ...form, accessToken: e.target.value })}
@@ -213,26 +213,26 @@ export default function WhatsAppSettings() {
         <button
           type="submit"
           disabled={savingConfig}
-          className="btn-primary !py-1.5 !px-4 !text-xs font-semibold flex items-center justify-center gap-1.5 w-full cursor-pointer shadow-2xs"
+          className="btn-primary !py-2 !px-4 !text-sm font-semibold flex items-center justify-center gap-2 w-full cursor-pointer shadow-2xs"
         >
-          <Save className="w-3.5 h-3.5" />
+          <Save className="w-4 h-4" />
           {savingConfig ? 'Saving Settings...' : 'Save API Credentials'}
         </button>
       </form>
 
       {/* Test Sending Card */}
-      <div className="card !p-3 space-y-2">
-        <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-          <Send className="w-3.5 h-3.5 text-emerald-600" /> Test WhatsApp Delivery
+      <div className="card !p-4 space-y-2.5">
+        <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+          <Send className="w-4 h-4 text-primary-600" /> Test WhatsApp Delivery
         </h3>
-        <p className="text-[11px] text-slate-500">
+        <p className="text-xs text-slate-500">
           Enter a mobile number below to verify your WhatsApp Cloud API connection:
         </p>
 
         <div className="flex items-center gap-2">
           <input
             type="text"
-            className="h-8 max-w-xs rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+            className="h-9 max-w-xs rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
             placeholder="10-digit mobile number"
             value={testPhone}
             onChange={(e) => setTestPhone(e.target.value)}
@@ -240,15 +240,15 @@ export default function WhatsAppSettings() {
           {isOnline ? (
             <button
               type="button"
-              className="btn-primary !py-1 !px-3 !text-xs flex items-center gap-1 cursor-pointer shadow-2xs shrink-0"
+              className="btn-primary !py-1.5 !px-3.5 !text-sm flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
               onClick={handleTestSend}
               disabled={sendingTest}
             >
-              <Send className="w-3 h-3 text-white" />
+              <Send className="w-4 h-4 text-white" />
               {sendingTest ? 'Sending Test PDF...' : 'Send Test WhatsApp PDF'}
             </button>
           ) : (
-            <span className="text-[11px] text-amber-600 font-medium bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+            <span className="text-xs text-amber-600 font-medium bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
               Offline (Internet required)
             </span>
           )}

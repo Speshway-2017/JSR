@@ -333,18 +333,7 @@ export default function BillPrint({ path: windowPath }) {
     if (searchQuery.trim()) {
       const q = searchQuery.trim();
       list = list.filter((st) => {
-        const custMatch =
-          matchesPrefix(st.name, q) ||
-          matchesPrefix(st.nameTelugu, q) ||
-          matchesPrefix(st.scheduleName, q) ||
-          matchesPrefix(st.city, q) ||
-          matchesPrefix(st.mobile, q);
-        const salesMatch = (st.sales || []).some(
-          (s) =>
-            matchesPrefix(s.material, q) ||
-            matchesPrefix(s.vendorName, q)
-        );
-        return custMatch || salesMatch;
+        return matchesPrefix(st.name, q) || matchesPrefix(st.nameTelugu, q);
       });
     }
 
@@ -494,13 +483,13 @@ export default function BillPrint({ path: windowPath }) {
     return (
       <button
         type="button"
-        className={`inline-flex items-center gap-0.5 font-semibold text-[10px] uppercase tracking-tight hover:text-primary-800 cursor-pointer ${
+        className={`inline-flex items-center gap-1 font-semibold text-xs uppercase tracking-tight hover:text-primary-800 cursor-pointer ${
           align === 'right' ? 'w-full justify-end text-right' : 'text-left'
         }`}
         onClick={() => toggleSort(column)}
       >
         <span>{label}</span>
-        <Icon className={`w-2.5 h-2.5 shrink-0 ${active ? 'text-primary-800' : 'text-primary-400'}`} />
+        <Icon className={`w-3 h-3 shrink-0 ${active ? 'text-primary-800' : 'text-primary-400'}`} />
       </button>
     );
   };
@@ -508,21 +497,21 @@ export default function BillPrint({ path: windowPath }) {
   const hasFilters = !!(filterCustomer || filterVendor || filterItem || filterSchedule || searchQuery.trim());
 
   return (
-    <div className="space-y-2.5 flex flex-col h-full overflow-hidden">
+    <div className="space-y-3 flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 shrink-0">
         <div>
-          <h1 className="text-sm font-bold text-primary-800">Bill Print</h1>
-          <p className="text-primary-400 text-[11px] mt-0.5">
+          <h1 className="page-title">Bill Print</h1>
+          <p className="text-xs text-primary-500 mt-0.5">
             {billType === 'purchase'
               ? 'Filter, preview, and print vendor purchase bills in 2, 4, or 6 per page layout'
               : 'Filter, preview, and print full customer ledger statements in 2, 4, or 6 per page layout'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap shrink-0">
           {/* Bill Type Switcher */}
-          <div className="flex items-center gap-1 bg-primary-100/80 p-0.5 rounded-lg border border-primary-200">
+          <div className="flex items-center gap-1 bg-primary-100/80 p-1 rounded-xl border border-primary-200">
             <button
               type="button"
               onClick={() => {
@@ -533,7 +522,7 @@ export default function BillPrint({ path: windowPath }) {
                 setFilterSchedule('');
                 setSearchQuery('');
               }}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 billType === 'customer'
                   ? 'bg-primary-800 text-white shadow-xs'
                   : 'text-primary-600 hover:text-primary-900 hover:bg-primary-200/50'
@@ -551,7 +540,7 @@ export default function BillPrint({ path: windowPath }) {
                 setFilterSchedule('');
                 setSearchQuery('');
               }}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 billType === 'purchase'
                   ? 'bg-primary-800 text-white shadow-xs'
                   : 'text-primary-600 hover:text-primary-900 hover:bg-primary-200/50'
@@ -564,61 +553,61 @@ export default function BillPrint({ path: windowPath }) {
           {isOnline && (
             <button
               type="button"
-              className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
+              className="btn-secondary !py-1.5 !px-3 !text-sm font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
               onClick={handleSendWhatsApp}
               disabled={!selectedStatements.length}
             >
-              <Send className="w-3.5 h-3.5 text-emerald-600" /> Send WhatsApp
+              <Send className="w-4 h-4 text-emerald-600" /> Send WhatsApp
             </button>
           )}
           <button
             type="button"
-            className="btn-primary !py-1.5 !px-3 !text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
+            className="btn-primary !py-1.5 !px-3.5 !text-sm font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
             onClick={handlePrintPDF}
             disabled={!selectedStatements.length || printing}
           >
-            <Printer className="w-3.5 h-3.5" /> {printing ? 'Opening PDF...' : 'Print / Save PDF'}
+            <Printer className="w-4 h-4" /> {printing ? 'Opening PDF...' : 'Print / Save PDF'}
           </button>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="card !p-1.5 shrink-0 space-y-1.5">
+      <div className="card !p-2.5 shrink-0 space-y-2">
         {/* Row 1: Date Range, Search & Actions */}
-        <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[10px] font-bold text-primary-500 uppercase tracking-tight">From:</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs font-semibold text-primary-600">From:</span>
             <input
               type="date"
-              className="h-7 w-[7.25rem] rounded-lg border border-primary-200 bg-surface px-1.5 py-0.5 text-[11px] font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-36 rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[10px] font-bold text-primary-500 uppercase tracking-tight">To:</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs font-semibold text-primary-600">To:</span>
             <input
               type="date"
-              className="h-7 w-[7.25rem] rounded-lg border border-primary-200 bg-surface px-1.5 py-0.5 text-[11px] font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-36 rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
 
-          <div className="relative flex-1 min-w-[110px]">
-            <Search className="w-3 h-3 text-primary-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <div className="relative flex-1 min-w-[130px]">
+            <Search className="w-3.5 h-3.5 text-primary-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder={billType === 'purchase' ? 'Search vendor, item...' : 'Search customer, vendor, item, schedule...'}
-              className="h-7 w-full rounded-lg border border-primary-200 bg-surface pl-6 pr-5 text-[11px] text-primary-700 placeholder:text-primary-400 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              placeholder={billType === 'purchase' ? 'Search vendor name...' : 'Search customer name...'}
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface pl-8 pr-6 text-sm font-medium text-primary-700 placeholder:text-primary-400 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             {searchQuery && (
               <button
                 type="button"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-600 text-[10px] font-bold cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-600 text-xs font-bold cursor-pointer"
                 onClick={() => setSearchQuery('')}
               >
                 ✕
@@ -629,7 +618,7 @@ export default function BillPrint({ path: windowPath }) {
           {hasFilters && (
             <button
               type="button"
-              className="text-[11px] font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg px-2 h-7 flex items-center gap-1 transition cursor-pointer shrink-0"
+              className="text-xs font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg px-2.5 h-9 flex items-center gap-1 transition cursor-pointer shrink-0"
               onClick={() => {
                 setFilterCustomer('');
                 setFilterVendor('');
@@ -639,25 +628,25 @@ export default function BillPrint({ path: windowPath }) {
               }}
               title="Clear active filters"
             >
-              <X className="w-3 h-3" /> Clear
+              <X className="w-3.5 h-3.5" /> Clear
             </button>
           )}
 
           <button
             type="button"
-            className="btn-secondary !h-7 !py-0.5 !px-2 !text-[11px] font-semibold rounded-lg flex items-center gap-1 shrink-0 cursor-pointer"
+            className="btn-secondary !h-9 !py-1 !px-3 !text-sm font-semibold rounded-lg flex items-center gap-1.5 shrink-0 cursor-pointer"
             onClick={fetchBills}
             disabled={loading}
           >
-            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
         </div>
 
         {/* Row 2: Filter Select Dropdowns */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {billType === 'customer' && (
             <select
-              className="h-7 flex-1 min-w-[110px] rounded-lg border border-primary-200 bg-surface px-2 py-0.5 text-[11px] text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              className="h-9 flex-1 min-w-[120px] rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
               value={filterCustomer}
               onChange={(e) => setFilterCustomer(e.target.value)}
             >
@@ -671,7 +660,7 @@ export default function BillPrint({ path: windowPath }) {
           )}
 
           <select
-            className="h-7 flex-1 min-w-[100px] rounded-lg border border-primary-200 bg-surface px-2 py-0.5 text-[11px] text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+            className="h-9 flex-1 min-w-[110px] rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
             value={filterVendor}
             onChange={(e) => setFilterVendor(e.target.value)}
           >
@@ -684,7 +673,7 @@ export default function BillPrint({ path: windowPath }) {
           </select>
 
           <select
-            className="h-7 flex-1 min-w-[100px] rounded-lg border border-primary-200 bg-surface px-2 py-0.5 text-[11px] text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+            className="h-9 flex-1 min-w-[110px] rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
             value={filterItem}
             onChange={(e) => setFilterItem(e.target.value)}
           >
@@ -698,7 +687,7 @@ export default function BillPrint({ path: windowPath }) {
 
           {billType === 'customer' && (
             <select
-              className="h-7 flex-1 min-w-[100px] rounded-lg border border-primary-200 bg-surface px-2 py-0.5 text-[11px] text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
+              className="h-9 flex-1 min-w-[110px] rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition truncate"
               value={filterSchedule}
               onChange={(e) => setFilterSchedule(e.target.value)}
             >
@@ -717,24 +706,24 @@ export default function BillPrint({ path: windowPath }) {
       <div className="flex flex-col md:flex-row gap-2.5 flex-1 min-h-0 overflow-hidden">
         {/* Left Column: Records Table (Collapsible) */}
         {showCustomerList && (
-          <div className="w-full md:w-60 lg:w-64 min-w-[235px] max-w-[260px] flex flex-col card !p-0 overflow-hidden min-h-[160px] max-h-[240px] md:max-h-none shrink-0 border border-primary-200">
-            <div className="px-2 py-1.5 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between">
-              <div className="flex items-center gap-1">
+          <div className="w-full md:w-64 lg:w-72 min-w-[250px] max-w-[280px] flex flex-col card !p-0 overflow-hidden min-h-[160px] max-h-[240px] md:max-h-none shrink-0 border border-primary-200">
+            <div className="px-2.5 py-2 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
                 <button type="button" onClick={toggleSelectAll} className="text-primary-600 cursor-pointer">
                   {selectedCids.size === filteredStatements.length && filteredStatements.length > 0 ? (
-                    <CheckSquare className="w-3.5 h-3.5" />
+                    <CheckSquare className="w-4 h-4 text-primary-700" />
                   ) : (
-                    <Square className="w-3.5 h-3.5 text-primary-400" />
+                    <Square className="w-4 h-4 text-primary-400" />
                   )}
                 </button>
-                <span className="font-bold text-primary-800 text-[11px]">
+                <span className="font-bold text-primary-800 text-xs">
                   Selected {selectedStatements.length} / {filteredStatements.length}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCustomerList(false)}
-                className="text-[10px] font-semibold text-primary-500 hover:text-primary-800 px-1 py-0.5 rounded hover:bg-primary-100 transition cursor-pointer"
+                className="text-xs font-semibold text-primary-500 hover:text-primary-800 px-1.5 py-0.5 rounded hover:bg-primary-100 transition cursor-pointer"
                 title="Hide list to expand bill preview"
               >
                 Hide
@@ -747,21 +736,21 @@ export default function BillPrint({ path: windowPath }) {
               ) : filteredStatements.length === 0 ? (
                 <div className="text-center py-12 text-primary-400 text-xs">No bills match filter</div>
               ) : (
-                <table className="w-full text-[11px] table-fixed">
-                  <thead className="sticky top-0 bg-primary-50 border-b border-primary-100 z-10 text-[10px]">
+                <table className="w-full text-xs table-fixed">
+                  <thead className="sticky top-0 bg-primary-50 border-b border-primary-100 z-10 text-xs">
                     <tr className="text-left text-primary-600">
-                      <th className="w-6 px-1 py-1 text-center"></th>
-                      <th className="px-1.5 py-1 font-semibold">
+                      <th className="w-7 px-1 py-1.5 text-center"></th>
+                      <th className="px-2 py-1.5 font-semibold">
                         <SortHeader column="name" label={billType === 'purchase' ? 'Vendor' : 'Customer'} />
                       </th>
-                      <th className="px-1 py-1 font-semibold text-right w-14">
+                      <th className="px-1.5 py-1.5 font-semibold text-right w-16">
                         <SortHeader
                           column="totalSale"
                           label={billType === 'purchase' ? 'Amount' : 'Sale'}
                           align="right"
                         />
                       </th>
-                      <th className="px-1.5 py-1 font-semibold text-right w-16">
+                      <th className="px-2 py-1.5 font-semibold text-right w-18">
                         <SortHeader
                           column="closing"
                           label={billType === 'purchase' ? 'Balance' : 'Closing'}
@@ -782,33 +771,33 @@ export default function BillPrint({ path: windowPath }) {
                             selected ? 'bg-primary-100/60 font-medium' : 'hover:bg-primary-50/40'
                           }`}
                         >
-                          <td className="px-1 py-1 text-center w-6" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-1 py-1 text-center w-7" onClick={(e) => e.stopPropagation()}>
                             <button type="button" onClick={() => toggleSelectOne(cid)} className="cursor-pointer">
                               {selected ? (
-                                <CheckSquare className="w-3.5 h-3.5 text-primary-600" />
+                                <CheckSquare className="w-4 h-4 text-primary-600" />
                               ) : (
-                                <Square className="w-3.5 h-3.5 text-primary-300" />
+                                <Square className="w-4 h-4 text-primary-300" />
                               )}
                             </button>
                           </td>
-                          <td className="px-1.5 py-1 text-primary-800 min-w-0">
-                            <div className="font-semibold text-[11px] leading-snug truncate" title={st.name}>
+                          <td className="px-2 py-1 text-primary-800 min-w-0">
+                            <div className="font-semibold text-xs leading-snug truncate" title={st.name}>
                               {st.name}
                             </div>
                             {st.isPurchase ? (
-                              <span className="text-[9.5px] text-primary-400 truncate block">
+                              <span className="text-xs text-primary-400 truncate block">
                                 {[st.nameTelugu, st.city, st.totalBags ? `${st.totalBags} bags` : ''].filter(Boolean).join(' · ')}
                               </span>
                             ) : st.nameTelugu || st.scheduleName ? (
-                              <span className="text-[9.5px] text-primary-400 truncate block">
+                              <span className="text-xs text-primary-400 truncate block">
                                 {[st.nameTelugu, st.scheduleName ? `(${st.scheduleName})` : ''].filter(Boolean).join(' ')}
                               </span>
                             ) : null}
                           </td>
-                          <td className="px-1 py-1 text-right text-primary-700 font-semibold tabular-nums text-[11px] whitespace-nowrap w-14">
+                          <td className="px-1.5 py-1 text-right text-primary-700 font-semibold tabular-nums text-xs whitespace-nowrap w-16">
                             {formatCurrency(st.totalSale)}
                           </td>
-                          <td className="px-1.5 py-1 text-right text-primary-800 font-bold tabular-nums text-[11px] whitespace-nowrap w-16">
+                          <td className="px-2 py-1 text-right text-primary-800 font-bold tabular-nums text-xs whitespace-nowrap w-18">
                             {formatCurrency(st.closing)}
                           </td>
                         </tr>
@@ -823,31 +812,31 @@ export default function BillPrint({ path: windowPath }) {
 
         {/* Right Column: Live Bill Preview */}
         <div className="flex-1 min-w-0 flex flex-col card !p-0 overflow-hidden border border-primary-200">
-          <div className="px-3 py-1.5 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between flex-wrap gap-2">
+          <div className="px-3 py-2 border-b border-primary-100 bg-primary-50/70 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               {!showCustomerList && (
                 <button
                   type="button"
                   onClick={() => setShowCustomerList(true)}
-                  className="px-2 py-0.5 rounded border border-primary-200 bg-white text-primary-700 hover:bg-primary-100 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                  className="px-2.5 py-1 rounded-lg border border-primary-200 bg-white text-primary-700 hover:bg-primary-100 text-xs font-semibold flex items-center gap-1 transition cursor-pointer shadow-2xs"
                   title="Show list"
                 >
-                  <Users className="w-3 h-3 text-primary-500" /> Show List
+                  <Users className="w-3.5 h-3.5 text-primary-500" /> Show List
                 </button>
               )}
-              <span className="font-bold text-primary-800 text-xs">
+              <span className="font-bold text-primary-800 text-sm">
                 Live Preview ({selectedStatements.length} {billType === 'purchase' ? 'Purchase Bills' : 'Bills'})
               </span>
             </div>
 
             <div className="flex items-center gap-3">
               {/* View Layout Toggle: 1 Column vs 2 Columns */}
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-primary-500 font-semibold uppercase tracking-wide">View:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-primary-500 font-semibold uppercase tracking-wide">View:</span>
                 <button
                   type="button"
                   onClick={() => setViewColumns(1)}
-                  className={`px-2 py-0.5 text-[11px] rounded-md font-semibold transition cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs rounded-md font-semibold transition cursor-pointer ${
                     viewColumns === 1
                       ? 'bg-primary-800 text-white shadow-xs'
                       : 'bg-white text-primary-700 hover:bg-primary-100 border border-primary-200'
@@ -859,7 +848,7 @@ export default function BillPrint({ path: windowPath }) {
                 <button
                   type="button"
                   onClick={() => setViewColumns(2)}
-                  className={`px-2 py-0.5 text-[11px] rounded-md font-semibold transition cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs rounded-md font-semibold transition cursor-pointer ${
                     viewColumns === 2
                       ? 'bg-primary-800 text-white shadow-xs'
                       : 'bg-white text-primary-700 hover:bg-primary-100 border border-primary-200'
@@ -871,14 +860,14 @@ export default function BillPrint({ path: windowPath }) {
               </div>
 
               {/* PDF Print N-Up Toggle */}
-              <div className="flex items-center gap-1 border-l border-primary-200 pl-2.5">
-                <span className="text-[10px] text-primary-500 font-semibold uppercase tracking-wide">Print:</span>
+              <div className="flex items-center gap-1.5 border-l border-primary-200 pl-3">
+                <span className="text-xs text-primary-500 font-semibold uppercase tracking-wide">Print:</span>
                 {[2, 4, 6].map((n) => (
                   <button
                     key={n}
                     type="button"
                     onClick={() => setPerPage(n)}
-                    className={`px-1.5 py-0.5 text-[11px] rounded-md font-semibold transition cursor-pointer ${
+                    className={`px-2 py-1 text-xs rounded-md font-semibold transition cursor-pointer ${
                       perPage === n
                         ? 'bg-primary-800 text-white shadow-xs'
                         : 'bg-white text-primary-700 hover:bg-primary-100 border border-primary-200'
@@ -891,31 +880,31 @@ export default function BillPrint({ path: windowPath }) {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto p-2.5 bg-primary-50/30">
+          <div className="flex-1 overflow-auto p-3 bg-primary-50/30">
             {selectedStatements.length === 0 ? (
               <div className="text-center py-20 text-primary-400">
                 <FileText className="w-10 h-10 text-primary-300 mx-auto mb-2" />
-                <p className="font-medium text-primary-600 text-xs">No bills selected for preview</p>
-                <p className="text-[11px] mt-1 text-primary-400">
+                <p className="font-medium text-primary-600 text-sm">No bills selected for preview</p>
+                <p className="text-xs mt-1 text-primary-400">
                   Select {billType === 'purchase' ? 'vendors' : 'customers'} on the left to see live preview
                 </p>
               </div>
             ) : (
-              <div className={`grid gap-2.5 ${viewColumns === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+              <div className={`grid gap-3 ${viewColumns === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
                 {selectedStatements.slice(0, 12).map((st) => (
                   <div
                     key={st.customerId}
                     className="card !p-0 border border-primary-200 shadow-sm bg-white overflow-hidden flex flex-col"
                   >
-                    <div className="bg-primary-50/90 px-2.5 py-1 border-b border-primary-200 flex items-center justify-between gap-1.5">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <span className="font-bold text-primary-900 text-xs truncate">{st.name}</span>
+                    <div className="bg-primary-50/90 px-3 py-1.5 border-b border-primary-200 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="font-bold text-primary-900 text-sm truncate">{st.name}</span>
                         {st.isPurchase ? (
-                          <span className="text-[10px] text-primary-600 font-medium truncate">
+                          <span className="text-xs text-primary-600 font-medium truncate">
                             ({[st.nameTelugu, st.city].filter(Boolean).join(' · ') || 'Vendor'})
                           </span>
                         ) : st.nameTelugu || st.scheduleName ? (
-                          <span className="text-[10px] text-primary-600 font-medium truncate">
+                          <span className="text-xs text-primary-600 font-medium truncate">
                             ({[st.nameTelugu, st.scheduleName ? `· ${st.scheduleName}` : ''].filter(Boolean).join(' ')})
                           </span>
                         ) : null}
@@ -925,39 +914,39 @@ export default function BillPrint({ path: windowPath }) {
                         <button
                           type="button"
                           onClick={() => openPurchaseBillPreview(st.rawPurchase || st)}
-                          className="btn-secondary !py-0.5 !px-2 !text-[10.5px] flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+                          className="btn-secondary !py-1 !px-2.5 !text-xs flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
                           title="Open full page purchase bill"
                         >
-                          <Eye className="w-3 h-3 text-primary-500" /> Full View
+                          <Eye className="w-3.5 h-3.5 text-primary-500" /> Full View
                         </button>
                       )}
                     </div>
 
                     <div className="overflow-x-auto flex-1">
-                      <table className="w-full text-[11px] excel-grid border border-primary-200">
+                      <table className="w-full text-xs excel-grid border border-primary-200">
                         <thead>
                           <tr className="bg-accent-200 text-accent-900 text-left whitespace-nowrap">
-                            <th className="bg-accent-200 px-1.5 py-1 font-bold text-center w-16 text-[10px]">తేదీ</th>
-                            <th className="bg-accent-200 px-1.5 py-1 font-bold min-w-[5.5rem] text-[10px]">వస్తువు</th>
-                            <th className="bg-accent-200 px-1 py-1 text-right font-bold w-10 text-[10px]">బ్యాగ్</th>
-                            <th className="bg-accent-200 px-1.5 py-1 text-right font-bold w-14 text-[10px]">బరువు (kg)</th>
-                            <th className="bg-accent-200 px-1.5 py-1 text-right font-bold w-14 text-[10px]">ధర</th>
-                            <th className="bg-accent-200 px-1.5 py-1 text-right font-bold w-18 text-[10px]">మొత్తం</th>
+                            <th className="bg-accent-200 px-2 py-1.5 font-bold text-center w-20 text-xs">తేదీ</th>
+                            <th className="bg-accent-200 px-2 py-1.5 font-bold min-w-[6rem] text-xs">వస్తువు</th>
+                            <th className="bg-accent-200 px-1.5 py-1.5 text-right font-bold w-12 text-xs">బ్యాగ్</th>
+                            <th className="bg-accent-200 px-2 py-1.5 text-right font-bold w-16 text-xs">బరువు (kg)</th>
+                            <th className="bg-accent-200 px-2 py-1.5 text-right font-bold w-16 text-xs">ధర</th>
+                            <th className="bg-accent-200 px-2 py-1.5 text-right font-bold w-20 text-xs">మొత్తం</th>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr className="bg-surface hover:bg-primary-50/40 text-[11px]">
-                            <td className="px-1.5 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
-                            <td className="px-1.5 py-0.5 font-semibold text-primary-700">Opening</td>
-                            <td className="px-1 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
-                            <td className="px-1.5 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
-                            <td className="px-1.5 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
-                            <td className="px-1.5 py-0.5 text-right font-semibold tabular-nums text-primary-800">
+                          <tr className="bg-surface hover:bg-primary-50/40 text-xs">
+                            <td className="px-2 py-1 text-center text-primary-400 text-xs">—</td>
+                            <td className="px-2 py-1 font-semibold text-primary-700">Opening</td>
+                            <td className="px-1.5 py-1 text-center text-primary-400 text-xs">—</td>
+                            <td className="px-2 py-1 text-center text-primary-400 text-xs">—</td>
+                            <td className="px-2 py-1 text-center text-primary-400 text-xs">—</td>
+                            <td className="px-2 py-1 text-right font-semibold tabular-nums text-primary-800">
                               {formatCurrency(st.opening || 0)}
                             </td>
                           </tr>
                           {(() => {
-                            const statementEntries = (st.entries && st.entries.length)
+                            const rawEntries = (st.entries && st.entries.length)
                               ? st.entries
                               : [
                                   ...(st.sales || []).map((s) => ({ ...s, isPayment: false })),
@@ -972,94 +961,160 @@ export default function BillPrint({ path: windowPath }) {
                                     new Date(b.date || b.createdAt || 0).getTime()
                                 );
 
-                            return statementEntries
-                              .filter((entry) => String(entry.material || '').toLowerCase() !== 'cooly' && !entry.isCoolyLine)
-                              .map((entry, idx) => {
-                                if (entry.isPayment || entry.type === 'payment') {
-                                  return (
-                                    <tr key={`pay-${idx}`} className="text-emerald-800 bg-emerald-50/50 text-[11px] font-medium">
-                                      <td className="px-1.5 py-0.5 text-center whitespace-nowrap tabular-nums text-[10.5px]">
-                                        {formatShortDate(entry.date)}
-                                      </td>
-                                      <td className="px-1.5 py-0.5 font-semibold text-emerald-800" colSpan={4}>
-                                        <div className="flex items-center gap-1">
-                                          <span>Paid</span>
-                                          <span className="text-[9.5px] text-emerald-600 font-normal">(చెల్లింపు)</span>
-                                        </div>
-                                      </td>
-                                      <td className="px-1.5 py-0.5 text-right font-bold text-emerald-800 whitespace-nowrap tabular-nums text-[11px]">
-                                        - {formatCurrency(entry.amount)}
-                                      </td>
-                                    </tr>
-                                  );
+                            const validEntries = rawEntries.filter(
+                              (entry) => String(entry.material || '').toLowerCase() !== 'cooly' && !entry.isCoolyLine
+                            );
+
+                            const renderedRows = [];
+                            let runningBalance = Number(st.opening || 0);
+
+                            for (let i = 0; i < validEntries.length; i++) {
+                              const entry = validEntries[i];
+
+                              if (entry.isPayment || entry.type === 'payment') {
+                                const payGroup = [entry];
+                                while (
+                                  i + 1 < validEntries.length &&
+                                  (validEntries[i + 1].isPayment || validEntries[i + 1].type === 'payment')
+                                ) {
+                                  i++;
+                                  payGroup.push(validEntries[i]);
                                 }
 
-                                const baseAmount = Number(entry.amount) || 0;
-                                const coolyAmt = Number(entry.cooly) || Number(entry.handlingCharges) || 0;
-                                const lineTotal = baseAmount + coolyAmt;
-
-                                return (
+                                // 1. Intermediate Subtotal before payment group
+                                renderedRows.push(
                                   <tr
-                                    key={`sale-${idx}`}
-                                    className={
-                                      idx % 2 === 0 ? 'bg-surface hover:bg-primary-50/40' : 'bg-primary-50/20 hover:bg-primary-50/50'
-                                    }
+                                    key={`subtotal-${i}`}
+                                    className="bg-primary-100/70 font-semibold text-xs border-t border-primary-200"
                                   >
-                                    <td className="px-1.5 py-0.5 text-primary-600 text-center whitespace-nowrap tabular-nums text-[10.5px]">
-                                      {formatShortDate(entry.date)}
+                                    <td className="px-2 py-1 text-center text-primary-400 text-xs">—</td>
+                                    <td className="px-2 py-1 font-bold text-primary-800" colSpan={4}>
+                                      మొత్తం (Subtotal)
                                     </td>
-                                    <td className="px-1.5 py-0.5 min-w-[5.5rem] font-semibold text-primary-800">
-                                      <span title={entry.material || 'Sale'}>{entry.material || 'Sale'}</span>
-                                      {teluguMap[String(entry.material || '').trim().toLowerCase()] &&
-                                      teluguMap[String(entry.material || '').trim().toLowerCase()] !== String(entry.material || '').trim() ? (
-                                        <span className="text-[9.5px] text-primary-400 font-normal block">
-                                          {teluguMap[String(entry.material || '').trim().toLowerCase()]}
-                                        </span>
-                                      ) : null}
-                                    </td>
-                                    <td className="px-1 py-0.5 text-right tabular-nums text-primary-800 font-semibold w-10">
-                                      {entry.bags || '—'}
-                                    </td>
-                                    <td className="px-1.5 py-0.5 text-right text-primary-700 font-medium tabular-nums w-14">
-                                      {entry.weight ? `${entry.weight}` : '—'}
-                                    </td>
-                                    <td className="px-1.5 py-0.5 text-right text-primary-700 font-medium tabular-nums w-14">
-                                      {entry.ratePerKg ? `₹${entry.ratePerKg}` : '—'}
-                                    </td>
-                                    <td className="px-1.5 py-0.5 text-right font-bold text-primary-900 whitespace-nowrap tabular-nums text-[11px] w-18">
-                                      {formatCurrency(lineTotal)}
-                                      {coolyAmt > 0 ? (
-                                        <span className="text-[9px] text-emerald-700 block font-normal leading-tight">
-                                          (incl. ₹{coolyAmt} cooly)
-                                        </span>
-                                      ) : null}
+                                    <td className="px-2 py-1 text-right font-bold tabular-nums text-primary-900">
+                                      {formatCurrency(runningBalance)}
                                     </td>
                                   </tr>
                                 );
-                              });
+
+                                // 2. Payment rows
+                                payGroup.forEach((p, pIdx) => {
+                                  const pAmt = Number(p.amount) || 0;
+                                  runningBalance -= pAmt;
+                                  renderedRows.push(
+                                    <tr
+                                      key={`pay-${i}-${pIdx}`}
+                                      className="text-emerald-800 bg-emerald-50/60 text-xs font-medium"
+                                    >
+                                      <td className="px-2 py-1 text-center whitespace-nowrap tabular-nums text-xs">
+                                        {formatShortDate(p.date)}
+                                      </td>
+                                      <td className="px-2 py-1 font-semibold text-emerald-800" colSpan={4}>
+                                        <div className="flex items-center gap-1">
+                                          <span>Paid</span>
+                                          <span className="text-xs text-emerald-600 font-normal">(చెల్లింపు)</span>
+                                        </div>
+                                      </td>
+                                      <td className="px-2 py-1 text-right font-bold text-emerald-800 whitespace-nowrap tabular-nums text-xs">
+                                        - {formatCurrency(pAmt)}
+                                      </td>
+                                    </tr>
+                                  );
+                                });
+
+                                // 3. Intermediate Balance Tally row
+                                renderedRows.push(
+                                  <tr
+                                    key={`tally-${i}`}
+                                    className="bg-amber-50/80 font-bold text-xs text-primary-900 border-t border-b border-dashed border-amber-300"
+                                  >
+                                    <td className="px-2 py-1 text-center text-primary-400 text-xs">—</td>
+                                    <td className="px-2 py-1 font-bold text-primary-900" colSpan={4}>
+                                      <div className="flex items-center gap-1">
+                                        <span>బాకీ</span>
+                                        <span className="text-xs text-primary-600 font-normal">(Balance)</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-1 text-right font-bold tabular-nums text-primary-900">
+                                      {formatCurrency(runningBalance)}
+                                    </td>
+                                  </tr>
+                                );
+
+                                continue;
+                              }
+
+                              const baseAmount = Number(entry.amount) || 0;
+                              const coolyAmt = Number(entry.cooly) || Number(entry.handlingCharges) || 0;
+                              const lineTotal = baseAmount + coolyAmt;
+                              runningBalance += lineTotal;
+
+                              renderedRows.push(
+                                <tr
+                                  key={`sale-${i}`}
+                                  className={
+                                    renderedRows.length % 2 === 0
+                                      ? 'bg-surface hover:bg-primary-50/40 text-xs'
+                                      : 'bg-primary-50/20 hover:bg-primary-50/50 text-xs'
+                                  }
+                                >
+                                  <td className="px-2 py-1 text-primary-600 text-center whitespace-nowrap tabular-nums text-xs">
+                                    {formatShortDate(entry.date)}
+                                  </td>
+                                  <td className="px-2 py-1 min-w-[6rem] font-semibold text-primary-800">
+                                    <span title={entry.material || 'Sale'}>{entry.material || 'Sale'}</span>
+                                    {teluguMap[String(entry.material || '').trim().toLowerCase()] &&
+                                    teluguMap[String(entry.material || '').trim().toLowerCase()] !== String(entry.material || '').trim() ? (
+                                      <span className="text-xs text-primary-400 font-normal block">
+                                        {teluguMap[String(entry.material || '').trim().toLowerCase()]}
+                                      </span>
+                                    ) : null}
+                                  </td>
+                                  <td className="px-1.5 py-1 text-right tabular-nums text-primary-800 font-semibold w-12">
+                                    {entry.bags || '—'}
+                                  </td>
+                                  <td className="px-2 py-1 text-right text-primary-700 font-medium tabular-nums w-16">
+                                    {entry.weight ? `${entry.weight}` : '—'}
+                                  </td>
+                                  <td className="px-2 py-1 text-right text-primary-700 font-medium tabular-nums w-16">
+                                    {entry.ratePerKg ? `₹${entry.ratePerKg}` : '—'}
+                                  </td>
+                                  <td className="px-2 py-1 text-right font-bold text-primary-900 whitespace-nowrap tabular-nums text-xs w-20">
+                                    {formatCurrency(lineTotal)}
+                                    {coolyAmt > 0 ? (
+                                      <span className="text-[10px] text-emerald-700 block font-normal leading-tight">
+                                        (incl. ₹{coolyAmt} cooly)
+                                      </span>
+                                    ) : null}
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return renderedRows;
                           })()}
                         </tbody>
                         <tfoot className="border-t-2 border-primary-300 bg-accent-200">
-                          <tr className="bg-accent-200 text-accent-900 font-bold whitespace-nowrap text-[11px]">
-                            <td className="bg-accent-200 px-1.5 py-1 font-bold text-[10.5px] uppercase tracking-wide text-accent-900" colSpan={5}>
+                          <tr className="bg-accent-200 text-accent-900 font-bold whitespace-nowrap text-xs">
+                            <td className="bg-accent-200 px-2 py-1.5 font-bold text-xs uppercase tracking-wide text-accent-900" colSpan={5}>
                               Total
                             </td>
-                            <td className="bg-accent-200 px-1.5 py-1 text-right font-bold text-xs tabular-nums text-accent-900">
+                            <td className="bg-accent-200 px-2 py-1.5 text-right font-bold text-sm tabular-nums text-accent-900">
                               {formatCurrency(st.totalSale)}
                             </td>
                           </tr>
-                          <tr className="bg-accent-100/70 text-accent-900 font-bold whitespace-nowrap text-[11px]">
-                            <td className="bg-accent-100/70 px-1.5 py-1 font-bold text-[10.5px] uppercase tracking-wide text-accent-900" colSpan={5}>
+                          <tr className="bg-accent-100/70 text-accent-900 font-bold whitespace-nowrap text-xs">
+                            <td className="bg-accent-100/70 px-2 py-1.5 font-bold text-xs uppercase tracking-wide text-accent-900" colSpan={5}>
                               Closing
                             </td>
-                            <td className="bg-accent-100/70 px-1.5 py-1 text-right font-bold text-xs tabular-nums text-accent-900">
+                            <td className="bg-accent-100/70 px-2 py-1.5 text-right font-bold text-sm tabular-nums text-accent-900">
                               {formatCurrency(st.closing)}
                             </td>
                           </tr>
                         </tfoot>
                       </table>
                     </div>
-                    <div className="flex items-center justify-between px-2.5 py-0.5 bg-primary-50/40 border-t border-primary-100 text-[9.5px] text-primary-400 font-medium shrink-0">
+                    <div className="flex items-center justify-between px-3 py-1 bg-primary-50/40 border-t border-primary-100 text-xs text-primary-400 font-medium shrink-0">
                       <span>Live Bill Preview</span>
                       <span>{(st.entries || st.sales || []).length} items</span>
                     </div>

@@ -75,48 +75,48 @@ export default function InventoryHistory() {
   const hasRows = !loading && !dateError && data?.rows?.length > 0;
 
   return (
-    <div className="space-y-2.5 max-w-3xl">
+    <div className="space-y-3 max-w-4xl">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-sm font-bold text-primary-800">Inventory History</h1>
-          <p className="text-primary-400 text-[11px] mt-0.5">
+          <h1 className="page-title text-2xl font-bold text-primary-700">Inventory History</h1>
+          <p className="text-xs text-primary-500 mt-1">
             Purchases + vendor loads from sales (same as Sale Patty)
           </p>
         </div>
         <button
           onClick={exportExcel}
           disabled={!data?.rows?.length}
-          className="btn-primary !py-1.5 !px-3 !text-xs font-semibold disabled:opacity-50 shrink-0 flex items-center gap-1.5"
+          className="btn-primary !py-1.5 !px-3 !text-sm font-semibold disabled:opacity-50 shrink-0 flex items-center gap-1.5"
         >
-          <Download className="w-3.5 h-3.5" /> Export Excel
+          <Download className="w-4 h-4" /> Export Excel
         </button>
       </div>
 
-      <div className="card !p-3 space-y-2.5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="card !p-3.5 space-y-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">From</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">From</label>
             <input
               type="date"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">To</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">To</label>
             <input
               type="date"
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={endDate}
               min={startDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Material</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Material</label>
             <select
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={materialId}
               onChange={(e) => setMaterialId(e.target.value)}
             >
@@ -129,9 +129,9 @@ export default function InventoryHistory() {
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-primary-500 uppercase tracking-wide mb-0.5 block">Vendor</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Vendor</label>
             <select
-              className="h-8 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-xs text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-100 transition"
+              className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
               value={vendorId}
               onChange={(e) => setVendorId(e.target.value)}
             >
@@ -147,15 +147,15 @@ export default function InventoryHistory() {
       </div>
 
       {hasRows && (
-        <div className="card !p-3 flex flex-wrap gap-4 text-xs">
+        <div className="card !p-3 flex flex-wrap gap-6 text-sm">
           <span>
-            <span className="text-primary-400">Total Weight </span>
+            <span className="text-primary-500 font-medium">Total Weight: </span>
             <span className="font-bold text-primary-800 tabular-nums">
               {formatWeight(data.summary.totalWeight)}
             </span>
           </span>
           <span>
-            <span className="text-primary-400">Total Amount </span>
+            <span className="text-primary-500 font-medium">Total Amount: </span>
             <span className="font-bold text-primary-800 tabular-nums">
               {formatCurrency(data.summary.totalAmount || 0)}
             </span>
@@ -178,17 +178,17 @@ export default function InventoryHistory() {
             <table className="w-full text-left table-fixed">
               <thead>
                 <tr className="bg-primary-50/80 border-b border-primary-200">
-                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-[140px]">Date</th>
-                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide w-[70px]">Source</th>
-                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">Material</th>
-                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide">Vendor</th>
-                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[80px]">
+                  <th className="py-2.5 px-3 text-xs font-semibold text-primary-700 w-[130px]">Date</th>
+                  <th className="py-2.5 px-3 text-xs font-semibold text-primary-700 w-[75px]">Source</th>
+                  <th className="py-2.5 px-3 text-xs font-semibold text-primary-700">Material</th>
+                  <th className="py-2.5 px-3 text-xs font-semibold text-primary-700">Vendor</th>
+                  <th className="py-2.5 px-3 text-xs font-semibold text-primary-700 text-right w-[90px]">
                     Weight
                   </th>
-                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[70px]">
+                  <th className="py-2.5 px-3 text-xs font-semibold text-primary-700 text-right w-[80px]">
                     Rate
                   </th>
-                  <th className="py-2 px-3 text-[10px] font-semibold text-primary-500 uppercase tracking-wide text-right w-[80px]">
+                  <th className="py-2.5 px-3 text-xs font-semibold text-primary-700 text-right w-[95px]">
                     Amount
                   </th>
                 </tr>
@@ -196,21 +196,21 @@ export default function InventoryHistory() {
               <tbody>
                 {data.rows.map((row) => (
                   <tr key={row.id} className="border-b border-primary-100 hover:bg-primary-50/40 transition">
-                    <td className="py-2 px-3 text-xs text-primary-600 whitespace-nowrap">
+                    <td className="py-2.5 px-3 text-xs font-medium text-primary-600 whitespace-nowrap">
                       {formatDate(row.date)}
                     </td>
-                    <td className="py-2 px-3 text-xs text-primary-600">{sourceLabel(row.source)}</td>
-                    <td className="py-2 px-3 text-xs font-semibold text-primary-800 truncate">
+                    <td className="py-2.5 px-3 text-xs font-medium text-primary-600">{sourceLabel(row.source)}</td>
+                    <td className="py-2.5 px-3 text-xs font-bold text-primary-800 truncate">
                       {row.materialName}
                     </td>
-                    <td className="py-2 px-3 text-xs text-primary-600 truncate">{row.vendorName}</td>
-                    <td className="py-2 px-3 text-xs text-primary-600 text-right whitespace-nowrap tabular-nums">
+                    <td className="py-2.5 px-3 text-xs font-medium text-primary-700 truncate">{row.vendorName}</td>
+                    <td className="py-2.5 px-3 text-xs font-semibold text-primary-700 text-right whitespace-nowrap tabular-nums">
                       {formatWeight(row.totalWeight)}
                     </td>
-                    <td className="py-2 px-3 text-xs text-primary-600 text-right whitespace-nowrap tabular-nums">
+                    <td className="py-2.5 px-3 text-xs font-medium text-primary-600 text-right whitespace-nowrap tabular-nums">
                       {row.ratePerKg ? formatCurrency(row.ratePerKg) : '—'}
                     </td>
-                    <td className="py-2 px-3 text-xs font-bold text-primary-800 text-right whitespace-nowrap tabular-nums">
+                    <td className="py-2.5 px-3 text-xs font-bold text-primary-800 text-right whitespace-nowrap tabular-nums">
                       {row.amount ? formatCurrency(row.amount) : '—'}
                     </td>
                   </tr>

@@ -112,28 +112,28 @@ export default function POS() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div>
-        <h1 className="page-title">POS Billing</h1>
-        <p className="text-primary-400 text-sm mt-0.5">Bill customers — cash payment only</p>
+        <h1 className="page-title text-2xl font-bold text-primary-700">POS Billing</h1>
+        <p className="text-xs text-primary-500 mt-1">Bill customers — cash payment only</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <div className="lg:col-span-2">
-          <div className="card !p-0 overflow-visible">
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-primary-100">
-              <label className="text-xs font-medium text-primary-400 shrink-0">Customer</label>
+          <div className="card !p-0 overflow-visible border border-primary-200">
+            <div className="flex items-center gap-3 px-4 py-2.5 border-b border-primary-100">
+              <label className="text-xs font-semibold text-primary-600 shrink-0">Customer</label>
               <input
-                className="input-field !py-2 !text-sm flex-1"
+                className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition flex-1"
                 placeholder="Walk-in Customer"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
               />
             </div>
 
-            <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_80px_72px_32px] gap-2 px-4 py-2 bg-primary-50/80 border-b border-primary-100 text-xs font-medium text-primary-400 uppercase tracking-wide">
+            <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_90px_80px_36px] gap-2 px-4 py-2 bg-primary-50/80 border-b border-primary-200 text-xs font-semibold text-primary-700 uppercase tracking-wide">
               <span>Material</span>
-              <span className="text-right">Qty</span>
+              <span className="text-right">Qty (kg)</span>
               <span className="text-right">Amount</span>
               <span />
             </div>
@@ -145,7 +145,7 @@ export default function POS() {
                 return (
                   <div
                     key={idx}
-                    className="grid grid-cols-[minmax(0,1fr)_72px_64px_32px] gap-2 px-3 sm:px-4 py-2 items-center"
+                    className="grid grid-cols-[minmax(0,1fr)_90px_80px_36px] gap-2 px-3 sm:px-4 py-2 items-center"
                   >
                     <PosMaterialInput
                       materials={materials}
@@ -157,7 +157,7 @@ export default function POS() {
 
                     <input
                       type="number"
-                      className="input-field !py-1.5 !px-2 !text-sm w-full text-right"
+                      className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition text-right"
                       placeholder="kg"
                       min="0.1"
                       step="0.1"
@@ -166,7 +166,7 @@ export default function POS() {
                       required
                     />
 
-                    <p className="text-sm font-semibold text-primary-700 text-right truncate">
+                    <p className="text-sm font-bold text-primary-800 text-right truncate">
                       {formatCurrency(itemTotal)}
                     </p>
 
@@ -174,7 +174,7 @@ export default function POS() {
                       type="button"
                       onClick={() => removeItem(idx)}
                       disabled={items.length === 1}
-                      className="p-1 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
                       aria-label="Remove item"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -185,7 +185,7 @@ export default function POS() {
             </div>
 
             <div className="px-4 py-3 border-t border-primary-100">
-              <button type="button" onClick={addItem} className="btn-secondary w-full !py-2 !text-sm">
+              <button type="button" onClick={addItem} className="btn-secondary w-full !py-2 !text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
                 <Plus className="w-4 h-4" /> Add Item
               </button>
             </div>
@@ -193,18 +193,18 @@ export default function POS() {
         </div>
 
         <div>
-          <div className="card sticky top-4 !p-4">
-            <div className="flex justify-between items-center mb-4">
-              <span className="text-sm font-medium text-primary-500">Grand Total</span>
-              <span className="text-2xl font-bold text-primary-700">{formatCurrency(grandTotal)}</span>
+          <div className="card sticky top-4 !p-4 border border-primary-200">
+            <div className="flex justify-between items-center mb-3 pb-2 border-b border-primary-100">
+              <span className="text-xs font-semibold uppercase text-primary-600">Grand Total</span>
+              <span className="text-2xl font-bold text-primary-800">{formatCurrency(grandTotal)}</span>
             </div>
 
-            <div className="flex items-center gap-2 bg-accent-100/80 text-accent-600 rounded-lg px-3 py-2 mb-4">
+            <div className="flex items-center gap-2 bg-accent-100/80 text-accent-700 border border-accent-200 rounded-lg px-3 py-2 mb-3">
               <Banknote className="w-4 h-4 shrink-0" />
-              <span className="font-medium text-xs">Cash payment only</span>
+              <span className="font-semibold text-xs">Cash payment only</span>
             </div>
 
-            <button type="submit" className="btn-primary w-full !py-3" disabled={saving || grandTotal <= 0}>
+            <button type="submit" className="btn-primary w-full !py-2.5 !text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-2xs" disabled={saving || grandTotal <= 0}>
               {saving ? 'Processing...' : 'Complete Sale'}
             </button>
           </div>

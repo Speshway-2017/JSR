@@ -203,34 +203,34 @@ export default function CustomerDetail({ path: windowPath }) {
   const scheduleLabel = customer.schedule?.name || '—';
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <button
         type="button"
         onClick={() => openWindow({ path: '/customers', title: 'Customers' })}
-        className="inline-flex items-center gap-2 text-primary-500 hover:text-primary-700 font-medium text-sm cursor-pointer"
+        className="inline-flex items-center gap-1.5 text-primary-600 hover:text-primary-800 font-semibold text-xs cursor-pointer transition"
       >
-        <ArrowLeft className="w-4 h-4" /> Back to Customer List
+        <ArrowLeft className="w-3.5 h-3.5" /> Back to Customer List
       </button>
 
-      <div className="card">
+      <div className="card !p-4">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div className="flex-1">
             {!editing ? (
               <>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h1 className="page-title">{customer.name}</h1>
+                    <h1 className="page-title text-2xl font-bold text-primary-700">{customer.name}</h1>
                     {customer.nameTelugu ? (
                       <p className="text-sm text-primary-500 mt-0.5">{customer.nameTelugu}</p>
                     ) : null}
                   </div>
-                  <button type="button" onClick={() => setEditing(true)} className="btn-secondary !py-2 !px-3 !text-sm">
-                    <Pencil className="w-4 h-4" /> Edit
+                  <button type="button" onClick={() => setEditing(true)} className="btn-secondary !py-1.5 !px-3 !text-xs font-semibold">
+                    <Pencil className="w-3.5 h-3.5" /> Edit
                   </button>
                 </div>
-                <p className="text-primary-500 mt-2">Schedule: {scheduleLabel}</p>
-                {customer.mobile && <p className="text-primary-500 text-sm mt-1">{customer.mobile}</p>}
-                <div className="mt-4 pt-4 border-t border-primary-100">
+                <p className="text-primary-600 text-xs mt-2 font-medium">Schedule: <span className="font-bold text-primary-800">{scheduleLabel}</span></p>
+                {customer.mobile && <p className="text-primary-500 text-xs mt-1">Mobile: <span className="font-semibold text-primary-700">{customer.mobile}</span></p>}
+                <div className="mt-3 pt-3 border-t border-primary-100">
                   <Toggle
                     checked={!!customer.handlingCharges}
                     onChange={handleToggleHandling}
@@ -240,24 +240,24 @@ export default function CustomerDetail({ path: windowPath }) {
               </>
             ) : (
               <form onSubmit={handleSave} className="space-y-3">
-                <div className="flex justify-between">
-                  <h2 className="font-bold text-primary-700">Edit Customer</h2>
-                  <button type="button" onClick={() => setEditing(false)} className="p-1"><X className="w-5 h-5 text-primary-400" /></button>
+                <div className="flex justify-between items-center">
+                  <h2 className="font-bold text-primary-800 text-sm">Edit Customer</h2>
+                  <button type="button" onClick={() => setEditing(false)} className="p-1 text-primary-400 hover:text-primary-600"><X className="w-5 h-5" /></button>
                 </div>
                 <div>
-                  <input className="input-field" placeholder="Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
-                  <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
+                  <input className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition" placeholder="Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
+                  <p className="mt-1 min-h-[1.25rem] text-sm text-primary-700 font-medium tracking-wide">
                     {editForm.name.trim()
                       ? teluguLoading && !liveTelugu
                         ? '…'
                         : editForm.nameTelugu || liveTelugu || ''
                       : ''}
                   </p>
-                  <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
+                  <p className="text-[11px] text-primary-400 -mt-1">తెలుగు</p>
                 </div>
-                <input className="input-field" placeholder="Mobile" value={editForm.mobile} onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })} />
+                <input className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition" placeholder="Mobile" value={editForm.mobile} onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })} />
                 <select
-                  className="input-field"
+                  className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
                   value={editForm.schedule}
                   onChange={(e) => setEditForm({ ...editForm, schedule: e.target.value })}
                   required
@@ -269,25 +269,25 @@ export default function CustomerDetail({ path: windowPath }) {
                 </select>
                 <Toggle checked={editForm.handlingCharges} onChange={(v) => setEditForm({ ...editForm, handlingCharges: v })} label="Cooly" />
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex-1">Cancel</button>
-                  <button type="submit" className="btn-primary flex-1" disabled={saving}><Save className="w-4 h-4" /> Save</button>
+                  <button type="button" onClick={() => setEditing(false)} className="btn-secondary !py-2 !px-4 !text-sm font-semibold flex-1">Cancel</button>
+                  <button type="submit" className="btn-primary !py-2 !px-4 !text-sm font-semibold flex-1" disabled={saving}><Save className="w-4 h-4" /> Save</button>
                 </div>
               </form>
             )}
           </div>
 
           {!editing && (
-            <div className="bg-accent-50 rounded-2xl p-5 text-center min-w-[200px] flex flex-col gap-2">
-              <p className="text-sm text-accent-600 font-medium">Credit Balance</p>
-              <p className="text-3xl font-bold text-accent-700 mt-1">{formatCurrency(customer.creditBalance)}</p>
-              <button type="button" onClick={() => setShowPayment(true)} className="btn-primary w-full mt-2 !py-2.5 !text-sm">
+            <div className="bg-accent-50/80 border border-accent-200 rounded-2xl p-4 text-center min-w-[220px] flex flex-col gap-2.5">
+              <p className="text-xs text-accent-700 font-semibold uppercase tracking-wider">Credit Balance</p>
+              <p className="text-3xl font-bold text-accent-700">{formatCurrency(customer.creditBalance)}</p>
+              <button type="button" onClick={() => setShowPayment(true)} className="btn-primary w-full !py-2 !text-sm font-semibold flex items-center justify-center gap-1.5">
                 <CreditCard className="w-4 h-4" /> Add Payment
               </button>
               {isOnline && (
                 <button
                   type="button"
                   onClick={handleSendWhatsAppStatement}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5 w-full"
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5 w-full cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" /> WhatsApp Statement
                 </button>
@@ -305,33 +305,33 @@ export default function CustomerDetail({ path: windowPath }) {
       >
         <form onSubmit={handlePayment} className="space-y-3">
           <div>
-            <label className="label">Amount (₹) *</label>
-            <input type="number" className="input-field" min="1" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required />
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Amount (₹) *</label>
+            <input type="number" className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition" min="1" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required />
           </div>
           <div>
-            <label className="label">Description</label>
-            <input className="input-field" value={paymentDesc} onChange={(e) => setPaymentDesc(e.target.value)} placeholder="Optional" />
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Description</label>
+            <input className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition" value={paymentDesc} onChange={(e) => setPaymentDesc(e.target.value)} placeholder="Optional" />
           </div>
           <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex gap-3 mt-2 z-10">
-            <button type="button" onClick={() => setShowPayment(false)} className="btn-secondary flex-1">Cancel</button>
-            <button type="submit" className="btn-primary flex-1" disabled={paying}>{paying ? 'Saving...' : 'Save'}</button>
+            <button type="button" onClick={() => setShowPayment(false)} className="btn-secondary !py-2 !px-4 !text-sm font-semibold flex-1">Cancel</button>
+            <button type="submit" className="btn-primary !py-2 !px-4 !text-sm font-semibold flex-1" disabled={paying}>{paying ? 'Saving...' : 'Save'}</button>
           </div>
         </form>
       </MDIModalWindow>
 
-      <div className="card !p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-primary-100 font-semibold text-primary-700">Sale History</div>
+      <div className="card !p-0 overflow-hidden border border-primary-200">
+        <div className="px-4 py-2.5 border-b border-primary-200 bg-primary-50/80 font-bold text-xs text-primary-700 uppercase tracking-wide">Sale History</div>
         {sales.length === 0 ? (
-          <p className="text-center py-10 text-primary-400 text-sm">No sales yet</p>
+          <p className="text-center py-10 text-primary-400 text-xs">No sales yet</p>
         ) : (
           <div className="divide-y divide-primary-100">
             {sales.map((sale) => (
-              <div key={sale._id} className="px-4 py-3">
+              <div key={sale._id} className="px-4 py-3 hover:bg-primary-50/30 transition">
                 <div className="flex justify-between gap-3 items-start">
                   <div className="min-w-0">
-                    <p className="text-sm text-primary-500">{formatDate(sale.createdAt)}</p>
-                    <p className="text-sm text-primary-600">Vendor: {sale.vendor?.name}</p>
-                    <div className="mt-1.5 space-y-0.5">
+                    <p className="text-xs font-medium text-primary-500">{formatDate(sale.createdAt)}</p>
+                    <p className="text-xs font-semibold text-primary-700 mt-0.5">Vendor: {sale.vendor?.name}</p>
+                    <div className="mt-1 space-y-0.5">
                       {Object.values(
                         (sale.lines || []).reduce((acc, l) => {
                           const name = l.materialName;
@@ -341,24 +341,24 @@ export default function CustomerDetail({ path: windowPath }) {
                           return acc;
                         }, {})
                       ).map((l) => (
-                        <p key={l.materialName} className="text-xs text-primary-500">
-                          {l.materialName} · {l.bagCount} bags · {formatKg(l.totalKg)}
+                        <p key={l.materialName} className="text-xs text-primary-600">
+                          <span className="font-semibold text-primary-800">{l.materialName}</span> · {l.bagCount} bags · {formatKg(l.totalKg)}
                         </p>
                       ))}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <p className="font-semibold text-primary-700">{formatCurrency(sale.totalAmount)}</p>
+                    <p className="font-bold text-primary-800 text-sm">{formatCurrency(sale.totalAmount)}</p>
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
                       {sale.isPaid ? (
-                        <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                        <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Paid Direct
                         </span>
                       ) : null}
                       <button
                         type="button"
                         onClick={() => handleViewSaleBill(sale)}
-                        className="btn-secondary !py-1.5 !px-2.5 !text-xs"
+                        className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold"
                       >
                         <FileText className="w-3.5 h-3.5" /> Bill
                       </button>
@@ -366,7 +366,7 @@ export default function CustomerDetail({ path: windowPath }) {
                         <button
                           type="button"
                           onClick={() => handleSendWhatsAppSale(sale)}
-                          className="btn-secondary !py-1.5 !px-2.5 !text-xs !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200"
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200"
                           title="Send Bill via WhatsApp"
                         >
                           <Send className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
@@ -381,24 +381,24 @@ export default function CustomerDetail({ path: windowPath }) {
         )}
       </div>
 
-      <div className="card !p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-primary-100 font-semibold text-primary-700">Payments</div>
+      <div className="card !p-0 overflow-hidden border border-primary-200">
+        <div className="px-4 py-2.5 border-b border-primary-200 bg-primary-50/80 font-bold text-xs text-primary-700 uppercase tracking-wide">Payments</div>
         {transactions.filter((t) => t.type === 'customer_payment').length === 0 ? (
-          <p className="text-center py-10 text-primary-400 text-sm">No payments yet</p>
+          <p className="text-center py-10 text-primary-400 text-xs">No payments yet</p>
         ) : (
           <div className="divide-y divide-primary-100">
             {transactions
               .filter((t) => t.type === 'customer_payment')
               .map((tx) => (
-                <div key={tx._id} className="px-4 py-3 flex justify-between">
+                <div key={tx._id} className="px-4 py-3 flex justify-between items-center hover:bg-primary-50/30 transition">
                   <div>
-                    <p className="text-sm text-primary-600">
+                    <p className="text-xs font-semibold text-primary-700">
                       {tx.description}
                       {tx.reason ? <span className="ml-1 text-xs text-primary-500 italic">({tx.reason})</span> : null}
                     </p>
-                    <p className="text-xs text-primary-400">{formatDate(tx.createdAt)}</p>
+                    <p className="text-xs text-primary-400 mt-0.5">{formatDate(tx.createdAt)}</p>
                   </div>
-                  <p className="font-semibold text-primary-700">-{formatCurrency(tx.amount)}</p>
+                  <p className="font-bold text-primary-800 text-sm">-{formatCurrency(tx.amount)}</p>
                 </div>
               ))}
           </div>

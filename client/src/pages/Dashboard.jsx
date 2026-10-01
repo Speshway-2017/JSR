@@ -172,15 +172,17 @@ export default function Dashboard() {
   const payableTotal = payables.reduce((s, p) => s + (p.value || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="page-title">Business Overview</h1>
-          <p className="text-primary-400 text-sm mt-0.5">
+          <h1 className="page-title text-2xl font-bold text-primary-700">Business Overview</h1>
+          <p className="text-xs text-primary-500 mt-1">
             Vendors, customers, sales, purchases & inventory at a glance
           </p>
         </div>
-        <p className="text-xs text-primary-400">Last 14 days charts · Month totals in cards</p>
+        <p className="text-xs font-medium text-primary-500 bg-primary-100/60 px-3 py-1 rounded-full border border-primary-200">
+          Last 14 days charts · Month totals in cards
+        </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -189,16 +191,16 @@ export default function Dashboard() {
             key={label}
             type="button"
             onClick={() => openWindow({ path: link, title: label })}
-            className="card hover:border-primary-200 transition !p-4 text-left cursor-pointer w-full"
+            className="card hover:border-primary-300 transition !p-3.5 text-left cursor-pointer w-full border border-primary-200 bg-surface shadow-2xs"
           >
             <div className="flex items-start justify-between gap-2">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border border-primary-200 ${color}`}>
                 <Icon className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-xs text-primary-400 mt-3">{label}</p>
-            <p className="text-lg font-bold text-primary-700 mt-0.5 leading-tight">{value}</p>
-            {sub && <p className="text-[11px] text-primary-400 mt-0.5">{sub}</p>}
+            <p className="text-xs font-semibold text-primary-600 mt-2.5">{label}</p>
+            <p className="text-lg font-bold text-primary-800 mt-0.5 leading-tight">{value}</p>
+            {sub && <p className="text-xs font-semibold text-primary-500 mt-0.5">{sub}</p>}
           </button>
         ))}
       </div>

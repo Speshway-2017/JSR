@@ -243,86 +243,86 @@ export default function VendorDetail({ path: windowPath }) {
   const payments = transactions.filter((t) => t.type === 'vendor_payment');
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <button
         type="button"
         onClick={() => openWindow({ path: '/vendors', title: 'Vendors' })}
-        className="inline-flex items-center gap-2 text-primary-500 hover:text-primary-700 font-medium text-sm cursor-pointer"
+        className="inline-flex items-center gap-1.5 text-primary-600 hover:text-primary-800 font-semibold text-xs cursor-pointer transition"
       >
-        <ArrowLeft className="w-4 h-4" /> Back to Vendors
+        <ArrowLeft className="w-3.5 h-3.5" /> Back to Vendors
       </button>
 
-      <div className="card">
+      <div className="card !p-4">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div className="flex-1">
             {!editing ? (
               <>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h1 className="page-title">{vendor.name}</h1>
+                    <h1 className="page-title text-2xl font-bold text-primary-700">{vendor.name}</h1>
                     {vendor.nameTelugu ? (
                       <p className="text-sm text-primary-500 mt-0.5">{vendor.nameTelugu}</p>
                     ) : null}
                   </div>
-                  <button type="button" onClick={() => setEditing(true)} className="btn-secondary !py-2 !px-3 !text-sm shrink-0">
-                    <Pencil className="w-4 h-4" /> Edit
+                  <button type="button" onClick={() => setEditing(true)} className="btn-secondary !py-1.5 !px-3 !text-xs font-semibold shrink-0">
+                    <Pencil className="w-3.5 h-3.5" /> Edit
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-4 mt-3 text-primary-500 text-sm">
-                  <span className="flex items-center gap-1.5"><Phone className="w-4 h-4" /> {vendor.mobile}</span>
-                  <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {vendor.city}</span>
+                <div className="flex flex-wrap gap-4 mt-2.5 text-primary-600 text-xs font-medium">
+                  <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-primary-500" /> {vendor.mobile}</span>
+                  <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-primary-500" /> {vendor.city}</span>
                 </div>
-                <p className="text-primary-400 text-sm mt-2">{vendor.address}</p>
+                <p className="text-primary-500 text-xs mt-1.5">{vendor.address}</p>
               </>
             ) : (
               <form onSubmit={handleSave} className="space-y-3">
-                <div className="flex justify-between">
-                  <h2 className="font-bold text-primary-700">Edit Vendor</h2>
-                  <button type="button" onClick={() => setEditing(false)}><X className="w-5 h-5 text-primary-400" /></button>
+                <div className="flex justify-between items-center">
+                  <h2 className="font-bold text-primary-800 text-sm">Edit Vendor</h2>
+                  <button type="button" onClick={() => setEditing(false)} className="p-1 text-primary-400 hover:text-primary-600"><X className="w-5 h-5" /></button>
                 </div>
                 {['name', 'mobile', 'city', 'address'].map((field) => (
                   <div key={field}>
                     <input
-                      className="input-field"
-                      placeholder={field}
+                      className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
+                      placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
                       value={editForm[field]}
                       onChange={(e) => setEditForm({ ...editForm, [field]: e.target.value })}
                       required
                     />
                     {field === 'name' ? (
                       <>
-                        <p className="mt-1.5 min-h-[1.5rem] text-base text-primary-700 font-medium tracking-wide">
+                        <p className="mt-1 min-h-[1.25rem] text-sm text-primary-700 font-medium tracking-wide">
                           {editForm.name.trim()
                             ? teluguLoading && !liveTelugu
                               ? '…'
                               : editForm.nameTelugu || liveTelugu || ''
                             : ''}
                         </p>
-                        <p className="text-xs text-primary-400 -mt-1">తెలుగు</p>
+                        <p className="text-[11px] text-primary-400 -mt-1">తెలుగు</p>
                       </>
                     ) : null}
                   </div>
                 ))}
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex-1">Cancel</button>
-                  <button type="submit" className="btn-primary flex-1" disabled={saving}><Save className="w-4 h-4" /> Save</button>
+                  <button type="button" onClick={() => setEditing(false)} className="btn-secondary !py-2 !px-4 !text-sm font-semibold flex-1">Cancel</button>
+                  <button type="submit" className="btn-primary !py-2 !px-4 !text-sm font-semibold flex-1" disabled={saving}><Save className="w-4 h-4" /> Save</button>
                 </div>
               </form>
             )}
           </div>
 
           {!editing && (
-            <div className="bg-accent-50 rounded-2xl p-5 text-center min-w-[200px] flex flex-col gap-2">
-              <p className="text-sm text-accent-600 font-medium">Payable Balance</p>
-              <p className="text-3xl font-bold text-accent-700 mt-1">{formatCurrency(vendor.creditBalance)}</p>
-              <button type="button" onClick={() => setShowPayment(true)} className="btn-primary w-full mt-2 !py-2.5 !text-sm">
+            <div className="bg-accent-50/80 border border-accent-200 rounded-2xl p-4 text-center min-w-[220px] flex flex-col gap-2.5">
+              <p className="text-xs text-accent-700 font-semibold uppercase tracking-wider">Payable Balance</p>
+              <p className="text-3xl font-bold text-accent-700">{formatCurrency(vendor.creditBalance)}</p>
+              <button type="button" onClick={() => setShowPayment(true)} className="btn-primary w-full !py-2 !text-sm font-semibold flex items-center justify-center gap-1.5">
                 <CreditCard className="w-4 h-4" /> Pay Vendor
               </button>
               {isOnline && (
                 <button
                   type="button"
                   onClick={handleSendWhatsAppVendorStatement}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5 w-full"
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5 w-full cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" /> WhatsApp Statement
                 </button>
@@ -339,18 +339,18 @@ export default function VendorDetail({ path: windowPath }) {
         onClose={() => setShowPayment(false)}
       >
         <form onSubmit={handlePayment} className="space-y-3">
-          <p className="text-xs text-primary-400">Pay the receivable amount from the vendor bill after deductions.</p>
+          <p className="text-xs text-primary-500">Pay the receivable amount from the vendor bill after deductions.</p>
           <div>
-            <label className="label">Amount (₹) *</label>
-            <input type="number" className="input-field" min="1" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required />
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Amount (₹) *</label>
+            <input type="number" className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition" min="1" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required />
           </div>
           <div>
-            <label className="label">Description</label>
-            <input className="input-field" value={paymentDesc} onChange={(e) => setPaymentDesc(e.target.value)} />
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Description</label>
+            <input className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition" value={paymentDesc} onChange={(e) => setPaymentDesc(e.target.value)} placeholder="Optional" />
           </div>
           <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex gap-3 mt-2 z-10">
-            <button type="button" onClick={() => setShowPayment(false)} className="btn-secondary flex-1">Cancel</button>
-            <button type="submit" className="btn-primary flex-1" disabled={paying}>{paying ? 'Saving...' : 'Save'}</button>
+            <button type="button" onClick={() => setShowPayment(false)} className="btn-secondary !py-2 !px-4 !text-sm font-semibold flex-1">Cancel</button>
+            <button type="submit" className="btn-primary !py-2 !px-4 !text-sm font-semibold flex-1" disabled={paying}>{paying ? 'Saving...' : 'Save'}</button>
           </div>
         </form>
       </MDIModalWindow>
@@ -363,12 +363,12 @@ export default function VendorDetail({ path: windowPath }) {
         maxWidth="max-w-lg"
       >
         <form onSubmit={handleGenerateBill} className="space-y-3">
-          <p className="text-xs text-primary-400">
+          <p className="text-xs text-primary-500">
             {billModal?.regenerating
               ? 'Adjust deduction rates and regenerate the bill PDF for this load.'
               : 'Confirm deduction rates (from Price Settings). Toggle Per bag for each field.'}
           </p>
-          <div className="grid grid-cols-[1fr_90px_72px] gap-2 text-xs font-semibold text-primary-400 uppercase">
+          <div className="grid grid-cols-[1fr_90px_72px] gap-2 text-xs font-semibold text-primary-600 uppercase">
             <span>Field</span>
             <span>Amount</span>
             <span className="text-center">Per bag</span>
@@ -380,7 +380,7 @@ export default function VendorDetail({ path: windowPath }) {
               <div key={field.key} className="grid grid-cols-[1fr_90px_72px] gap-2 items-center">
                 <div>
                   <p className="text-sm font-medium text-primary-800">{field.telugu}</p>
-                  <p className="text-xs text-primary-400">{field.label}</p>
+                  <p className="text-xs text-primary-500">{field.label}</p>
                 </div>
                 <div className="relative">
                   <input
@@ -388,18 +388,18 @@ export default function VendorDetail({ path: windowPath }) {
                     min="0"
                     max={isPct ? 100 : undefined}
                     step="0.01"
-                    className="input-field !py-2"
+                    className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
                     value={billForm[field.key]}
                     onChange={(e) => setBillForm({ ...billForm, [field.key]: e.target.value })}
                   />
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-primary-400">
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary-400">
                     {isPct ? '%' : '₹'}
                   </span>
                 </div>
-                <label className="flex justify-center">
+                <label className="flex justify-center cursor-pointer">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 accent-primary-600"
+                    className="w-4 h-4 rounded border-primary-300 text-primary-600 focus:ring-primary-400 accent-primary-600 cursor-pointer"
                     checked={perBag}
                     onChange={(e) =>
                       setBillForm({ ...billForm, [`${field.key}PerBag`]: e.target.checked })
@@ -410,10 +410,10 @@ export default function VendorDetail({ path: windowPath }) {
             );
           })}
           <div className="sticky bottom-0 bg-surface/95 backdrop-blur-xs pt-2.5 pb-0.5 border-t border-primary-100 flex gap-3 mt-2 z-10">
-            <button type="button" onClick={() => setBillModal(null)} className="btn-secondary flex-1">
+            <button type="button" onClick={() => setBillModal(null)} className="btn-secondary !py-2 !px-4 !text-sm font-semibold flex-1">
               Cancel
             </button>
-            <button type="submit" className="btn-primary flex-1" disabled={generatingBill}>
+            <button type="submit" className="btn-primary !py-2 !px-4 !text-sm font-semibold flex-1" disabled={generatingBill}>
               {generatingBill
                 ? (billModal?.regenerating ? 'Updating...' : 'Generating...')
                 : (billModal?.regenerating ? 'Update & View Bill' : 'Generate Bill')}
@@ -422,8 +422,8 @@ export default function VendorDetail({ path: windowPath }) {
         </form>
       </MDIModalWindow>
 
-      <div className="card !p-0 overflow-hidden">
-        <div className="flex border-b border-primary-100">
+      <div className="card !p-0 overflow-hidden border border-primary-200">
+        <div className="flex border-b border-primary-200 bg-primary-50/50">
           {[
             { id: 'loads', label: 'Loads', count: loads.length },
             { id: 'sales', label: 'Sales', count: sales.length },
@@ -433,10 +433,10 @@ export default function VendorDetail({ path: windowPath }) {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 px-3 py-3 text-sm font-semibold transition ${
+              className={`flex-1 px-4 py-3 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
                 activeTab === tab.id
-                  ? 'bg-primary-100 text-primary-700 border-b-2 border-primary-400'
-                  : 'text-primary-500 hover:bg-primary-50'
+                  ? 'bg-primary-100/80 text-primary-800 border-b-2 border-primary-600'
+                  : 'text-primary-500 hover:bg-primary-50 hover:text-primary-700'
               }`}
             >
               {tab.label} ({tab.count})
@@ -444,24 +444,24 @@ export default function VendorDetail({ path: windowPath }) {
           ))}
         </div>
 
-        <div className="p-4">
+        <div className="p-3">
           {activeTab === 'loads' && (
             loads.length === 0 ? (
-              <p className="text-center py-10 text-primary-400 text-sm">No loads yet</p>
+              <p className="text-center py-10 text-primary-400 text-xs">No loads yet</p>
             ) : (
               <div className="space-y-2">
                 {loads.map((load) => (
                   <div
                     key={load._id}
-                    className="border border-primary-100 rounded-xl flex items-center gap-2 p-3"
+                    className="border border-primary-200 rounded-xl flex items-center justify-between gap-3 p-3 bg-surface hover:bg-primary-50/20 transition"
                   >
-                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                    <div className="flex-1 flex items-center gap-2.5 min-w-0">
                       <Truck className="w-4 h-4 text-primary-500 shrink-0" />
-                      <span className="text-sm font-medium text-primary-700">
+                      <span className="text-xs font-semibold text-primary-800">
                         {formatDate(load.loadDate || load.createdAt)}
                       </span>
                       {load.billGenerated && (
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-accent-100 text-accent-700">
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-accent-100 text-accent-800 border border-accent-200">
                           Bill done
                         </span>
                       )}
@@ -472,7 +472,7 @@ export default function VendorDetail({ path: windowPath }) {
                           type="button"
                           onClick={() => handleViewBill(load)}
                           disabled={billLoadingId === load._id}
-                          className="btn-secondary !py-1.5 !px-2.5 !text-xs disabled:opacity-50"
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold disabled:opacity-50"
                         >
                           <FileText className="w-3.5 h-3.5" />
                           {billLoadingId === load._id ? '...' : 'View'}
@@ -481,7 +481,7 @@ export default function VendorDetail({ path: windowPath }) {
                           type="button"
                           onClick={() => openBillChargesModal(load)}
                           disabled={billLoadingId === load._id}
-                          className="btn-secondary !py-1.5 !px-2.5 !text-xs disabled:opacity-50"
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold disabled:opacity-50"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                           Modify
@@ -491,7 +491,7 @@ export default function VendorDetail({ path: windowPath }) {
                             type="button"
                             onClick={() => handleSendWhatsAppVendorLoad(load)}
                             disabled={billLoadingId === load._id}
-                            className="btn-secondary !py-1.5 !px-2.5 !text-xs !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200"
+                            className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200"
                             title="Send Load Bill via WhatsApp"
                           >
                             <Send className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
@@ -503,7 +503,7 @@ export default function VendorDetail({ path: windowPath }) {
                         type="button"
                         onClick={() => openBillChargesModal(load)}
                         disabled={billLoadingId === load._id}
-                        className="btn-secondary !py-1.5 !px-2.5 !text-xs shrink-0 disabled:opacity-50"
+                        className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold shrink-0 disabled:opacity-50"
                       >
                         <FileText className="w-3.5 h-3.5" />
                         {billLoadingId === load._id ? '...' : 'Bill'}
@@ -517,14 +517,14 @@ export default function VendorDetail({ path: windowPath }) {
 
           {activeTab === 'sales' && (
             sales.length === 0 ? (
-              <p className="text-center py-10 text-primary-400 text-sm">No sales from this vendor stock</p>
+              <p className="text-center py-10 text-primary-400 text-xs">No sales from this vendor stock</p>
             ) : (
-              <div className="divide-y divide-primary-100 -mx-4">
+              <div className="divide-y divide-primary-100 -mx-3">
                 {sales.map((sale) => (
-                  <div key={sale._id} className="px-4 py-3 flex justify-between gap-3 items-start">
+                  <div key={sale._id} className="px-4 py-3 flex justify-between gap-3 items-start hover:bg-primary-50/30 transition">
                     <div className="min-w-0">
-                      <p className="text-sm text-primary-500">{formatDate(sale.createdAt)}</p>
-                      <p className="text-sm text-primary-600">To: {sale.customer?.name}</p>
+                      <p className="text-xs font-medium text-primary-500">{formatDate(sale.createdAt)}</p>
+                      <p className="text-xs font-semibold text-primary-700 mt-0.5">To: {sale.customer?.name}</p>
                       <div className="mt-1 space-y-0.5">
                         {Object.values(
                           (sale.lines || []).reduce((acc, l) => {
@@ -535,14 +535,14 @@ export default function VendorDetail({ path: windowPath }) {
                             return acc;
                           }, {})
                         ).map((l) => (
-                          <p key={l.materialName} className="text-xs text-primary-400">
-                            {l.materialName} · {l.bagCount} bags · {formatKg(l.totalKg)}
+                          <p key={l.materialName} className="text-xs text-primary-600">
+                            <span className="font-semibold text-primary-800">{l.materialName}</span> · {l.bagCount} bags · {formatKg(l.totalKg)}
                           </p>
                         ))}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
-                      <p className="font-semibold text-primary-700">
+                      <p className="font-bold text-primary-800 text-sm">
                         {formatCurrency(sale.lines?.reduce((s, l) => s + l.totalAmount, 0) || 0)}
                       </p>
                       <button
@@ -557,7 +557,7 @@ export default function VendorDetail({ path: windowPath }) {
                             toast.error(err.response?.data?.message || 'Failed to generate bill');
                           }
                         }}
-                        className="btn-secondary !py-1.5 !px-2.5 !text-xs"
+                        className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold"
                       >
                         <FileText className="w-3.5 h-3.5" /> Bill
                       </button>
@@ -570,19 +570,19 @@ export default function VendorDetail({ path: windowPath }) {
 
           {activeTab === 'payments' && (
             payments.length === 0 ? (
-              <p className="text-center py-10 text-primary-400 text-sm">No payments yet</p>
+              <p className="text-center py-10 text-primary-400 text-xs">No payments yet</p>
             ) : (
-              <div className="divide-y divide-primary-100 -mx-4">
+              <div className="divide-y divide-primary-100 -mx-3">
                 {payments.map((tx) => (
-                  <div key={tx._id} className="px-4 py-3 flex justify-between">
+                  <div key={tx._id} className="px-4 py-3 flex justify-between items-center hover:bg-primary-50/30 transition">
                     <div>
-                      <p className="text-sm text-primary-600">
+                      <p className="text-xs font-semibold text-primary-700">
                         {tx.description}
                         {tx.reason ? <span className="ml-1 text-xs text-primary-500 italic">({tx.reason})</span> : null}
                       </p>
-                      <p className="text-xs text-primary-400">{formatDate(tx.createdAt)}</p>
+                      <p className="text-xs text-primary-400 mt-0.5">{formatDate(tx.createdAt)}</p>
                     </div>
-                    <p className="font-semibold text-primary-700">-{formatCurrency(tx.amount)}</p>
+                    <p className="font-bold text-primary-800 text-sm">-{formatCurrency(tx.amount)}</p>
                   </div>
                 ))}
               </div>

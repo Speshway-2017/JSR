@@ -46,16 +46,16 @@ export default function Login() {
           <p className="text-primary-500 mt-2 text-lg">Vendor &amp; Sales Management</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="card !p-8 space-y-5">
-          <h2 className="text-xl font-bold text-primary-700 text-center">Sign In</h2>
+        <form onSubmit={handleSubmit} className="card !p-7 space-y-4 border border-primary-200">
+          <h2 className="text-lg font-bold text-primary-800 text-center">Sign In</h2>
 
           <div>
-            <label className="label">Email Address</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Email Address</label>
             <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-300" />
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-400" />
               <input
                 type="email"
-                className="input-field pl-12"
+                className="h-10 w-full rounded-lg border border-primary-200 bg-surface pl-10 pr-3 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -66,12 +66,12 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="label">Password</label>
+            <label className="text-xs font-semibold text-primary-600 mb-1 block">Password</label>
             <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-300" />
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-400" />
               <input
                 type={showPassword ? 'text' : 'password'}
-                className="input-field pl-12 pr-12"
+                className="h-10 w-full rounded-lg border border-primary-200 bg-surface pl-10 pr-10 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -81,21 +81,21 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-600 cursor-pointer"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
-          <button type="submit" className="btn-primary w-full !py-4 text-lg" disabled={loading}>
+          <button type="submit" className="btn-primary w-full !py-2.5 text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-2xs" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        <div className="text-center text-primary-400 text-sm mt-6 space-y-1">
-          <p>Admin: admin@jsr.com / admin123</p>
-          <p>Sales: sales@jsr.com / sales123</p>
+        <div className="text-center text-primary-400 text-xs mt-6 space-y-0.5">
+          <p>Admin: <span className="font-mono text-primary-600">admin@jsr.com / admin123</span></p>
+          <p>Sales: <span className="font-mono text-primary-600">sales@jsr.com / sales123</span></p>
         </div>
       </div>
     </div>
