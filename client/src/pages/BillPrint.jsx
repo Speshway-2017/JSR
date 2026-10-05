@@ -920,7 +920,7 @@ export default function BillPrint({ path: windowPath }) {
                         <thead>
                           <tr className="bg-accent-200 text-accent-900 text-left whitespace-nowrap">
                             <th className="bg-accent-200 px-2 py-1.5 font-bold text-center w-20 text-xs">తేదీ</th>
-                            <th className="bg-accent-200 px-2 py-1.5 font-bold min-w-[6rem] text-xs">వస్తువు</th>
+                            <th className="bg-accent-200 px-2 py-1.5 font-bold min-w-[6rem] text-sm">వస్తువు</th>
                             <th className="bg-accent-200 px-1.5 py-1.5 text-right font-bold w-12 text-xs">బ్యాగ్</th>
                             <th className="bg-accent-200 px-2 py-1.5 text-right font-bold w-16 text-xs">బరువు (kg)</th>
                             <th className="bg-accent-200 px-2 py-1.5 text-right font-bold w-16 text-xs">ధర</th>
@@ -930,7 +930,7 @@ export default function BillPrint({ path: windowPath }) {
                         <tbody>
                           <tr className="bg-surface hover:bg-primary-50/40 text-xs">
                             <td className="px-2 py-1 text-center text-primary-400 text-xs">—</td>
-                            <td className="px-2 py-1 font-semibold text-primary-700">Opening</td>
+                            <td className="px-2 py-1 font-bold text-primary-800 text-sm">Opening</td>
                             <td className="px-1.5 py-1 text-center text-primary-400 text-xs">—</td>
                             <td className="px-2 py-1 text-center text-primary-400 text-xs">—</td>
                             <td className="px-2 py-1 text-center text-primary-400 text-xs">—</td>
@@ -981,7 +981,7 @@ export default function BillPrint({ path: windowPath }) {
                                     className="bg-primary-100/70 font-semibold text-xs border-t border-primary-200"
                                   >
                                     <td className="px-2 py-1 text-center text-primary-400 text-xs">—</td>
-                                    <td className="px-2 py-1 font-bold text-primary-800" colSpan={4}>
+                                    <td className="px-2 py-1 font-bold text-primary-800 text-sm" colSpan={4}>
                                       మొత్తం (Subtotal)
                                     </td>
                                     <td className="px-2 py-1 text-right font-bold tabular-nums text-primary-900">
@@ -1002,7 +1002,7 @@ export default function BillPrint({ path: windowPath }) {
                                       <td className="px-2 py-1 text-center whitespace-nowrap tabular-nums text-xs">
                                         {formatShortDate(p.date)}
                                       </td>
-                                      <td className="px-2 py-1 font-semibold text-emerald-800" colSpan={4}>
+                                      <td className="px-2 py-1 font-semibold text-emerald-800 text-sm" colSpan={4}>
                                         <div className="flex items-center gap-1">
                                           <span>Paid</span>
                                           <span className="text-xs text-emerald-600 font-normal">(చెల్లింపు)</span>
@@ -1022,7 +1022,7 @@ export default function BillPrint({ path: windowPath }) {
                                     className="bg-amber-50/80 font-bold text-xs text-primary-900 border-t border-b border-dashed border-amber-300"
                                   >
                                     <td className="px-2 py-1 text-center text-primary-400 text-xs">—</td>
-                                    <td className="px-2 py-1 font-bold text-primary-900" colSpan={4}>
+                                    <td className="px-2 py-1 font-bold text-primary-900 text-sm" colSpan={4}>
                                       <div className="flex items-center gap-1">
                                         <span>బాకీ</span>
                                         <span className="text-xs text-primary-600 font-normal">(Balance)</span>
@@ -1054,12 +1054,12 @@ export default function BillPrint({ path: windowPath }) {
                                   <td className="px-2 py-1 text-primary-600 text-center whitespace-nowrap tabular-nums text-xs">
                                     {formatShortDate(entry.date)}
                                   </td>
-                                  <td className="px-2 py-1 min-w-[6rem] font-semibold text-primary-800">
+                                  <td className="px-2 py-1 min-w-[6rem] font-bold text-primary-900 text-sm">
                                     {(() => {
                                       const rawName = String(entry.material || 'Sale').trim();
                                       const teName = entry.materialNameTelugu || teluguMap[rawName.toLowerCase()];
                                       const displayName = teName && teName.trim() ? teName.trim() : rawName;
-                                      return <span title={rawName}>{displayName}</span>;
+                                      return <span title={rawName} className="text-sm font-bold text-primary-900">{displayName}</span>;
                                     })()}
                                   </td>
                                   <td className="px-1.5 py-1 text-right tabular-nums text-primary-800 font-semibold w-12">

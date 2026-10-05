@@ -153,7 +153,7 @@ function renderCellChunkHtml(chunk) {
   if (isFirst) {
     rowsHtml += `<tr>
       <td class="date"></td>
-      <td class="item">Opening</td>
+      <td class="item opening-item">Opening</td>
       <td class="num"></td>
       <td class="num"></td>
       <td class="num"></td>
@@ -162,7 +162,7 @@ function renderCellChunkHtml(chunk) {
   } else {
     rowsHtml += `<tr class="brought-row">
       <td class="date"></td>
-      <td class="item" style="font-weight:700;">బాకీ (b/f)</td>
+      <td class="item brought-item" style="font-weight:700;">బాకీ (b/f)</td>
       <td class="num" colspan="3"></td>
       <td class="num" style="font-weight:700;">${esc(fmtMoney(runningBalance))}</td>
     </tr>`;
@@ -174,7 +174,7 @@ function renderCellChunkHtml(chunk) {
       // Subtotal row before payment
       rowsHtml += `<tr class="subtotal-row">
         <td class="date"></td>
-        <td class="item" style="font-weight:700;">మొత్తం (Subtotal)</td>
+        <td class="item subtotal-item" style="font-weight:700;">మొత్తం (Subtotal)</td>
         <td class="num" colspan="3"></td>
         <td class="num" style="font-weight:700;">${esc(fmtMoney(runningBalance))}</td>
       </tr>`;
@@ -187,7 +187,7 @@ function renderCellChunkHtml(chunk) {
         const payDateStr = formatDateShort(p.date || p.createdAt || stmt.purchaseDate);
         rowsHtml += `<tr class="payment-row">
           <td class="date">${esc(payDateStr)}</td>
-          <td class="item" style="font-weight:600;color:#047857;">Paid (చెల్లింపు)</td>
+          <td class="item payment-item" style="font-weight:600;color:#047857;">Paid (చెల్లింపు)</td>
           <td class="num"></td>
           <td class="num"></td>
           <td class="num"></td>
@@ -198,7 +198,7 @@ function renderCellChunkHtml(chunk) {
       // Balance tally row
       rowsHtml += `<tr class="tally-row">
         <td class="date"></td>
-        <td class="item" style="font-weight:700;">బాకీ (Balance)</td>
+        <td class="item balance-item" style="font-weight:700;">బాకీ (Balance)</td>
         <td class="num" colspan="3"></td>
         <td class="num" style="font-weight:700;">${esc(fmtMoney(runningBalance))}</td>
       </tr>`;
@@ -206,7 +206,7 @@ function renderCellChunkHtml(chunk) {
       runningBalance += u.lineTotal;
       rowsHtml += `<tr>
         <td class="date">${esc(u.dateStr)}</td>
-        <td class="item">${esc(u.matName)}</td>
+        <td class="item mat-item">${esc(u.matName)}</td>
         <td class="num">${esc(u.bagsStr)}</td>
         <td class="num">${esc(u.weightStr)}</td>
         <td class="num">${esc(u.rateStr)}</td>
@@ -219,21 +219,21 @@ function renderCellChunkHtml(chunk) {
   if (isLast) {
     rowsHtml += `<tr class="rule">
       <td class="date"></td>
-      <td class="item">Total</td>
+      <td class="item total-item">Total</td>
       <td class="num" colspan="3"></td>
       <td class="num">${esc(fmtMoney(stmt.total))}</td>
     </tr>`;
 
     rowsHtml += `<tr class="rule">
       <td class="date"></td>
-      <td class="item">Closing</td>
+      <td class="item closing-item">Closing</td>
       <td class="num" colspan="3"></td>
       <td class="num">${esc(fmtMoney(stmt.closing))}</td>
     </tr>`;
   } else {
     rowsHtml += `<tr class="carry-row">
       <td class="date"></td>
-      <td class="item" style="font-weight:700;">కొనసాగింపు (c/f)</td>
+      <td class="item carry-item" style="font-weight:700;">కొనసాగింపు (c/f)</td>
       <td class="num" colspan="3"></td>
       <td class="num" style="font-weight:700;">${esc(fmtMoney(runningBalance))}</td>
     </tr>`;
@@ -466,49 +466,75 @@ body.bill-preview {
   position: relative;
 }
 .party {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: #000000;
   text-align: center;
   border-bottom: 1px solid #000000;
   padding-bottom: 2px;
   margin-bottom: 3px;
-  line-height: 1.2;
+  line-height: 1.25;
   flex-shrink: 0;
 }
-.party .te { display: block; font-size: 12px; font-weight: normal; color: #000000; }
+.party .te { display: block; font-size: 13px; font-weight: normal; color: #000000; }
 table.lines {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
-  line-height: 1.25;
+  font-size: 12px;
+  line-height: 1.35;
   color: #000000;
 }
 table.lines th {
-  padding: 2px 2px;
+  padding: 3px 2px;
   border-bottom: 1px solid #000000;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #000000;
   text-align: left;
+}
+table.lines th.item {
+  font-size: 13.5px;
 }
 table.lines th.num {
   text-align: right;
 }
 table.lines td {
-  padding: 1px 2px;
-  vertical-align: top;
+  padding: 1.5px 2px;
+  vertical-align: middle;
   color: #000000;
 }
-table.lines td.date { width: 1%; white-space: nowrap; color: #000000; }
-table.lines td.item { width: 100%; color: #000000; }
-table.lines td.num { width: 1%; white-space: nowrap; text-align: right; padding-left: 4px; color: #000000; }
-table.lines tr.rule td { border-top: 1px solid #000000; font-weight: 700; padding-top: 2px; color: #000000; }
-table.lines tr.subtotal-row td { border-top: 1px solid #000000; font-weight: 700; padding-top: 1px; color: #000000; }
-table.lines tr.payment-row td { color: #047857; }
-table.lines tr.tally-row td { border-top: 1px dashed #000000; border-bottom: 1px dashed #000000; font-weight: 700; padding: 1px 2px; color: #000000; }
-table.lines tr.carry-row td { border-top: 1px solid #000000; font-weight: 700; color: #374151; font-style: italic; }
-table.lines tr.brought-row td { border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #374151; }
+table.lines td.date { width: 1%; white-space: nowrap; color: #000000; font-size: 11.5px; }
+table.lines td.item {
+  width: 100%;
+  color: #000000;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+}
+table.lines td.mat-item {
+  font-size: 15px;
+  font-weight: 700;
+  color: #000000;
+}
+table.lines td.opening-item {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+table.lines td.num {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  padding-left: 4px;
+  color: #000000;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+table.lines tr.rule td { border-top: 1px solid #000000; font-weight: 700; padding-top: 2px; color: #000000; font-size: 13px; }
+table.lines tr.subtotal-row td { border-top: 1px solid #000000; font-weight: 700; padding-top: 1px; color: #000000; font-size: 13px; }
+table.lines tr.payment-row td { color: #047857; font-size: 13px; }
+table.lines tr.tally-row td { border-top: 1px dashed #000000; border-bottom: 1px dashed #000000; font-weight: 700; padding: 1px 2px; color: #000000; font-size: 13px; }
+table.lines tr.carry-row td { border-top: 1px solid #000000; font-weight: 700; color: #374151; font-style: italic; font-size: 13px; }
+table.lines tr.brought-row td { border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #374151; font-size: 13px; }
 @media print {
   .preview-toolbar { display: none !important; }
   body.bill-preview { background: #ffffff; }

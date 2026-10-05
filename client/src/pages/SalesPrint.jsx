@@ -873,10 +873,10 @@ export default function SalesPrint({ path: windowPath }) {
                                       renderedRows.push(
                                         <tr
                                           key={`subtotal-${i}`}
-                                          className="bg-primary-100/70 font-semibold text-[10.5px] border-t border-primary-200"
+                                          className="bg-primary-100/70 font-semibold text-xs border-t border-primary-200"
                                         >
                                           <td className="px-1.5 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
-                                          <td className="px-1.5 py-0.5 font-bold text-primary-800" colSpan={4}>
+                                          <td className="px-1.5 py-0.5 font-bold text-primary-800 text-sm" colSpan={4}>
                                             మొత్తం (Subtotal)
                                           </td>
                                           <td className="px-1.5 py-0.5 text-right font-bold tabular-nums text-primary-900">
@@ -892,18 +892,18 @@ export default function SalesPrint({ path: windowPath }) {
                                         renderedRows.push(
                                           <tr
                                             key={`pay-${i}-${pIdx}`}
-                                            className="text-emerald-800 bg-emerald-50/60 text-[11px] font-medium"
+                                            className="text-emerald-800 bg-emerald-50/60 text-xs font-medium"
                                           >
                                             <td className="px-1.5 py-0.5 text-center whitespace-nowrap tabular-nums text-[10.5px]">
                                               {formatShortDate(p.date)}
                                             </td>
-                                            <td className="px-1.5 py-0.5 font-semibold text-emerald-800" colSpan={4}>
+                                            <td className="px-1.5 py-0.5 font-semibold text-emerald-800 text-sm" colSpan={4}>
                                               <div className="flex items-center gap-1">
                                                 <span>Paid</span>
-                                                <span className="text-[9.5px] text-emerald-600 font-normal">(చెల్లింపు)</span>
+                                                <span className="text-xs text-emerald-600 font-normal">(చెల్లింపు)</span>
                                               </div>
                                             </td>
-                                            <td className="px-1.5 py-0.5 text-right font-bold text-emerald-800 whitespace-nowrap tabular-nums text-[11px]">
+                                            <td className="px-1.5 py-0.5 text-right font-bold text-emerald-800 whitespace-nowrap tabular-nums text-xs">
                                               - {formatCurrency(pAmt)}
                                             </td>
                                           </tr>
@@ -914,13 +914,13 @@ export default function SalesPrint({ path: windowPath }) {
                                       renderedRows.push(
                                         <tr
                                           key={`tally-${i}`}
-                                          className="bg-amber-50/80 font-bold text-[11px] text-primary-900 border-t border-b border-dashed border-amber-300"
+                                          className="bg-amber-50/80 font-bold text-xs text-primary-900 border-t border-b border-dashed border-amber-300"
                                         >
                                           <td className="px-1.5 py-0.5 text-center text-primary-400 text-[9.5px]">—</td>
-                                          <td className="px-1.5 py-0.5 font-bold text-primary-900" colSpan={4}>
+                                          <td className="px-1.5 py-0.5 font-bold text-primary-900 text-sm" colSpan={4}>
                                             <div className="flex items-center gap-1">
                                               <span>బాకీ</span>
-                                              <span className="text-[9.5px] text-primary-600 font-normal">(Balance)</span>
+                                              <span className="text-xs text-primary-600 font-normal">(Balance)</span>
                                             </div>
                                           </td>
                                           <td className="px-1.5 py-0.5 text-right font-bold tabular-nums text-primary-900">
@@ -965,7 +965,7 @@ export default function SalesPrint({ path: windowPath }) {
                                             data-print-row={rIdx}
                                             data-print-col={0}
                                             onKeyDown={(e) => handleGridKeyDown(e, rIdx, 0)}
-                                            className={`${cellStyle} font-semibold text-primary-800 cursor-pointer text-[11px] py-0.5`}
+                                            className={`${cellStyle} font-bold text-primary-900 cursor-pointer text-sm py-0.5`}
                                             defaultValue={selectedMatId}
                                             onChange={(e) => {
                                               const newMatId = e.target.value;
