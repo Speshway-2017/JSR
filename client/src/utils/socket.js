@@ -6,7 +6,7 @@ export function getSocket() {
   if (!socket) {
     // Connect dynamically based on window.location or fallback to standard server port
     const isHttp = typeof window !== 'undefined' && window.location.protocol.startsWith('http');
-    const socketUrl = isHttp ? window.location.origin : 'http://127.0.0.1:5000';
+    const socketUrl = isHttp ? window.location.origin : 'http://127.0.0.1:5050';
 
     socket = io(socketUrl, {
       transports: ['polling', 'websocket'],

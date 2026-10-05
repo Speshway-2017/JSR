@@ -16,6 +16,8 @@ export default defineConfig({
             if (res && typeof res.writeHead === 'function' && !res.headersSent) {
               res.writeHead(503, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ message: 'Backend server is reconnecting' }));
+            } else if (res && typeof res.destroy === 'function') {
+              res.destroy();
             }
           });
         },
@@ -29,6 +31,13 @@ export default defineConfig({
             if (res && typeof res.writeHead === 'function' && !res.headersSent) {
               res.writeHead(503, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ message: 'Socket reconnecting' }));
+            } else if (res && typeof res.destroy === 'function') {
+              res.destroy();
+            }
+          });
+          proxy.on('proxyReqWsError', (_err, _req, socket) => {
+            if (socket && typeof socket.destroy === 'function') {
+              socket.destroy();
             }
           });
         },

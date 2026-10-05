@@ -22,7 +22,9 @@ api.interceptors.response.use(
       (err.response?.status === 503 ||
         !err.response ||
         err.code === 'ECONNABORTED' ||
-        err.code === 'ERR_NETWORK');
+        err.code === 'ERR_NETWORK' ||
+        err.code === 'ECONNRESET' ||
+        err.message?.includes('Network Error'));
 
     if (isRetryable) {
       config._retryCount = (config._retryCount || 0) + 1;

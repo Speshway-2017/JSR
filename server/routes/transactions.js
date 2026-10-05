@@ -297,7 +297,7 @@ router.post('/cash-entry', async (req, res) => {
 router.put('/cash-entry/:id', async (req, res) => {
   try {
     const tx = await Transaction.findById(req.params.id);
-    if (!tx || tx.source !== 'cash_entry') {
+    if (!tx || (tx.source && tx.source !== 'cash_entry' && tx.sale)) {
       return res.status(404).json({ message: 'Cash entry not found' });
     }
 
@@ -317,6 +317,7 @@ router.put('/cash-entry/:id', async (req, res) => {
       tx.cashSide = result.fields.cashSide;
       tx.paymentType = result.fields.paymentType;
       tx.entryDate = result.fields.entryDate;
+      tx.source = 'cash_entry';
       tx.description = result.fields.description;
       tx.reason = result.fields.reason || '';
       tx.balanceAfter = result.fields.balanceAfter;
@@ -345,7 +346,12 @@ router.put('/cash-entry/:id', async (req, res) => {
 router.get('/cash-entries', async (req, res) => {
   try {
     const { date, startDate, endDate } = req.query;
-    const filter = { source: { $in: ['cash_entry', 'cash_sale', 'Direct Sale Payment'] } };
+    const filter = {
+      $or: [
+        { source: { $in: ['cash_entry', 'cash_sale', 'Direct Sale Payment'] } },
+        { type: { $in: ['customer_payment', 'vendor_payment'] }, sale: null },
+      ],
+    };
     if (startDate && endDate) {
       const start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
@@ -377,7 +383,7 @@ router.get('/cash-entries', async (req, res) => {
 router.delete('/cash-entry/:id', async (req, res) => {
   try {
     const tx = await Transaction.findById(req.params.id);
-    if (!tx || tx.source !== 'cash_entry') {
+    if (!tx || (tx.source && tx.source !== 'cash_entry' && tx.sale)) {
       return res.status(404).json({ message: 'Cash entry not found' });
     }
 

@@ -110,6 +110,7 @@ router.get('/ledger', async (req, res) => {
           lessAmt,
           delta,
           saleId: sId,
+          transactionId: tx._id ? String(tx._id) : null,
         });
       }
 
@@ -143,6 +144,7 @@ router.get('/ledger', async (req, res) => {
           lessAmt: 0,
           delta: saleAmt,
           saleId: sId,
+          transactionId: null,
         });
       }
 
@@ -171,6 +173,7 @@ router.get('/ledger', async (req, res) => {
           less: item.lessAmt,
           balance: Number(running.toFixed(2)),
           saleId: item.saleId,
+          transactionId: item.transactionId,
         });
       }
 
@@ -262,6 +265,7 @@ router.get('/ledger', async (req, res) => {
         less,
         balance: Number(running.toFixed(2)),
         saleId: tx.sale?._id ? String(tx.sale._id) : tx.sale ? String(tx.sale) : null,
+        transactionId: tx._id ? String(tx._id) : null,
       });
     }
 

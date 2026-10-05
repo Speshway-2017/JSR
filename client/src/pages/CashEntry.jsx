@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Banknote, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
@@ -10,14 +11,27 @@ function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function CashEntry() {
+export default function CashEntry({ path: windowPath }) {
+  const [searchParams] = useSearchParams();
+  const effectiveSearchParams = useMemo(() => {
+    if (windowPath && windowPath.includes('?')) {
+      return new URLSearchParams(windowPath.split('?')[1]);
+    }
+    return searchParams;
+  }, [windowPath, searchParams]);
+
   const [customers, setCustomers] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [entries, setEntries] = useState([]);
   const [nameQuery, setNameQuery] = useState('');
   const [partyType, setPartyType] = useState(''); // 'customer' | 'vendor'
   const [partyId, setPartyId] = useState('');
-  const [entryDate, setEntryDate] = useState(todayInputValue());
+  const [entryDate, setEntryDate] = useState(() => {
+    return effectiveSearchParams.get('date') || todayInputValue();
+  });
+  const [highlightTxId, setHighlightTxId] = useState(() => {
+    return effectiveSearchParams.get('highlightId') || effectiveSearchParams.get('txId') || '';
+  });
   const [amount, setAmount] = useState('');
   const [less, setLess] = useState('');
   const [reason, setReason] = useState('');
@@ -40,6 +54,24 @@ export default function CashEntry() {
   const pendingFocusCell = useRef(null);
   const originalCellRef = useRef(null);
   const cancelEditRef = useRef(false);
+
+  useEffect(() => {
+    const pDate = effectiveSearchParams.get('date');
+    const pTxId = effectiveSearchParams.get('highlightId') || effectiveSearchParams.get('txId');
+    const pPartyType = effectiveSearchParams.get('partyType');
+    const pPartyId = effectiveSearchParams.get('partyId');
+
+    if (pDate && pDate !== entryDate) {
+      setEntryDate(pDate);
+    }
+    if (pTxId) {
+      setHighlightTxId(pTxId);
+    }
+    if (pPartyType && pPartyId) {
+      setPartyType(pPartyType);
+      setPartyId(pPartyId);
+    }
+  }, [effectiveSearchParams, entryDate]);
 
   useLayoutEffect(() => {
     if (pendingFocusCell.current) {
@@ -140,6 +172,39 @@ export default function CashEntry() {
       .then((res) => setEntries(res.data))
       .catch(() => {});
   }, [entryDate]);
+
+  useEffect(() => {
+    if (!highlightTxId || entries.length === 0) return;
+    const rowIdx = entries.findIndex((tx) => String(tx._id) === String(highlightTxId));
+    if (rowIdx >= 0) {
+      const tx = entries[rowIdx];
+      const lessAmt = Number(tx.lessAmount || 0);
+      const isCredit = tx.cashSide === 'credit';
+      const targetCol = isCredit ? 3 : 4;
+
+      const scrollAndFocus = () => {
+        const selector = `[data-table-row="${rowIdx}"][data-table-col="${targetCol}"]`;
+        const el = document.querySelector(selector);
+        if (el) {
+          el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          el.focus();
+          if (typeof el.select === 'function' && el.tagName === 'INPUT') {
+            try {
+              el.select();
+            } catch (_) {}
+          }
+          return true;
+        }
+        return false;
+      };
+
+      if (!scrollAndFocus()) {
+        pendingFocusCell.current = { row: rowIdx, col: targetCol };
+        const timer = setTimeout(scrollAndFocus, 100);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [highlightTxId, entries]);
 
   useEffect(() => {
     setHighlight(-1);
@@ -785,9 +850,17 @@ export default function CashEntry() {
                     const busy = savingRowId === tx._id || deletingRowId === tx._id;
                     const lessAllowed =
                       (!cur.isVendor && cur.isCredit) || (cur.isVendor && !cur.isCredit);
+                    const isHighlighted = highlightTxId && String(tx._id) === String(highlightTxId);
 
                     return (
-                      <tr key={tx._id} className="hover:bg-primary-50/40">
+                      <tr
+                        key={tx._id}
+                        className={`transition-all duration-300 ${
+                          isHighlighted
+                            ? 'bg-amber-100/90 ring-2 ring-amber-400 ring-inset font-medium shadow-xs'
+                            : 'hover:bg-primary-50/40'
+                        }`}
+                      >
                         <td className="px-2 py-1 min-w-[10rem]">
                           <select
                             data-table-row={i}

@@ -138,15 +138,12 @@ app.use((err, _req, res, next) => {
   res.status(err.status || err.statusCode || 500).json({ message: msg || 'Server error' });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 
 const start = async () => {
-  await connectDB();
-  await ensureDefaultUsers();
-  refreshLicense().catch((err) => console.error('License check:', err.message));
   const httpServer = createServer(app);
   initSocket(httpServer);
-  httpServer.listen(PORT, '0.0.0.0', () => console.log(`Server running with Socket.io on port ${PORT}`));
+
   httpServer.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`Port ${PORT} is already in use. Stop the other process or reuse it with: npm run electron:open`);
@@ -154,10 +151,23 @@ const start = async () => {
     }
     throw err;
   });
+
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running with Socket.io on port ${PORT}`);
+  });
+
+  try {
+    await connectDB();
+    await ensureDefaultUsers();
+    refreshLicense().catch((err) => console.error('License check:', err.message));
+  } catch (err) {
+    console.error('Failed during database startup:', err);
+  }
 };
 
 start().catch((err) => {
   console.error('Failed to start server:', err);
   process.exit(1);
 });
+
 

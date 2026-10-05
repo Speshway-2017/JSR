@@ -146,21 +146,37 @@ export default function Ledger() {
     return () => window.removeEventListener('jsr_data_updated', handleDataUpdated);
   }, [reloadAll]);
 
-  const openEntry = (row) => {
+  const openSale = (row) => {
+    if (!row.saleId) return;
     const d = new Date(row.date).toISOString().slice(0, 10);
+    const params = new URLSearchParams({
+      date: d,
+      saleId: row.saleId,
+      highlightSaleId: row.saleId,
+      t: Date.now().toString(),
+    });
+    openWindow({ path: `/sell?${params.toString()}`, title: 'Sales Entry' });
+  };
+
+  const openCashEntry = (row) => {
+    const d = new Date(row.date).toISOString().slice(0, 10);
+    const txId = row.transactionId || row.id;
+    const params = new URLSearchParams({
+      date: d,
+      highlightId: txId || '',
+      txId: txId || '',
+      partyType,
+      partyId,
+      t: Date.now().toString(),
+    });
+    openWindow({ path: `/cash-entry?${params.toString()}`, title: 'Cash Entry' });
+  };
+
+  const openEntry = (row) => {
     if (row.saleId) {
-      const params = new URLSearchParams({
-        date: d,
-        saleId: row.saleId,
-        highlightSaleId: row.saleId,
-        t: Date.now().toString(),
-      });
-      openWindow({ path: `/sell?${params.toString()}`, title: 'Sales Entry' });
-    } else if (row.kind === 'payment' || row.paid > 0 || row.less > 0) {
-      const params = new URLSearchParams({
-        date: d,
-      });
-      openWindow({ path: `/cash-entry?${params.toString()}`, title: 'Cash Entry' });
+      openSale(row);
+    } else if (row.kind === 'payment' || row.paid > 0 || row.less > 0 || row.transactionId) {
+      openCashEntry(row);
     }
   };
 
@@ -390,28 +406,78 @@ export default function Ledger() {
                       className="border-b border-primary-100 hover:bg-primary-50/40 cursor-pointer transition"
                       onClick={() => openEntry(row)}
                       onDoubleClick={() => openEntry(row)}
-                      title="Click to open sale details"
+                      title={row.saleId ? 'Click to open sale details' : 'Click to open cash entry details'}
                     >
                       <td className="px-3 py-2 whitespace-nowrap text-primary-600 font-medium">{formatDateOnly(row.date)}</td>
                       <td className="px-3 py-2 text-primary-700 font-medium truncate">{row.particulars}</td>
                       <td
-                        className="px-3 py-2 text-right tabular-nums font-semibold text-primary-800 hover:text-accent-700 underline underline-offset-2 decoration-primary-200"
+                        className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                          row.saleId || row.sale
+                            ? 'text-primary-800 hover:text-accent-700 underline underline-offset-2 decoration-primary-200 cursor-pointer'
+                            : 'text-primary-400'
+                        }`}
                         onClick={(e) => {
-                          e.stopPropagation();
-                          openEntry(row);
+                          if (row.saleId) {
+                            e.stopPropagation();
+                            openSale(row);
+                          }
                         }}
                         onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          openEntry(row);
+                          if (row.saleId) {
+                            e.stopPropagation();
+                            openSale(row);
+                          }
                         }}
-                        title="Click sale to view in Sales"
+                        title={row.saleId ? 'Click sale to view/edit in Sales Entry' : undefined}
                       >
                         {row.sale ? formatCurrency(row.sale) : '—'}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums font-medium text-primary-600">
+                      <td
+                        className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                          row.paid > 0 || row.kind === 'payment' || (row.transactionId && !row.saleId)
+                            ? 'text-emerald-700 hover:text-emerald-900 underline underline-offset-2 decoration-emerald-300 cursor-pointer'
+                            : 'text-primary-400'
+                        }`}
+                        onClick={(e) => {
+                          if (row.paid > 0 || row.kind === 'payment' || row.transactionId) {
+                            e.stopPropagation();
+                            openCashEntry(row);
+                          }
+                        }}
+                        onDoubleClick={(e) => {
+                          if (row.paid > 0 || row.kind === 'payment' || row.transactionId) {
+                            e.stopPropagation();
+                            openCashEntry(row);
+                          }
+                        }}
+                        title={
+                          row.paid > 0 || row.kind === 'payment' || row.transactionId
+                            ? 'Click paid amount to edit in Cash Entry'
+                            : undefined
+                        }
+                      >
                         {row.paid ? formatCurrency(row.paid) : '—'}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums font-medium text-primary-400">
+                      <td
+                        className={`px-3 py-2 text-right tabular-nums font-medium ${
+                          row.less > 0
+                            ? 'text-red-600 hover:text-red-800 underline underline-offset-2 decoration-red-300 cursor-pointer'
+                            : 'text-primary-400'
+                        }`}
+                        onClick={(e) => {
+                          if (row.less > 0 || row.kind === 'payment' || row.transactionId) {
+                            e.stopPropagation();
+                            openCashEntry(row);
+                          }
+                        }}
+                        onDoubleClick={(e) => {
+                          if (row.less > 0 || row.kind === 'payment' || row.transactionId) {
+                            e.stopPropagation();
+                            openCashEntry(row);
+                          }
+                        }}
+                        title={row.less > 0 ? 'Click less amount to edit in Cash Entry' : undefined}
+                      >
                         {row.less ? formatCurrency(row.less) : '—'}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-bold text-primary-800">
