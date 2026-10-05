@@ -135,7 +135,7 @@ export default function BillPrint({ path: windowPath }) {
         });
         setTeluguMap(tMap);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const fetchBills = useCallback(async () => {
@@ -483,9 +483,8 @@ export default function BillPrint({ path: windowPath }) {
     return (
       <button
         type="button"
-        className={`inline-flex items-center gap-1 font-semibold text-xs uppercase tracking-tight hover:text-primary-800 cursor-pointer ${
-          align === 'right' ? 'w-full justify-end text-right' : 'text-left'
-        }`}
+        className={`inline-flex items-center gap-1 font-semibold text-xs uppercase tracking-tight hover:text-primary-800 cursor-pointer ${align === 'right' ? 'w-full justify-end text-right' : 'text-left'
+          }`}
         onClick={() => toggleSort(column)}
       >
         <span>{label}</span>
@@ -522,11 +521,10 @@ export default function BillPrint({ path: windowPath }) {
                 setFilterSchedule('');
                 setSearchQuery('');
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                billType === 'customer'
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${billType === 'customer'
                   ? 'bg-primary-800 text-white shadow-xs'
                   : 'text-primary-600 hover:text-primary-900 hover:bg-primary-200/50'
-              }`}
+                }`}
             >
               Customer Bills
             </button>
@@ -540,11 +538,10 @@ export default function BillPrint({ path: windowPath }) {
                 setFilterSchedule('');
                 setSearchQuery('');
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                billType === 'purchase'
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${billType === 'purchase'
                   ? 'bg-primary-800 text-white shadow-xs'
                   : 'text-primary-600 hover:text-primary-900 hover:bg-primary-200/50'
-              }`}
+                }`}
             >
               Purchase Bills
             </button>
@@ -767,9 +764,8 @@ export default function BillPrint({ path: windowPath }) {
                         <tr
                           key={cid}
                           onClick={() => toggleSelectOne(cid)}
-                          className={`border-b border-primary-100 cursor-pointer transition ${
-                            selected ? 'bg-primary-100/60 font-medium' : 'hover:bg-primary-50/40'
-                          }`}
+                          className={`border-b border-primary-100 cursor-pointer transition ${selected ? 'bg-primary-100/60 font-medium' : 'hover:bg-primary-50/40'
+                            }`}
                         >
                           <td className="px-1 py-1 text-center w-7" onClick={(e) => e.stopPropagation()}>
                             <button type="button" onClick={() => toggleSelectOne(cid)} className="cursor-pointer">
@@ -836,11 +832,10 @@ export default function BillPrint({ path: windowPath }) {
                 <button
                   type="button"
                   onClick={() => setViewColumns(1)}
-                  className={`px-2.5 py-1 text-xs rounded-md font-semibold transition cursor-pointer ${
-                    viewColumns === 1
+                  className={`px-2.5 py-1 text-xs rounded-md font-semibold transition cursor-pointer ${viewColumns === 1
                       ? 'bg-primary-800 text-white shadow-xs'
                       : 'bg-white text-primary-700 hover:bg-primary-100 border border-primary-200'
-                  }`}
+                    }`}
                   title="1 Column (Full Width - Zero Scrolling)"
                 >
                   1 Col
@@ -848,11 +843,10 @@ export default function BillPrint({ path: windowPath }) {
                 <button
                   type="button"
                   onClick={() => setViewColumns(2)}
-                  className={`px-2.5 py-1 text-xs rounded-md font-semibold transition cursor-pointer ${
-                    viewColumns === 2
+                  className={`px-2.5 py-1 text-xs rounded-md font-semibold transition cursor-pointer ${viewColumns === 2
                       ? 'bg-primary-800 text-white shadow-xs'
                       : 'bg-white text-primary-700 hover:bg-primary-100 border border-primary-200'
-                  }`}
+                    }`}
                   title="2 Columns Side by Side"
                 >
                   2 Cols
@@ -867,11 +861,10 @@ export default function BillPrint({ path: windowPath }) {
                     key={n}
                     type="button"
                     onClick={() => setPerPage(n)}
-                    className={`px-2 py-1 text-xs rounded-md font-semibold transition cursor-pointer ${
-                      perPage === n
+                    className={`px-2 py-1 text-xs rounded-md font-semibold transition cursor-pointer ${perPage === n
                         ? 'bg-primary-800 text-white shadow-xs'
                         : 'bg-white text-primary-700 hover:bg-primary-100 border border-primary-200'
-                    }`}
+                      }`}
                   >
                     {n}/page
                   </button>
@@ -949,17 +942,17 @@ export default function BillPrint({ path: windowPath }) {
                             const rawEntries = (st.entries && st.entries.length)
                               ? st.entries
                               : [
-                                  ...(st.sales || []).map((s) => ({ ...s, isPayment: false })),
-                                  ...(st.payments || []).map((p) => ({
-                                    ...p,
-                                    isPayment: true,
-                                    material: p.description || 'Paid',
-                                  })),
-                                ].sort(
-                                  (a, b) =>
-                                    new Date(a.date || a.createdAt || 0).getTime() -
-                                    new Date(b.date || b.createdAt || 0).getTime()
-                                );
+                                ...(st.sales || []).map((s) => ({ ...s, isPayment: false })),
+                                ...(st.payments || []).map((p) => ({
+                                  ...p,
+                                  isPayment: true,
+                                  material: p.description || 'Paid',
+                                })),
+                              ].sort(
+                                (a, b) =>
+                                  new Date(a.date || a.createdAt || 0).getTime() -
+                                  new Date(b.date || b.createdAt || 0).getTime()
+                              );
 
                             const validEntries = rawEntries.filter(
                               (entry) => String(entry.material || '').toLowerCase() !== 'cooly' && !entry.isCoolyLine
@@ -1062,13 +1055,12 @@ export default function BillPrint({ path: windowPath }) {
                                     {formatShortDate(entry.date)}
                                   </td>
                                   <td className="px-2 py-1 min-w-[6rem] font-semibold text-primary-800">
-                                    <span title={entry.material || 'Sale'}>{entry.material || 'Sale'}</span>
-                                    {teluguMap[String(entry.material || '').trim().toLowerCase()] &&
-                                    teluguMap[String(entry.material || '').trim().toLowerCase()] !== String(entry.material || '').trim() ? (
-                                      <span className="text-xs text-primary-400 font-normal block">
-                                        {teluguMap[String(entry.material || '').trim().toLowerCase()]}
-                                      </span>
-                                    ) : null}
+                                    {(() => {
+                                      const rawName = String(entry.material || 'Sale').trim();
+                                      const teName = entry.materialNameTelugu || teluguMap[rawName.toLowerCase()];
+                                      const displayName = teName && teName.trim() ? teName.trim() : rawName;
+                                      return <span title={rawName}>{displayName}</span>;
+                                    })()}
                                   </td>
                                   <td className="px-1.5 py-1 text-right tabular-nums text-primary-800 font-semibold w-12">
                                     {entry.bags || '—'}

@@ -125,25 +125,20 @@ export default function Sell({ path: windowPath }) {
   const editingSaleIdRef = useRef(editingSaleId);
   editingSaleIdRef.current = editingSaleId;
   const inFlightUpdatesRef = useRef(new Set());
+  const fillFromSaleTimerRef = useRef(null);
+  const isNavigatingGridRef = useRef(false);
+
+  // Cleanup any pending fill timer on unmount
+  useEffect(() => {
+    return () => {
+      if (fillFromSaleTimerRef.current) {
+        clearTimeout(fillFromSaleTimerRef.current);
+      }
+    };
+  }, []);
 
   // Restore focus to pending cell immediately after React commits DOM mutations
   useLayoutEffect(() => {
-    if (pendingFocusCell.current) {
-      const { row, col } = pendingFocusCell.current;
-      const selector = `[data-table-row="${row}"][data-table-col="${col}"]`;
-      const target = document.querySelector(selector);
-      if (target) {
-        target.focus();
-        if (typeof target.select === 'function' && target.tagName === 'INPUT') {
-          target.select();
-        }
-        pendingFocusCell.current = null;
-      }
-    }
-  });
-
-  // Secondary fallback for asynchronous state updates
-  useEffect(() => {
     if (pendingFocusCell.current) {
       const { row, col } = pendingFocusCell.current;
       const selector = `[data-table-row="${row}"][data-table-col="${col}"]`;
@@ -657,7 +652,7 @@ export default function Sell({ path: windowPath }) {
   useEffect(() => {
     if (!focusSaleId || !focusRowRef.current) return;
     const timer = setTimeout(() => {
-      focusRowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      focusRowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }, 50);
     return () => clearTimeout(timer);
   }, [focusSaleId, displayedRows.length]);
@@ -1679,6 +1674,8 @@ export default function Sell({ path: windowPath }) {
                   e.preventDefault();
                   e.stopPropagation();
 
+                  isNavigatingGridRef.current = true;
+
                   // Cancel / revert any uncommitted edit in current cell before navigating away
                   cancelEditRef.current = true;
                   if (isInput) {
@@ -1702,50 +1699,37 @@ export default function Sell({ path: windowPath }) {
                     }
                   }
 
-                  // If moving to a different row while authorized, switch edit focus cleanly
-                  if (targetRow !== i && editAuthorized) {
-                    const targetRowData = displayedRows[targetRow];
-                    if (targetRowData) {
+                  // Debounce fillFromSale during rapid arrow navigation to prevent continuous re-rendering
+                  if (fillFromSaleTimerRef.current) {
+                    clearTimeout(fillFromSaleTimerRef.current);
+                  }
+
+                  const targetRowData = displayedRows[targetRow];
+                  if (targetRow !== i && editAuthorized && targetRowData) {
+                    fillFromSaleTimerRef.current = setTimeout(() => {
+                      isNavigatingGridRef.current = false;
                       fillFromSale(targetRowData.sale, targetRowData.lineIndex);
-                    }
-                  }
-
-                  if (isInput || isSelect) {
-                    el.blur();
-                  }
-
-                  // Store the target cell so we can re-focus after React re-render
-                  pendingFocusCell.current = { row: targetRow, col: targetCol };
-
-                  const focusTarget = () => {
-                    const selector = `[data-table-row="${targetRow}"][data-table-col="${targetCol}"]`;
-                    const target = document.querySelector(selector);
-                    if (target) {
-                      target.focus();
-                      if (typeof target.select === 'function' && target.tagName === 'INPUT') {
-                        target.select();
-                      }
-                      return true;
-                    }
-                    return false;
-                  };
-
-                  if (targetRow === i) {
-                    if (focusTarget()) {
-                      pendingFocusCell.current = null;
-                    }
+                    }, 75);
                   } else {
-                    focusTarget();
-                    requestAnimationFrame(() => {
-                      if (pendingFocusCell.current) {
-                        if (focusTarget()) pendingFocusCell.current = null;
-                      }
-                    });
-                    setTimeout(() => {
-                      if (pendingFocusCell.current) {
-                        if (focusTarget()) pendingFocusCell.current = null;
-                      }
-                    }, 50);
+                    fillFromSaleTimerRef.current = setTimeout(() => {
+                      isNavigatingGridRef.current = false;
+                    }, 75);
+                  }
+
+                  // Immediately focus the target cell in the DOM
+                  const selector = `[data-table-row="${targetRow}"][data-table-col="${targetCol}"]`;
+                  const target = document.querySelector(selector);
+                  if (target) {
+                    target.focus();
+                    if (typeof target.select === 'function' && target.tagName === 'INPUT') {
+                      target.select();
+                    }
+                    if (typeof target.scrollIntoView === 'function') {
+                      target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    }
+                    pendingFocusCell.current = null;
+                  } else {
+                    pendingFocusCell.current = { row: targetRow, col: targetCol };
                   }
                 };
 
@@ -1816,7 +1800,7 @@ export default function Sell({ path: windowPath }) {
                               col: 2,
                               val: r.line?.material?._id || r.line?.material || r.materialId
                             };
-                            if (!r.isLiveEditing) fillFromSale(r.sale, r.lineIndex);
+                            if (!r.isLiveEditing && !isNavigatingGridRef.current) fillFromSale(r.sale, r.lineIndex);
                           }
                         }}
                         onKeyDown={(e) => {
@@ -1899,7 +1883,7 @@ export default function Sell({ path: windowPath }) {
                               col: 3,
                               val: r.sale?.customer?._id || r.sale?.customer || r.customerId
                             };
-                            if (!r.isLiveEditing) fillFromSale(r.sale, r.lineIndex);
+                            if (!r.isLiveEditing && !isNavigatingGridRef.current) fillFromSale(r.sale, r.lineIndex);
                           }
                         }}
                         onKeyDown={(e) => {
@@ -2045,11 +2029,9 @@ export default function Sell({ path: windowPath }) {
                                 col: 6,
                                 val: origVal
                               };
-                              if (!r.isLiveEditing) fillFromSale(r.sale, r.lineIndex);
-                              if (typeof e.target.select === 'function') {
-                                setTimeout(() => {
-                                  try { e.target.select(); } catch (_) {}
-                                }, 0);
+                              if (!r.isLiveEditing && !isNavigatingGridRef.current) fillFromSale(r.sale, r.lineIndex);
+                              if (!isNavigatingGridRef.current && typeof e.target.select === 'function') {
+                                try { e.target.select(); } catch (_) {}
                               }
                             }
                           }}

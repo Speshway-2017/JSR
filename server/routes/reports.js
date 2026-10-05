@@ -661,6 +661,7 @@ router.get('/bills', async (req, res) => {
           populate: { path: 'schedule', select: 'name' },
         })
         .populate('vendor', 'name city mobile')
+        .populate('lines.material', 'name nameTelugu')
         .sort({ createdAt: 1 })
         .lean(),
       Transaction.find({
@@ -717,13 +718,15 @@ router.get('/bills', async (req, res) => {
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
           const lineCooly = i === 0 ? coolyTotal : 0;
+          const matObj = line.material && typeof line.material === 'object' ? line.material : null;
           bucket.sales.push({
             saleId: String(sale._id),
             lineId: String(line._id || ''),
             date: sale.createdAt,
             createdAt: sale.createdAt,
-            material: line.materialName || 'Item',
-            materialId: line.material ? String(line.material) : '',
+            material: matObj?.name || line.materialName || 'Item',
+            materialNameTelugu: matObj?.nameTelugu || line.materialNameTelugu || '',
+            materialId: matObj?._id ? String(matObj._id) : (line.material ? String(line.material) : ''),
             vendorId: vId,
             vendorName: vName,
             bags: Number(line.bagCount) || (line.bags?.length) || 0,
@@ -891,6 +894,7 @@ router.get('/purchase-bills', async (req, res) => {
         ],
       })
         .populate('vendor', 'name nameTelugu city mobile address creditBalance')
+        .populate('lines.material', 'name nameTelugu')
         .sort({ purchaseDate: 1, createdAt: 1 })
         .lean(),
       Transaction.find({
@@ -941,13 +945,15 @@ router.get('/purchase-bills', async (req, res) => {
       if (lines.length) {
         for (let i = 0; i < lines.length; i++) {
           const l = lines[i];
+          const matObj = l.material && typeof l.material === 'object' ? l.material : null;
           bucket.sales.push({
             purchaseId: String(p._id),
             lineId: String(l._id || ''),
             date: pDate,
             createdAt: p.createdAt || pDate,
-            material: l.materialName || 'Item',
-            materialId: l.material ? String(l.material) : '',
+            material: matObj?.name || l.materialName || 'Item',
+            materialNameTelugu: matObj?.nameTelugu || l.materialNameTelugu || '',
+            materialId: matObj?._id ? String(matObj._id) : (l.material ? String(l.material) : ''),
             bags: l.purchaseType === 'by_box' ? l.boxes || l.bags || 0 : l.bags || 0,
             boxes: l.boxes || 0,
             weightPerBox: l.weightPerBox || 0,

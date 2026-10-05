@@ -67,7 +67,10 @@ export async function materialTeluguMap() {
   }
 }
 
-export function displayMaterialName(name, teluguMap) {
+export function displayMaterialName(name, teluguMap, explicitTelugu) {
+  if (explicitTelugu && String(explicitTelugu).trim()) {
+    return String(explicitTelugu).trim();
+  }
   const raw = String(name || '').trim();
   if (!raw) return '—';
   let te = null;
@@ -78,8 +81,8 @@ export function displayMaterialName(name, teluguMap) {
       te = teluguMap[raw.toLowerCase()];
     }
   }
-  if (te && te.trim() && te.trim().toLowerCase() !== raw.toLowerCase()) {
-    return `${raw} (${te.trim()})`;
+  if (te && te.trim()) {
+    return te.trim();
   }
   return raw;
 }
@@ -88,7 +91,8 @@ export function displayMaterialName(name, teluguMap) {
 export function itemsTableHtml(lines, teluguMap) {
   const rows = (lines || [])
     .map((line) => {
-      const name = displayMaterialName(line.materialName, teluguMap) || '—';
+      const explicitTe = line.materialNameTelugu || line.nameTelugu;
+      const name = displayMaterialName(line.materialName || line.material, teluguMap, explicitTe) || '—';
       return `<tr>
         <td class="col-item">${esc(name)}</td>
         <td class="col-num">${esc(fmtNum(line.totalKg))}</td>
@@ -120,7 +124,8 @@ export function itemsTableHtml(lines, teluguMap) {
 export function vendorMaterialsHtml(lines, teluguMap) {
   const blocks = (lines || [])
     .map((line) => {
-      const name = displayMaterialName(line.materialName, teluguMap) || '—';
+      const explicitTe = line.materialNameTelugu || line.nameTelugu;
+      const name = displayMaterialName(line.materialName || line.material, teluguMap, explicitTe) || '—';
       const bags = line.bags || [];
       const count = bags.length || Number(line.bagCount) || 0;
       const weights = bags.map((b) => fmtNum(b.billKg));
