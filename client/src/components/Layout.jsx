@@ -280,12 +280,9 @@ function AdminMobileMenu({ onClose, onLogout, onChangePassword, user, onUtilActi
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-primary-100">
-        <BrandLogo className="w-9 h-9" />
-        <div>
-          <h1 className="font-bold text-primary-700 text-lg leading-tight">JSR</h1>
-          <p className="text-xs text-primary-400">Admin</p>
-        </div>
+      <div className="px-4 py-5 border-b border-primary-100">
+        <h1 className="font-bold text-primary-700 text-lg leading-tight">JSR</h1>
+        <p className="text-xs text-primary-400">Admin</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
@@ -431,12 +428,9 @@ function SalesMobileMenu({ onClose, onLogout, onChangePassword, user }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-primary-100">
-        <BrandLogo className="w-9 h-9" />
-        <div>
-          <h1 className="font-bold text-primary-700 text-lg leading-tight">JSR</h1>
-          <p className="text-xs text-primary-400">Sales</p>
-        </div>
+      <div className="px-4 py-5 border-b border-primary-100">
+        <h1 className="font-bold text-primary-700 text-lg leading-tight">JSR</h1>
+        <p className="text-xs text-primary-400">Sales</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
@@ -553,12 +547,11 @@ export default function Layout({ children }) {
               closeMenu();
               minimizeAllWindows();
             }}
-            className="flex items-center gap-2 shrink-0 text-left hover:opacity-85 transition"
+            className="flex items-center shrink-0 text-left hover:opacity-85 transition pr-1"
             title="Minimize all active windows"
             style={noDragRegion}
           >
-            <BrandLogo className="w-8 h-8" />
-            <div className="hidden sm:block leading-tight">
+            <div className="leading-tight">
               <p className="font-bold text-primary-700 text-sm">JSR</p>
               <p className="text-[10px] text-primary-400 -mt-0.5">{roleLabel}</p>
             </div>

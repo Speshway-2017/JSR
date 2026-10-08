@@ -287,9 +287,9 @@ export default function CustomerDetail({ path: windowPath }) {
                 <button
                   type="button"
                   onClick={handleSendWhatsAppStatement}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5 w-full cursor-pointer"
+                  className="btn-secondary !py-2 !text-xs font-bold w-full flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                 >
-                  <Send className="w-3.5 h-3.5" /> WhatsApp Statement
+                  <Send className="w-3.5 h-3.5 text-primary-600" /> WhatsApp Statement
                 </button>
               )}
             </div>
@@ -351,8 +351,8 @@ export default function CustomerDetail({ path: windowPath }) {
                     <p className="font-bold text-primary-800 text-sm">{formatCurrency(sale.totalAmount)}</p>
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
                       {sale.isPaid ? (
-                        <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Paid Direct
+                        <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-primary-100 text-primary-800 border border-primary-300 inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-primary-600" /> Paid Direct
                         </span>
                       ) : null}
                       <button
@@ -366,10 +366,10 @@ export default function CustomerDetail({ path: windowPath }) {
                         <button
                           type="button"
                           onClick={() => handleSendWhatsAppSale(sale)}
-                          className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200"
+                          className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold"
                           title="Send Bill via WhatsApp"
                         >
-                          <Send className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
+                          <Send className="w-3.5 h-3.5 text-primary-600" /> WhatsApp
                         </button>
                       )}
                     </div>

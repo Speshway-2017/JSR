@@ -921,6 +921,34 @@ export default function Sell({ path: windowPath }) {
     }
   };
 
+  const commitIfDirty = (row, colIdx, el) => {
+    if (cancelEditRef.current || !editAuthorized || !row || !el) return;
+
+    if (colIdx === 2) {
+      const matId = el.value;
+      const dbMatId = row.line?.material?._id || row.line?.material || row.materialId;
+      if (matId && matId !== dbMatId) {
+        if (originalCellRef.current) originalCellRef.current.val = matId;
+        commitCellEdit(row, { materialId: matId });
+      }
+    } else if (colIdx === 3) {
+      const custId = el.value;
+      const dbCustId = row.sale?.customer?._id || row.sale?.customer || row.customerId;
+      if (custId && custId !== dbCustId) {
+        if (originalCellRef.current) originalCellRef.current.val = custId;
+        commitCellEdit(row, { customerId: custId });
+      }
+    } else if (colIdx === 6) {
+      const rawVal = String(el.value).trim();
+      const rateVal = Number(rawVal);
+      const dbRate = Number(row.line?.ratePerKg != null ? row.line.ratePerKg : row.rate);
+      if (rawVal !== '' && !isNaN(rateVal) && rateVal >= 0 && rateVal !== dbRate) {
+        if (originalCellRef.current) originalCellRef.current.val = String(rateVal);
+        commitCellEdit(row, { rate: rateVal });
+      }
+    }
+  };
+
   const persistTableRow = async (row, patch) => {
     if (!editAuthorized) {
       requestEditSale(row.sale, row.lineIndex, true);
@@ -1000,7 +1028,9 @@ export default function Sell({ path: windowPath }) {
       });
       const updatedSales = await loadDaySales();
       window.dispatchEvent(new CustomEvent('jsr_data_updated'));
-      setFocusSaleId(sale._id);
+      if (!editingSaleIdRef.current || editingSaleIdRef.current === sale._id) {
+        setFocusSaleId(sale._id);
+      }
       const freshSale = (updatedSales || []).find((s) => s._id === sale._id) || res.data;
       if (freshSale && editingSaleIdRef.current === sale._id) {
         fillFromSale(freshSale, row.lineIndex);
@@ -1674,30 +1704,10 @@ export default function Sell({ path: windowPath }) {
                   e.preventDefault();
                   e.stopPropagation();
 
-                  isNavigatingGridRef.current = true;
+                  // Auto-save any modified cell value before navigating away
+                  commitIfDirty(r, colIdx, el);
 
-                  // Cancel / revert any uncommitted edit in current cell before navigating away
-                  cancelEditRef.current = true;
-                  if (isInput) {
-                    const origVal = originalCellRef.current?.val ?? (r.line?.ratePerKg != null ? String(r.line.ratePerKg) : (r.rate != null ? String(r.rate) : ''));
-                    el.value = origVal;
-                    if (r.isLiveEditing && colIdx === 6) {
-                      setRate(origVal);
-                    }
-                  } else if (isSelect) {
-                    const origVal = originalCellRef.current?.val;
-                    if (origVal !== undefined) {
-                      el.value = origVal;
-                      if (r.isLiveEditing) {
-                        if (colIdx === 2) setMaterialId(origVal);
-                        if (colIdx === 3) {
-                          setCustomerId(origVal);
-                          const match = customers.find((c) => c._id === origVal);
-                          if (match) setNameQuery(match.name);
-                        }
-                      }
-                    }
-                  }
+                  isNavigatingGridRef.current = true;
 
                   // Debounce fillFromSale during rapid arrow navigation to prevent continuous re-rendering
                   if (fillFromSaleTimerRef.current) {
@@ -1817,14 +1827,7 @@ export default function Sell({ path: windowPath }) {
                           if (e.key === 'Enter') {
                             e.preventDefault();
                             cancelEditRef.current = false;
-                            const matId = e.currentTarget.value;
-                            const dbMatId = r.line?.material?._id || r.line?.material || r.materialId;
-                            if (originalCellRef.current) {
-                              originalCellRef.current.val = matId;
-                            }
-                            if (matId && matId !== dbMatId) {
-                              commitCellEdit(r, { materialId: matId });
-                            }
+                            commitIfDirty(r, 2, e.currentTarget);
                             pendingFocusCell.current = { row: i, col: 2 };
                             e.currentTarget.focus();
                             return;
@@ -1833,13 +1836,14 @@ export default function Sell({ path: windowPath }) {
                         }}
                         onBlur={(e) => {
                           if (!editAuthorized) return;
-                          // If blurred without pressing Enter or if cancelled, revert value
-                          const orig = originalCellRef.current?.val ?? (r.line?.material?._id || r.line?.material || r.materialId);
-                          if (e.target.value !== orig) {
+                          if (cancelEditRef.current) {
+                            const orig = originalCellRef.current?.val ?? (r.line?.material?._id || r.line?.material || r.materialId);
                             e.target.value = orig;
                             if (r.isLiveEditing) setMaterialId(orig);
+                            cancelEditRef.current = false;
+                            return;
                           }
-                          cancelEditRef.current = false;
+                          commitIfDirty(r, 2, e.target);
                         }}
                         className={`${cell} font-medium text-primary-700 text-xs cursor-pointer`}
                         value={r.isLiveEditing ? materialId : r.materialId}
@@ -1904,14 +1908,7 @@ export default function Sell({ path: windowPath }) {
                           if (e.key === 'Enter') {
                             e.preventDefault();
                             cancelEditRef.current = false;
-                            const custId = e.currentTarget.value;
-                            const dbCustId = r.sale?.customer?._id || r.sale?.customer || r.customerId;
-                            if (originalCellRef.current) {
-                              originalCellRef.current.val = custId;
-                            }
-                            if (custId && custId !== dbCustId) {
-                              commitCellEdit(r, { customerId: custId });
-                            }
+                            commitIfDirty(r, 3, e.currentTarget);
                             pendingFocusCell.current = { row: i, col: 3 };
                             e.currentTarget.focus();
                             return;
@@ -1920,17 +1917,18 @@ export default function Sell({ path: windowPath }) {
                         }}
                         onBlur={(e) => {
                           if (!editAuthorized) return;
-                          // If blurred without pressing Enter or if cancelled, revert value
-                          const orig = originalCellRef.current?.val ?? (r.sale?.customer?._id || r.sale?.customer || r.customerId);
-                          if (e.target.value !== orig) {
+                          if (cancelEditRef.current) {
+                            const orig = originalCellRef.current?.val ?? (r.sale?.customer?._id || r.sale?.customer || r.customerId);
                             e.target.value = orig;
                             if (r.isLiveEditing) {
                               setCustomerId(orig);
                               const match = customers.find((c) => c._id === orig);
                               if (match) setNameQuery(match.name);
                             }
+                            cancelEditRef.current = false;
+                            return;
                           }
-                          cancelEditRef.current = false;
+                          commitIfDirty(r, 3, e.target);
                         }}
                         className={`${cell} text-primary-700 text-xs cursor-pointer`}
                         value={r.isLiveEditing ? customerId : r.customerId}
@@ -2060,14 +2058,7 @@ export default function Sell({ path: windowPath }) {
                             if (e.key === 'Enter') {
                               e.preventDefault();
                               cancelEditRef.current = false;
-                              const rateVal = Number(e.currentTarget.value);
-                              const dbRate = Number(r.line?.ratePerKg != null ? r.line.ratePerKg : r.rate);
-                              if (originalCellRef.current) {
-                                originalCellRef.current.val = String(rateVal);
-                              }
-                              if (!isNaN(rateVal) && rateVal >= 0 && rateVal !== dbRate) {
-                                commitCellEdit(r, { rate: rateVal });
-                              }
+                              commitIfDirty(r, 6, e.currentTarget);
                               pendingFocusCell.current = { row: i, col: 6 };
                               e.currentTarget.focus();
                               if (typeof e.currentTarget.select === 'function') {
@@ -2079,15 +2070,16 @@ export default function Sell({ path: windowPath }) {
                           }}
                           onBlur={(e) => {
                             if (!editAuthorized) return;
-                            // If blurred without pressing Enter or if cancelled, revert value
-                            const orig = originalCellRef.current?.val ?? (r.line?.ratePerKg != null ? String(r.line.ratePerKg) : (r.rate != null ? String(r.rate) : ''));
-                            if (e.target.value !== orig) {
+                            if (cancelEditRef.current) {
+                              const orig = originalCellRef.current?.val ?? (r.line?.ratePerKg != null ? String(r.line.ratePerKg) : (r.rate != null ? String(r.rate) : ''));
                               e.target.value = orig;
                               if (r.isLiveEditing) {
                                 setRate(orig);
                               }
+                              cancelEditRef.current = false;
+                              return;
                             }
-                            cancelEditRef.current = false;
+                            commitIfDirty(r, 6, e.target);
                           }}
                         />
                         {r.isByBag && (
@@ -2212,7 +2204,7 @@ export default function Sell({ path: windowPath }) {
 
         {/* Lightweight status strip matching table */}
         <div className="flex items-center justify-between px-3 py-1 bg-surface border-t border-primary-100 text-[11px] text-primary-400 shrink-0">
-          <span>Enter to save • Esc to cancel • Arrow keys to navigate</span>
+          <span>Arrow keys or Enter to navigate & auto-save • Esc to cancel</span>
           <span className="font-medium text-primary-500">
             {displayedRows.length} {displayedRows.length === 1 ? 'sale' : 'sales'}
           </span>

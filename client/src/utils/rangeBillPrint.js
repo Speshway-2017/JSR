@@ -215,15 +215,8 @@ function renderCellChunkHtml(chunk) {
     }
   }
 
-  // 3. Footer: Total & Closing (if last chunk) or Continuation c/f (if intermediate chunk)
+  // 3. Footer: Closing (if last chunk) or Continuation c/f (if intermediate chunk)
   if (isLast) {
-    rowsHtml += `<tr class="rule">
-      <td class="date"></td>
-      <td class="item total-item">Total</td>
-      <td class="num" colspan="3"></td>
-      <td class="num">${esc(fmtMoney(stmt.total))}</td>
-    </tr>`;
-
     rowsHtml += `<tr class="rule">
       <td class="date"></td>
       <td class="item closing-item">Closing</td>
@@ -275,7 +268,7 @@ export function buildNUpCellChunks(summaryRow, teluguMap, perPage = 4) {
   const maxRows = perPage === 2 ? 48 : perPage === 4 ? 23 : 13;
 
   const totalUnitsRows = stmt.units.reduce((s, u) => s + u.lineCount, 0);
-  const totalRowsSingleCell = 1 + totalUnitsRows + 2;
+  const totalRowsSingleCell = 1 + totalUnitsRows + 1;
 
   if (totalRowsSingleCell <= maxRows) {
     return [
@@ -304,7 +297,7 @@ export function buildNUpCellChunks(summaryRow, teluguMap, perPage = 4) {
     while (unitIdx < stmt.units.length) {
       const nextUnit = stmt.units[unitIdx];
       const remainingUnitsAfterNext = stmt.units.length - (unitIdx + 1);
-      const neededFooterRows = remainingUnitsAfterNext === 0 ? 2 : 1;
+      const neededFooterRows = 1; // 1 row for Closing (last chunk) or carry-forward (intermediate chunk)
 
       if (currentRows + nextUnit.lineCount + neededFooterRows <= maxRows || chunkUnits.length === 0) {
         chunkUnits.push(nextUnit);

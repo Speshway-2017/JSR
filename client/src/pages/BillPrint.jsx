@@ -73,14 +73,21 @@ export default function BillPrint({ path: windowPath }) {
   useEffect(() => {
     if (startDate && typeof updateWindowPath === 'function') {
       isInternalPathUpdate.current = true;
-      updateWindowPath('/bill-print', `/bill-print?date=${startDate}&type=${billType}`);
+      const params = new URLSearchParams();
+      params.set('date', startDate);
+      params.set('type', billType);
+      if (filterCustomer) params.set('customer', filterCustomer);
+      if (filterVendor) params.set('vendor', filterVendor);
+      if (filterItem) params.set('item', filterItem);
+      if (filterSchedule) params.set('schedule', filterSchedule);
+      updateWindowPath('/bill-print', `/bill-print?${params.toString()}`);
     }
-  }, [startDate, billType, updateWindowPath]);
+  }, [startDate, billType, filterCustomer, filterVendor, filterItem, filterSchedule, updateWindowPath]);
 
-  const [filterCustomer, setFilterCustomer] = useState(effectiveSearchParams.get('customer') || '');
-  const [filterVendor, setFilterVendor] = useState(effectiveSearchParams.get('vendor') || '');
-  const [filterItem, setFilterItem] = useState(effectiveSearchParams.get('item') || '');
-  const [filterSchedule, setFilterSchedule] = useState(effectiveSearchParams.get('schedule') || '');
+  const [filterCustomer, setFilterCustomer] = useState(() => effectiveSearchParams.get('customer') || '');
+  const [filterVendor, setFilterVendor] = useState(() => effectiveSearchParams.get('vendor') || '');
+  const [filterItem, setFilterItem] = useState(() => effectiveSearchParams.get('item') || '');
+  const [filterSchedule, setFilterSchedule] = useState(() => effectiveSearchParams.get('schedule') || '');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -102,10 +109,10 @@ export default function BillPrint({ path: windowPath }) {
       setEndDate(pDate);
     }
     if (pType === 'purchase' || pType === 'customer') setBillType(pType);
-    if (pCust !== null && pCust !== undefined) setFilterCustomer(pCust);
-    if (pVend !== null && pVend !== undefined) setFilterVendor(pVend);
-    if (pItem !== null && pItem !== undefined) setFilterItem(pItem);
-    if (pSched !== null && pSched !== undefined) setFilterSchedule(pSched);
+    setFilterCustomer(pCust || '');
+    setFilterVendor(pVend || '');
+    setFilterItem(pItem || '');
+    setFilterSchedule(pSched || '');
   }, [windowPath, effectiveSearchParams]);
 
   const [materials, setMaterials] = useState([]);
@@ -273,6 +280,7 @@ export default function BillPrint({ path: windowPath }) {
 
   // Reset filter selection if it's no longer present in available options for current date range
   useEffect(() => {
+    if (!data?.statements) return;
     if (filterCustomer && !availableCustomers.some((c) => c._id === filterCustomer || c.name === filterCustomer)) {
       setFilterCustomer('');
     }
@@ -290,7 +298,7 @@ export default function BillPrint({ path: windowPath }) {
     ) {
       setFilterSchedule('');
     }
-  }, [availableCustomers, availableVendors, availableItems, availableSchedules, filterCustomer, filterVendor, filterItem, filterSchedule]);
+  }, [data, availableCustomers, availableVendors, availableItems, availableSchedules, filterCustomer, filterVendor, filterItem, filterSchedule]);
 
   const filteredStatements = useMemo(() => {
     if (!data?.statements) return [];
@@ -554,7 +562,7 @@ export default function BillPrint({ path: windowPath }) {
               onClick={handleSendWhatsApp}
               disabled={!selectedStatements.length}
             >
-              <Send className="w-4 h-4 text-emerald-600" /> Send WhatsApp
+              <Send className="w-4 h-4 text-primary-600" /> Send WhatsApp
             </button>
           )}
           <button
@@ -997,18 +1005,18 @@ export default function BillPrint({ path: windowPath }) {
                                   renderedRows.push(
                                     <tr
                                       key={`pay-${i}-${pIdx}`}
-                                      className="text-emerald-800 bg-emerald-50/60 text-xs font-medium"
+                                      className="text-primary-850 bg-primary-50/70 text-xs font-medium"
                                     >
                                       <td className="px-2 py-1 text-center whitespace-nowrap tabular-nums text-xs">
                                         {formatShortDate(p.date)}
                                       </td>
-                                      <td className="px-2 py-1 font-semibold text-emerald-800 text-sm" colSpan={4}>
+                                      <td className="px-2 py-1 font-semibold text-primary-800 text-sm" colSpan={4}>
                                         <div className="flex items-center gap-1">
                                           <span>Paid</span>
-                                          <span className="text-xs text-emerald-600 font-normal">(చెల్లింపు)</span>
+                                          <span className="text-xs text-primary-600 font-normal">(చెల్లింపు)</span>
                                         </div>
                                       </td>
-                                      <td className="px-2 py-1 text-right font-bold text-emerald-800 whitespace-nowrap tabular-nums text-xs">
+                                      <td className="px-2 py-1 text-right font-bold text-primary-800 whitespace-nowrap tabular-nums text-xs">
                                         - {formatCurrency(pAmt)}
                                       </td>
                                     </tr>
@@ -1074,7 +1082,7 @@ export default function BillPrint({ path: windowPath }) {
                                   <td className="px-2 py-1 text-right font-bold text-primary-900 whitespace-nowrap tabular-nums text-xs w-20">
                                     {formatCurrency(lineTotal)}
                                     {coolyAmt > 0 ? (
-                                      <span className="text-[10px] text-emerald-700 block font-normal leading-tight">
+                                      <span className="text-[10px] text-primary-600 block font-normal leading-tight">
                                         (incl. ₹{coolyAmt} cooly)
                                       </span>
                                     ) : null}
@@ -1086,15 +1094,7 @@ export default function BillPrint({ path: windowPath }) {
                             return renderedRows;
                           })()}
                         </tbody>
-                        <tfoot className="border-t-2 border-primary-300 bg-accent-200">
-                          <tr className="bg-accent-200 text-accent-900 font-bold whitespace-nowrap text-xs">
-                            <td className="bg-accent-200 px-2 py-1.5 font-bold text-xs uppercase tracking-wide text-accent-900" colSpan={5}>
-                              Total
-                            </td>
-                            <td className="bg-accent-200 px-2 py-1.5 text-right font-bold text-sm tabular-nums text-accent-900">
-                              {formatCurrency(st.totalSale)}
-                            </td>
-                          </tr>
+                        <tfoot className="border-t-2 border-primary-300 bg-accent-100/70">
                           <tr className="bg-accent-100/70 text-accent-900 font-bold whitespace-nowrap text-xs">
                             <td className="bg-accent-100/70 px-2 py-1.5 font-bold text-xs uppercase tracking-wide text-accent-900" colSpan={5}>
                               Closing

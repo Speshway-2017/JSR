@@ -39,9 +39,6 @@ export default function Login() {
       <TitleBar standalone />
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center mb-4">
-            <BrandLogo className="w-20 h-20 shadow-soft" />
-          </div>
           <h1 className="text-3xl font-bold text-primary-700">JSR</h1>
           <p className="text-primary-500 mt-2 text-lg">Vendor &amp; Sales Management</p>
         </div>

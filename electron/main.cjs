@@ -133,9 +133,6 @@ function createWindow() {
     titleBarStyle: isMac ? 'hiddenInset' : undefined,
     trafficLightPosition: isMac ? { x: 14, y: 11 } : undefined,
     title: 'JSR',
-    icon: process.platform === 'win32'
-      ? path.join(__dirname, '..', 'build', 'icon.ico')
-      : path.join(__dirname, '..', 'build', 'icon.png'),
     backgroundColor: '#F8F9F4',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),

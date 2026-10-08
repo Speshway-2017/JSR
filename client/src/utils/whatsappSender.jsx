@@ -181,7 +181,7 @@ export async function sendWhatsAppBillPdf({
                 window.open(waUrl, '_blank');
                 toast.dismiss(t.id);
               }}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow transition flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-primary-700 hover:bg-primary-800 text-white rounded-lg text-xs font-bold shadow transition flex items-center gap-1.5 cursor-pointer"
             >
               🚀 Send via WhatsApp Web ({displayPhone})
             </button>

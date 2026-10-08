@@ -322,9 +322,9 @@ export default function VendorDetail({ path: windowPath }) {
                 <button
                   type="button"
                   onClick={handleSendWhatsAppVendorStatement}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5 w-full cursor-pointer"
+                  className="btn-secondary !py-2 !text-xs font-bold w-full flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                 >
-                  <Send className="w-3.5 h-3.5" /> WhatsApp Statement
+                  <Send className="w-3.5 h-3.5 text-primary-600" /> WhatsApp Statement
                 </button>
               )}
             </div>
@@ -491,10 +491,10 @@ export default function VendorDetail({ path: windowPath }) {
                             type="button"
                             onClick={() => handleSendWhatsAppVendorLoad(load)}
                             disabled={billLoadingId === load._id}
-                            className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200"
+                            className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold"
                             title="Send Load Bill via WhatsApp"
                           >
-                            <Send className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
+                            <Send className="w-3.5 h-3.5 text-primary-600" /> WhatsApp
                           </button>
                         )}
                       </div>

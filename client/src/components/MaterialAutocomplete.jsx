@@ -141,7 +141,7 @@ export default function MaterialAutocomplete({
       />
 
       {materialId && (
-        <span className={`absolute right-2.5 ${compact ? 'top-[24px]' : 'top-[38px]'} text-emerald-600`}>
+        <span className={`absolute right-2.5 ${compact ? 'top-[24px]' : 'top-[38px]'} text-primary-600`}>
           <Check className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
         </span>
       )}

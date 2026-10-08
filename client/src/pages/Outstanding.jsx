@@ -299,10 +299,10 @@ export default function Outstanding({ path: windowPath }) {
                                   <button
                                     type="button"
                                     onClick={() => handleSendWhatsAppRow(row)}
-                                    className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                    className="px-2.5 py-1 bg-primary-100/70 hover:bg-primary-100 text-primary-800 border border-primary-300 rounded text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
                                     title="Send Outstanding Statement via WhatsApp"
                                   >
-                                    <Send className="w-3 h-3 text-emerald-600" /> Send
+                                    <Send className="w-3 h-3 text-primary-600" /> Send
                                   </button>
                                 )}
                               </td>

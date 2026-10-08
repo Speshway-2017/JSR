@@ -125,6 +125,7 @@ export default function CashChecklist() {
         totalDebit += item.amount;
       }
     });
+    const totalCashCollected = totalCredit;
     const closingBalance = openingBalance + totalCredit - totalDebit;
     return {
       count: filteredEntries.length,
@@ -132,6 +133,7 @@ export default function CashChecklist() {
       totalLess,
       totalCredit,
       totalDebit,
+      totalCashCollected,
       closingBalance,
     };
   }, [filteredEntries, openingBalance]);
@@ -178,6 +180,16 @@ export default function CashChecklist() {
       'Debit (₹)': summary.totalDebit,
     });
     sheetRows.push({
+      'Date & Time': 'TOTAL CASH COLLECTED',
+      Name: '',
+      Type: '',
+      'Type of Payment': '',
+      Reason: '',
+      'Less (₹)': '',
+      'Credit (₹)': summary.totalCashCollected,
+      'Debit (₹)': '',
+    });
+    sheetRows.push({
       'Date & Time': 'CLOSING BALANCE',
       Name: '',
       Type: '',
@@ -200,7 +212,7 @@ export default function CashChecklist() {
     const previewTab = openBillPreviewTab();
 
     const openBalRow = `
-      <tr style="background: #f0fdf4; font-weight: 600;">
+      <tr style="background: #f4f7f5; font-weight: 600;">
         <td>—</td>
         <td>As of ${formatDateOnly(startDate)}</td>
         <td><strong>Opening Balance</strong></td>
@@ -208,8 +220,8 @@ export default function CashChecklist() {
         <td>—</td>
         <td>—</td>
         <td style="text-align: right;">—</td>
-        <td style="text-align: right; color: #15803d;">${summary.openingBalance > 0 ? formatCurrency(summary.openingBalance) : '—'}</td>
-        <td style="text-align: right; color: #1d4ed8;">${summary.openingBalance < 0 ? formatCurrency(Math.abs(summary.openingBalance)) : '—'}</td>
+        <td style="text-align: right; color: #2f3b33;">${summary.openingBalance > 0 ? formatCurrency(summary.openingBalance) : '—'}</td>
+        <td style="text-align: right; color: #6d5c47;">${summary.openingBalance < 0 ? formatCurrency(Math.abs(summary.openingBalance)) : '—'}</td>
       </tr>
     `;
 
@@ -223,8 +235,8 @@ export default function CashChecklist() {
         <td>${e.paymentType || 'Cash'}</td>
         <td>${e.reason || '—'}</td>
         <td style="text-align: right; color: #b45309;">${e.lessAmount > 0 ? formatCurrency(e.lessAmount) : '—'}</td>
-        <td style="text-align: right; font-weight: 700; color: #15803d;">${e.cashSide === 'credit' ? formatCurrency(e.amount) : '—'}</td>
-        <td style="text-align: right; font-weight: 700; color: #1d4ed8;">${e.cashSide === 'debit' ? formatCurrency(e.amount) : '—'}</td>
+        <td style="text-align: right; font-weight: 700; color: #2f3b33;">${e.cashSide === 'credit' ? formatCurrency(e.amount) : '—'}</td>
+        <td style="text-align: right; font-weight: 700; color: #6d5c47;">${e.cashSide === 'debit' ? formatCurrency(e.amount) : '—'}</td>
       </tr>`
       )
       .join('');
@@ -239,14 +251,14 @@ export default function CashChecklist() {
     body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background: #fff; color: #111; }
     .preview-toolbar { position: sticky; top: 0; display: flex; justify-content: flex-end; gap: 10px; padding: 10px 16px; background: #f4f4f5; border-bottom: 1px solid #e4e4e7; }
     .preview-toolbar button { font: inherit; padding: 8px 16px; cursor: pointer; border-radius: 6px; border: 1px solid #d4d4d8; background: #fff; }
-    .preview-toolbar button.primary { background: #166534; border-color: #166534; color: #fff; font-weight: 600; }
+    .preview-toolbar button.primary { background: #3d4d42; border-color: #3d4d42; color: #fff; font-weight: 600; }
     .container { max-width: 850px; margin: 20px auto; padding: 0 16px; }
-    h2 { margin: 0 0 4px; font-size: 20px; color: #166534; }
+    h2 { margin: 0 0 4px; font-size: 20px; color: #2f3b33; }
     .sub { font-size: 13px; color: #666; margin-bottom: 16px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
     th, td { border: 1px solid #e4e4e7; padding: 8px 12px; text-align: left; }
-    th { background: #f4f4f5; font-weight: 600; }
-    .total-row td { background: #f0fdf4; font-weight: 700; font-size: 14px; }
+    th { background: #f4f7f5; font-weight: 600; }
+    .total-row td { background: #f4f7f5; font-weight: 700; font-size: 14px; }
     @media print {
       .preview-toolbar { display: none !important; }
       .container { margin: 0; max-width: 100%; }
@@ -283,6 +295,10 @@ export default function CashChecklist() {
           <td style="text-align: right; color: #b45309;">${formatCurrency(summary.totalLess)}</td>
           <td style="text-align: right; color: #15803d;">${formatCurrency(summary.totalCredit)}</td>
           <td style="text-align: right; color: #1d4ed8;">${formatCurrency(summary.totalDebit)}</td>
+        </tr>
+        <tr class="total-row" style="background: #f0fdf4; font-size: 14px;">
+          <td colspan="7" style="text-align: right; font-weight: 700; color: #15803d;">Total Cash Collected:</td>
+          <td colspan="2" style="text-align: right; font-weight: 800; color: #15803d;">${formatCurrency(summary.totalCashCollected)}</td>
         </tr>
         <tr class="total-row" style="background: #e0f2fe; font-size: 15px;">
           <td colspan="7" style="text-align: right; font-weight: 800;">Closing Balance:</td>
@@ -415,34 +431,52 @@ export default function CashChecklist() {
 
       {/* Summary KPI Strip */}
       {hasRows && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-          <div className="card !py-2.5 !px-3 flex items-center justify-between border border-primary-200">
-            <span className="text-xs font-semibold text-primary-600">Opening</span>
-            <span className="font-bold text-sky-700 text-sm tabular-nums">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          <div className="card !py-2.5 !px-3.5 flex flex-col justify-between border border-primary-200 bg-surface shadow-2xs">
+            <span className="text-[11px] font-semibold text-primary-500 uppercase tracking-wider truncate">
+              Opening
+            </span>
+            <span className="text-sm md:text-base font-bold text-primary-800 tabular-nums whitespace-nowrap mt-1">
               {formatCurrency(summary.openingBalance)}
             </span>
           </div>
-          <div className="card !py-2.5 !px-3 flex items-center justify-between border border-primary-200">
-            <span className="text-xs font-semibold text-primary-600">Credit</span>
-            <span className="font-bold text-emerald-700 text-sm tabular-nums">
+          <div className="card !py-2.5 !px-3.5 flex flex-col justify-between border border-primary-300 bg-primary-50/70 shadow-2xs">
+            <span className="text-[11px] font-bold text-primary-800 uppercase tracking-wider truncate">
+              Total Collected
+            </span>
+            <span className="text-sm md:text-base font-bold text-primary-900 tabular-nums whitespace-nowrap mt-1">
+              {formatCurrency(summary.totalCashCollected)}
+            </span>
+          </div>
+          <div className="card !py-2.5 !px-3.5 flex flex-col justify-between border border-primary-200 bg-surface shadow-2xs">
+            <span className="text-[11px] font-semibold text-primary-500 uppercase tracking-wider truncate">
+              Credit
+            </span>
+            <span className="text-sm md:text-base font-bold text-primary-800 tabular-nums whitespace-nowrap mt-1">
               {formatCurrency(summary.totalCredit)}
             </span>
           </div>
-          <div className="card !py-2.5 !px-3 flex items-center justify-between border border-primary-200">
-            <span className="text-xs font-semibold text-primary-600">Debit</span>
-            <span className="font-bold text-blue-700 text-sm tabular-nums">
+          <div className="card !py-2.5 !px-3.5 flex flex-col justify-between border border-primary-200 bg-surface shadow-2xs">
+            <span className="text-[11px] font-semibold text-primary-500 uppercase tracking-wider truncate">
+              Debit
+            </span>
+            <span className="text-sm md:text-base font-bold text-primary-800 tabular-nums whitespace-nowrap mt-1">
               {formatCurrency(summary.totalDebit)}
             </span>
           </div>
-          <div className="card !py-2.5 !px-3 flex items-center justify-between border border-primary-200">
-            <span className="text-xs font-semibold text-primary-600">Less</span>
-            <span className="font-bold text-amber-700 text-sm tabular-nums">
+          <div className="card !py-2.5 !px-3.5 flex flex-col justify-between border border-primary-200 bg-surface shadow-2xs">
+            <span className="text-[11px] font-semibold text-primary-500 uppercase tracking-wider truncate">
+              Less
+            </span>
+            <span className="text-sm md:text-base font-bold text-accent-700 tabular-nums whitespace-nowrap mt-1">
               {formatCurrency(summary.totalLess)}
             </span>
           </div>
-          <div className="card !py-2.5 !px-3 flex items-center justify-between border border-emerald-300 bg-emerald-50/50">
-            <span className="text-xs font-bold text-emerald-800">Closing</span>
-            <span className="font-bold text-emerald-800 text-base tabular-nums">
+          <div className="card !py-2.5 !px-3.5 flex flex-col justify-between border border-accent-300 bg-accent-100/70 shadow-2xs">
+            <span className="text-[11px] font-bold text-accent-800 uppercase tracking-wider truncate">
+              Closing
+            </span>
+            <span className="text-sm md:text-base font-bold text-accent-950 tabular-nums whitespace-nowrap mt-1">
               {formatCurrency(summary.closingBalance)}
             </span>
           </div>
@@ -464,9 +498,9 @@ export default function CashChecklist() {
           <>
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-primary-100 text-sm">
-              <div className="px-3.5 py-2.5 bg-sky-50 flex justify-between text-sm font-semibold text-sky-800">
+              <div className="px-3.5 py-2.5 bg-primary-50 flex justify-between text-sm font-semibold text-primary-800">
                 <span>Opening Balance (as of {formatDateOnly(startDate)})</span>
-                <span className="tabular-nums font-bold">{formatCurrency(summary.openingBalance)}</span>
+                <span className="tabular-nums font-bold whitespace-nowrap">{formatCurrency(summary.openingBalance)}</span>
               </div>
               {filteredEntries.map((row) => (
                 <div key={row.id} className="px-3.5 py-3 hover:bg-primary-50/40 transition">
@@ -490,18 +524,18 @@ export default function CashChecklist() {
                         </p>
                       )}
                       {row.lessAmount > 0 && (
-                        <p className="text-xs text-amber-700 font-medium">
+                        <p className="text-xs text-accent-700 font-medium">
                           Less: {formatCurrency(row.lessAmount)}
                         </p>
                       )}
                     </div>
                     <div className="text-right shrink-0">
                       {row.cashSide === 'credit' ? (
-                        <p className="font-bold text-emerald-700 text-sm tabular-nums">
+                        <p className="font-bold text-primary-800 text-sm tabular-nums whitespace-nowrap">
                           Credit: {formatCurrency(row.amount)}
                         </p>
                       ) : (
-                        <p className="font-bold text-blue-700 text-sm tabular-nums">
+                        <p className="font-bold text-primary-700 text-sm tabular-nums whitespace-nowrap">
                           Debit: {formatCurrency(row.amount)}
                         </p>
                       )}
@@ -509,9 +543,13 @@ export default function CashChecklist() {
                   </div>
                 </div>
               ))}
-              <div className="px-3.5 py-2.5 bg-emerald-50 border-t border-primary-200 flex justify-between text-sm font-bold text-emerald-900">
+              <div className="px-3.5 py-2 bg-primary-50/80 border-t border-primary-200 flex justify-between text-sm font-semibold text-primary-800">
+                <span>Total Cash Collected</span>
+                <span className="tabular-nums font-bold whitespace-nowrap">{formatCurrency(summary.totalCashCollected)}</span>
+              </div>
+              <div className="px-3.5 py-2.5 bg-accent-100 border-t border-primary-200 flex justify-between text-sm font-bold text-accent-950">
                 <span>Closing Balance</span>
-                <span className="tabular-nums">{formatCurrency(summary.closingBalance)}</span>
+                <span className="tabular-nums whitespace-nowrap">{formatCurrency(summary.closingBalance)}</span>
               </div>
             </div>
 
@@ -548,19 +586,19 @@ export default function CashChecklist() {
                 </thead>
                 <tbody>
                   {/* Opening Balance Row */}
-                  <tr className="bg-sky-50/60 font-semibold border-b border-sky-100">
-                    <td className="px-3 py-2 text-sky-800 whitespace-nowrap text-xs font-medium">
+                  <tr className="bg-primary-50/70 font-semibold border-b border-primary-100">
+                    <td className="px-3 py-2 text-primary-700 whitespace-nowrap text-xs font-medium">
                       As of {formatDateOnly(startDate)}
                     </td>
-                    <td className="px-3 py-2 text-sky-900 font-bold text-xs">Opening Balance</td>
-                    <td className="px-3 py-2 text-sky-700 font-medium text-xs">—</td>
-                    <td className="px-3 py-2 text-sky-700 font-medium text-xs">—</td>
-                    <td className="px-3 py-2 text-sky-700 font-medium text-xs">—</td>
-                    <td className="px-3 py-2 text-slate-400 text-right text-xs">—</td>
-                    <td className="px-3 py-2 text-emerald-700 text-right tabular-nums font-bold text-xs">
+                    <td className="px-3 py-2 text-primary-900 font-bold text-xs">Opening Balance</td>
+                    <td className="px-3 py-2 text-primary-600 font-medium text-xs">—</td>
+                    <td className="px-3 py-2 text-primary-600 font-medium text-xs">—</td>
+                    <td className="px-3 py-2 text-primary-600 font-medium text-xs">—</td>
+                    <td className="px-3 py-2 text-primary-400 text-right text-xs">—</td>
+                    <td className="px-3 py-2 text-primary-800 text-right tabular-nums font-bold text-xs whitespace-nowrap">
                       {summary.openingBalance > 0 ? formatCurrency(summary.openingBalance) : '—'}
                     </td>
-                    <td className="px-3 py-2 text-blue-700 text-right tabular-nums font-bold text-xs">
+                    <td className="px-3 py-2 text-primary-800 text-right tabular-nums font-bold text-xs whitespace-nowrap">
                       {summary.openingBalance < 0 ? formatCurrency(Math.abs(summary.openingBalance)) : '—'}
                     </td>
                   </tr>
@@ -583,13 +621,13 @@ export default function CashChecklist() {
                       <td className="px-3 py-2 text-primary-600 text-xs max-w-[160px] truncate" title={row.reason}>
                         {row.reason || '—'}
                       </td>
-                      <td className="px-3 py-2 text-amber-700 text-right tabular-nums text-xs font-semibold">
+                      <td className="px-3 py-2 text-accent-700 text-right tabular-nums text-xs font-semibold whitespace-nowrap">
                         {row.lessAmount > 0 ? formatCurrency(row.lessAmount) : '—'}
                       </td>
-                      <td className="px-3 py-2 text-emerald-700 text-right tabular-nums font-bold text-xs">
+                      <td className="px-3 py-2 text-primary-800 text-right tabular-nums font-bold text-xs whitespace-nowrap">
                         {row.cashSide === 'credit' ? formatCurrency(row.amount) : '—'}
                       </td>
-                      <td className="px-3 py-2 text-blue-700 text-right tabular-nums font-bold text-xs">
+                      <td className="px-3 py-2 text-primary-700 text-right tabular-nums font-bold text-xs whitespace-nowrap">
                         {row.cashSide === 'debit' ? formatCurrency(row.amount) : '—'}
                       </td>
                     </tr>
@@ -600,21 +638,29 @@ export default function CashChecklist() {
                     <td colSpan={5} className="px-3 py-2.5 font-bold text-primary-800">
                       Period Total ({summary.count} records)
                     </td>
-                    <td className="px-3 py-2.5 text-amber-700 text-right tabular-nums font-bold text-sm">
+                    <td className="px-3 py-2.5 text-accent-700 text-right tabular-nums font-bold text-sm whitespace-nowrap">
                       {formatCurrency(summary.totalLess)}
                     </td>
-                    <td className="px-3 py-2.5 text-emerald-700 text-right tabular-nums font-bold text-sm">
+                    <td className="px-3 py-2.5 text-primary-800 text-right tabular-nums font-bold text-sm whitespace-nowrap">
                       {formatCurrency(summary.totalCredit)}
                     </td>
-                    <td className="px-3 py-2.5 text-blue-700 text-right tabular-nums font-bold text-sm">
+                    <td className="px-3 py-2.5 text-primary-700 text-right tabular-nums font-bold text-sm whitespace-nowrap">
                       {formatCurrency(summary.totalDebit)}
+                    </td>
+                  </tr>
+                  <tr className="bg-primary-50/70 border-t border-primary-200 font-bold text-sm text-primary-900">
+                    <td colSpan={6} className="px-3 py-2.5 font-bold uppercase tracking-wide">
+                      Total Cash Collected
+                    </td>
+                    <td colSpan={2} className="px-3 py-2.5 text-right font-bold tabular-nums text-base text-primary-800 whitespace-nowrap">
+                      {formatCurrency(summary.totalCashCollected)}
                     </td>
                   </tr>
                   <tr className="bg-accent-100/70 border-t border-primary-200 font-bold text-sm text-accent-900">
                     <td colSpan={6} className="px-3 py-2.5 font-bold uppercase tracking-wide">
                       Closing Balance
                     </td>
-                    <td colSpan={2} className="px-3 py-2.5 text-right font-bold tabular-nums text-base text-accent-900">
+                    <td colSpan={2} className="px-3 py-2.5 text-right font-bold tabular-nums text-base text-accent-900 whitespace-nowrap">
                       {formatCurrency(summary.closingBalance)}
                     </td>
                   </tr>

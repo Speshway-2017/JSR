@@ -42,7 +42,7 @@ export default function MDITaskSwitcherOverlay() {
         {/* Header Bar */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-slate-800 text-emerald-400 border border-slate-700 shadow-inner">
+            <div className="p-2.5 rounded-2xl bg-slate-800 text-accent-400 border border-slate-700 shadow-inner">
               <LayoutGrid className="w-6 h-6" />
             </div>
             <div>
@@ -50,11 +50,11 @@ export default function MDITaskSwitcherOverlay() {
                 Task Switcher
               </h2>
               <p className="text-xs text-slate-300">
-                Hold <kbd className="font-mono bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-[11px] font-bold text-emerald-400">Ctrl</kbd> & press <kbd className="font-mono bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-[11px] font-bold text-emerald-400">Tab</kbd> to cycle • Release to switch
+                Hold <kbd className="font-mono bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-[11px] font-bold text-accent-400">Ctrl</kbd> & press <kbd className="font-mono bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-[11px] font-bold text-accent-400">Tab</kbd> to cycle • Release to switch
               </p>
             </div>
           </div>
-          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-accent-500/20 text-accent-300 border border-accent-500/30">
             {visibleWindows.length} {visibleWindows.length === 1 ? 'window open' : 'windows open'}
           </span>
         </div>
@@ -77,7 +77,7 @@ export default function MDITaskSwitcherOverlay() {
                 onMouseEnter={() => setSwitcherIndex(idx)}
                 className={`relative w-64 h-44 rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-150 shrink-0 border ${
                   isSelected
-                    ? 'bg-slate-800 border-2 border-emerald-400 shadow-2xl scale-105 ring-4 ring-emerald-500/30 z-20'
+                    ? 'bg-slate-800 border-2 border-accent-400 shadow-2xl scale-105 ring-4 ring-accent-500/30 z-20'
                     : 'bg-slate-800/90 border-slate-700/80 hover:bg-slate-800 opacity-80 hover:opacity-100 shadow-md z-10'
                 }`}
               >
@@ -86,7 +86,7 @@ export default function MDITaskSwitcherOverlay() {
                   <div
                     className={`p-2 rounded-xl border shrink-0 transition ${
                       isSelected
-                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-bold shadow-md'
+                        ? 'bg-accent-500 text-slate-950 border-accent-400 font-bold shadow-md'
                         : 'bg-slate-700/80 text-slate-200 border-slate-600'
                     }`}
                   >
@@ -101,7 +101,7 @@ export default function MDITaskSwitcherOverlay() {
                 {/* Center Preview Box */}
                 <div className="flex-1 my-2 rounded-xl bg-slate-950/70 border border-slate-800 p-2 flex flex-col justify-center items-center text-center gap-1.5 overflow-hidden">
                   <div className="flex items-center gap-1.5 text-xs text-slate-300">
-                    <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                    <Eye className="w-3.5 h-3.5 text-accent-400" />
                     <span className="truncate max-w-[170px]">{win.title}</span>
                   </div>
                   {win.isMinimized ? (
@@ -109,7 +109,7 @@ export default function MDITaskSwitcherOverlay() {
                       Minimized
                     </span>
                   ) : win.isMaximized ? (
-                    <span className="text-[10px] uppercase font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    <span className="text-[10px] uppercase font-bold text-accent-300 bg-accent-500/20 px-2 py-0.5 rounded-full border border-accent-500/30">
                       Full Screen
                     </span>
                   ) : (
@@ -123,8 +123,8 @@ export default function MDITaskSwitcherOverlay() {
                 <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-700/60">
                   <span className="font-mono font-semibold text-slate-400">#{idx + 1}</span>
                   {isSelected && (
-                    <span className="flex items-center gap-1 font-bold text-emerald-400 text-xs">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Selected
+                    <span className="flex items-center gap-1 font-bold text-accent-400 text-xs">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-accent-400" /> Selected
                     </span>
                   )}
                 </div>

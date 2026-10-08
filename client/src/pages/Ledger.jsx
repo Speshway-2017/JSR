@@ -365,9 +365,9 @@ export default function Ledger() {
                   type="button"
                   onClick={handleSendWhatsApp}
                   disabled={sendingWa}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold shadow-2xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                  className="btn-secondary !py-1.5 !px-3 !text-sm font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-4 h-4 text-primary-600" />
                   {sendingWa ? 'Sending...' : 'Send to WhatsApp'}
                 </button>
               )}
@@ -435,7 +435,7 @@ export default function Ledger() {
                       <td
                         className={`px-3 py-2 text-right tabular-nums font-semibold ${
                           row.paid > 0 || row.kind === 'payment' || (row.transactionId && !row.saleId)
-                            ? 'text-emerald-700 hover:text-emerald-900 underline underline-offset-2 decoration-emerald-300 cursor-pointer'
+                            ? 'text-primary-800 hover:text-primary-950 underline underline-offset-2 decoration-primary-300 cursor-pointer'
                             : 'text-primary-400'
                         }`}
                         onClick={(e) => {

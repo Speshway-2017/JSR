@@ -66,8 +66,7 @@
           "from": "resources/mongodb/win32",
           "to": "mongodb"
         }
-      ],
-      "icon": "build/icon.ico"
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -79,8 +78,6 @@
       "shortcutName": "JSR",
       "uninstallDisplayName": "JSR",
       "deleteAppDataOnUninstall": false,
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
       "license": "build/license.txt",
       "artifactName": "JSR-Setup-${version}.${ext}"
     },
@@ -98,8 +95,7 @@
           "from": "resources/mongodb/darwin",
           "to": "mongodb"
         }
-      ],
-      "icon": "build/icon.png"
+      ]
     },
     "linux": {
       "target": [
@@ -111,8 +107,7 @@
           "from": "resources/mongodb/linux",
           "to": "mongodb"
         }
-      ],
-      "icon": "build/icon.png"
+      ]
     }
   },
   "devDependencies": {

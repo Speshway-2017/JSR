@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Printer, Send, FileText, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Edit2, Calendar, CheckCircle2, DollarSign, Users, X } from 'lucide-react';
+import { Printer, Send, FileText, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Edit2, Calendar, CheckCircle2, DollarSign, Users, X, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
@@ -47,17 +47,33 @@ export default function SalesPrint({ path: windowPath }) {
   const [startDate, setStartDate] = useState(dateParam);
   const [endDate, setEndDate] = useState(dateParam);
 
+  const [filterCustomer, setFilterCustomer] = useState(() => effectiveSearchParams.get('customer') || '');
+  const [filterVendor, setFilterVendor] = useState(() => effectiveSearchParams.get('vendor') || '');
+  const [filterItem, setFilterItem] = useState(() => effectiveSearchParams.get('item') || '');
+
+  /* Track whether the windowPath change was triggered internally by our own
+     updateWindowPath call (i.e. the user changed the date or dropdowns in SalesPrint),
+     vs externally (e.g. clicking Print in Sales Entry). We skip re-syncing on internal updates. */
+  const isInternalPathUpdate = useRef(false);
+
   useEffect(() => {
     if (startDate && typeof updateWindowPath === 'function') {
-      updateWindowPath('/sales-print', `/sales-print?date=${startDate}`);
+      isInternalPathUpdate.current = true;
+      const params = new URLSearchParams();
+      params.set('date', startDate);
+      if (filterCustomer) params.set('customer', filterCustomer);
+      if (filterVendor) params.set('vendor', filterVendor);
+      if (filterItem) params.set('item', filterItem);
+      updateWindowPath('/sales-print', `/sales-print?${params.toString()}`);
     }
-  }, [startDate, updateWindowPath]);
-
-  const [filterCustomer, setFilterCustomer] = useState(effectiveSearchParams.get('customer') || '');
-  const [filterVendor, setFilterVendor] = useState(effectiveSearchParams.get('vendor') || '');
-  const [filterItem, setFilterItem] = useState(effectiveSearchParams.get('item') || '');
+  }, [startDate, filterCustomer, filterVendor, filterItem, updateWindowPath]);
 
   useEffect(() => {
+    if (isInternalPathUpdate.current) {
+      isInternalPathUpdate.current = false;
+      return;
+    }
+
     const pDate = effectiveSearchParams.get('date');
     const pCust = effectiveSearchParams.get('customer');
     const pVend = effectiveSearchParams.get('vendor');
@@ -66,9 +82,9 @@ export default function SalesPrint({ path: windowPath }) {
       setStartDate(pDate);
       setEndDate(pDate);
     }
-    if (pCust !== null && pCust !== undefined) setFilterCustomer(pCust);
-    if (pVend !== null && pVend !== undefined) setFilterVendor(pVend);
-    if (pItem !== null && pItem !== undefined) setFilterItem(pItem);
+    setFilterCustomer(pCust || '');
+    setFilterVendor(pVend || '');
+    setFilterItem(pItem || '');
   }, [windowPath, effectiveSearchParams]);
 
   const [customers, setCustomers] = useState([]);
@@ -86,6 +102,14 @@ export default function SalesPrint({ path: windowPath }) {
   const [selectedCids, setSelectedCids] = useState(new Set());
   const [sortKey, setSortKey] = useState('');
   const [sortDir, setSortDir] = useState('asc');
+
+  const [editAuthorized, setEditAuthorized] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingEditTarget, setPendingEditTarget] = useState(null);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [verifyingPassword, setVerifyingPassword] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   const cellStyle = 'grid-input text-[11px] leading-tight w-full';
 
@@ -213,6 +237,7 @@ export default function SalesPrint({ path: windowPath }) {
   }, [data]);
 
   useEffect(() => {
+    if (!data?.statements) return;
     if (filterCustomer && !availableCustomers.some((c) => c._id === filterCustomer || c.name === filterCustomer)) {
       setFilterCustomer('');
     }
@@ -222,7 +247,7 @@ export default function SalesPrint({ path: windowPath }) {
     if (filterItem && !availableItems.some((i) => i._id === filterItem || i.name.toLowerCase() === filterItem.toLowerCase())) {
       setFilterItem('');
     }
-  }, [availableCustomers, availableVendors, availableItems, filterCustomer, filterVendor, filterItem]);
+  }, [data, availableCustomers, availableVendors, availableItems, filterCustomer, filterVendor, filterItem]);
 
   const filteredStatements = useMemo(() => {
     if (!data?.statements) return [];
@@ -264,6 +289,13 @@ export default function SalesPrint({ path: windowPath }) {
 
     return list;
   }, [data, filterCustomer, filterVendor, filterItem, sortKey, sortDir]);
+
+  // Keep selection synchronized with active filtered statements
+  useEffect(() => {
+    if (data?.statements) {
+      setSelectedCids(new Set(filteredStatements.map((st) => String(st.customerId))));
+    }
+  }, [filteredStatements, data]);
 
   const selectedStatements = useMemo(() => {
     return filteredStatements.filter((st) => selectedCids.has(String(st.customerId)));
@@ -366,9 +398,68 @@ export default function SalesPrint({ path: windowPath }) {
     }
   };
 
+  const requestEditAccess = (pending = null) => {
+    if (editAuthorized) {
+      if (typeof pending?.action === 'function') pending.action();
+      return true;
+    }
+    setPendingEditTarget(pending);
+    setAdminPasswordInput('');
+    setAuthError('');
+    setShowAuthModal(true);
+    return false;
+  };
+
+  const handleVerifyPassword = async (e) => {
+    e?.preventDefault?.();
+    if (!adminPasswordInput) {
+      setAuthError('Please enter the admin password.');
+      return;
+    }
+    setAuthError('');
+    setVerifyingPassword(true);
+    try {
+      await api.post('/auth/verify-password', { password: adminPasswordInput });
+      setEditAuthorized(true);
+      setShowAuthModal(false);
+      setAuthError('');
+      toast.success('Admin verified — edit access granted');
+      if (pendingEditTarget) {
+        if (typeof pendingEditTarget.action === 'function') {
+          pendingEditTarget.action();
+        } else if (pendingEditTarget.row !== undefined && pendingEditTarget.col !== undefined) {
+          const { row, col } = pendingEditTarget;
+          setTimeout(() => {
+            const selector = `[data-print-row="${row}"][data-print-col="${col}"]`;
+            const el = document.querySelector(selector);
+            if (el) {
+              el.focus();
+              if (typeof el.select === 'function' && el.tagName === 'INPUT') {
+                el.select();
+              }
+            }
+          }, 80);
+        }
+        setPendingEditTarget(null);
+      }
+    } catch (err) {
+      setAuthError(err.response?.data?.message || 'Wrong password. Please try again.');
+      setAdminPasswordInput('');
+    } finally {
+      setVerifyingPassword(false);
+    }
+  };
+
   const persistSaleLine = async (st, s, patch) => {
     if (!s || !s.saleId) {
       toast.error('Cannot update this sale record');
+      return;
+    }
+
+    if (!editAuthorized) {
+      requestEditAccess({
+        action: () => persistSaleLine(st, s, patch),
+      });
       return;
     }
 
@@ -532,7 +623,7 @@ export default function SalesPrint({ path: windowPath }) {
               onClick={handleSendWhatsApp}
               disabled={!selectedStatements.length}
             >
-              <Send className="w-4 h-4 text-emerald-600" /> Send WhatsApp
+              <Send className="w-4 h-4 text-primary-600" /> Send WhatsApp
             </button>
           )}
           <button
@@ -892,18 +983,18 @@ export default function SalesPrint({ path: windowPath }) {
                                         renderedRows.push(
                                           <tr
                                             key={`pay-${i}-${pIdx}`}
-                                            className="text-emerald-800 bg-emerald-50/60 text-xs font-medium"
+                                            className="text-primary-850 bg-primary-50/70 text-xs font-medium"
                                           >
                                             <td className="px-1.5 py-0.5 text-center whitespace-nowrap tabular-nums text-[10.5px]">
                                               {formatShortDate(p.date)}
                                             </td>
-                                            <td className="px-1.5 py-0.5 font-semibold text-emerald-800 text-sm" colSpan={4}>
+                                            <td className="px-1.5 py-0.5 font-semibold text-primary-800 text-sm" colSpan={4}>
                                               <div className="flex items-center gap-1">
                                                 <span>Paid</span>
-                                                <span className="text-xs text-emerald-600 font-normal">(చెల్లింపు)</span>
+                                                <span className="text-xs text-primary-600 font-normal">(చెల్లింపు)</span>
                                               </div>
                                             </td>
-                                            <td className="px-1.5 py-0.5 text-right font-bold text-emerald-800 whitespace-nowrap tabular-nums text-xs">
+                                            <td className="px-1.5 py-0.5 text-right font-bold text-primary-800 whitespace-nowrap tabular-nums text-xs">
                                               - {formatCurrency(pAmt)}
                                             </td>
                                           </tr>
@@ -964,6 +1055,18 @@ export default function SalesPrint({ path: windowPath }) {
                                             key={`${s.saleId}-mat-${s.materialId || s.material}`}
                                             data-print-row={rIdx}
                                             data-print-col={0}
+                                            onFocus={(e) => {
+                                              if (!editAuthorized) {
+                                                e.target.blur();
+                                                requestEditAccess({ row: rIdx, col: 0 });
+                                              }
+                                            }}
+                                            onMouseDown={(e) => {
+                                              if (!editAuthorized) {
+                                                e.preventDefault();
+                                                requestEditAccess({ row: rIdx, col: 0 });
+                                              }
+                                            }}
                                             onKeyDown={(e) => handleGridKeyDown(e, rIdx, 0)}
                                             className={`${cellStyle} font-bold text-primary-900 cursor-pointer text-sm py-0.5`}
                                             defaultValue={selectedMatId}
@@ -997,6 +1100,18 @@ export default function SalesPrint({ path: windowPath }) {
                                             inputMode="numeric"
                                             autoComplete="off"
                                             defaultValue={s.bags || 1}
+                                            onFocus={(e) => {
+                                              if (!editAuthorized) {
+                                                e.target.blur();
+                                                requestEditAccess({ row: rIdx, col: 1 });
+                                              }
+                                            }}
+                                            onMouseDown={(e) => {
+                                              if (!editAuthorized) {
+                                                e.preventDefault();
+                                                requestEditAccess({ row: rIdx, col: 1 });
+                                              }
+                                            }}
                                             className={`${cellStyle} text-right font-semibold tabular-nums text-primary-800 text-[11px] py-0.5`}
                                             onBlur={(e) => {
                                               const newBags = Math.max(1, Math.floor(Number(e.target.value)) || 1);
@@ -1032,6 +1147,18 @@ export default function SalesPrint({ path: windowPath }) {
                                               inputMode="decimal"
                                               autoComplete="off"
                                               defaultValue={s.weight != null ? s.weight : ''}
+                                              onFocus={(e) => {
+                                                if (!editAuthorized) {
+                                                  e.target.blur();
+                                                  requestEditAccess({ row: rIdx, col: 2 });
+                                                }
+                                              }}
+                                              onMouseDown={(e) => {
+                                                if (!editAuthorized) {
+                                                  e.preventDefault();
+                                                  requestEditAccess({ row: rIdx, col: 2 });
+                                                }
+                                              }}
                                               className={`${cellStyle} text-right font-medium tabular-nums text-primary-700 text-[11px] py-0.5`}
                                               onBlur={(e) => {
                                                 const newWeight = Number(e.target.value) || 0;
@@ -1058,6 +1185,18 @@ export default function SalesPrint({ path: windowPath }) {
                                               inputMode="decimal"
                                               autoComplete="off"
                                               defaultValue={s.ratePerKg != null ? s.ratePerKg : ''}
+                                              onFocus={(e) => {
+                                                if (!editAuthorized) {
+                                                  e.target.blur();
+                                                  requestEditAccess({ row: rIdx, col: 3 });
+                                                }
+                                              }}
+                                              onMouseDown={(e) => {
+                                                if (!editAuthorized) {
+                                                  e.preventDefault();
+                                                  requestEditAccess({ row: rIdx, col: 3 });
+                                                }
+                                              }}
                                               className={`${cellStyle} text-right font-medium tabular-nums text-primary-700 text-[11px] py-0.5`}
                                               onBlur={(e) => {
                                                 const newRate = Number(e.target.value) || 0;
@@ -1082,7 +1221,7 @@ export default function SalesPrint({ path: windowPath }) {
                                         <td className="px-1.5 py-0.5 text-right font-bold text-primary-900 whitespace-nowrap tabular-nums text-[11px]">
                                           {formatCurrency(lineTotal)}
                                           {coolyAmt > 0 ? (
-                                            <span className="text-[9px] text-emerald-700 block font-normal leading-tight">
+                                            <span className="text-[9px] text-primary-600 block font-normal leading-tight">
                                               (incl. ₹{coolyAmt} cooly)
                                             </span>
                                           ) : null}
@@ -1094,15 +1233,7 @@ export default function SalesPrint({ path: windowPath }) {
                                   return renderedRows;
                                 })()}
                               </tbody>
-                              <tfoot className="border-t-2 border-primary-300 bg-accent-200">
-                                <tr className="bg-accent-200 text-accent-900 font-bold whitespace-nowrap text-[11px]">
-                                  <td className="bg-accent-200 px-1.5 py-1 font-bold text-[10.5px] uppercase tracking-wide text-accent-900" colSpan={5}>
-                                    Total
-                                  </td>
-                                  <td className="bg-accent-200 px-1.5 py-1 text-right font-bold text-xs tabular-nums text-accent-900">
-                                    {formatCurrency(st.totalSale)}
-                                  </td>
-                                </tr>
+                              <tfoot className="border-t-2 border-primary-300 bg-accent-100/70">
                                 <tr className="bg-accent-100/70 text-accent-900 font-bold whitespace-nowrap text-[11px]">
                                   <td className="bg-accent-100/70 px-1.5 py-1 font-bold text-[10.5px] uppercase tracking-wide text-accent-900" colSpan={5}>
                                     Closing
@@ -1128,6 +1259,93 @@ export default function SalesPrint({ path: windowPath }) {
           </div>
         </div>
       </div>
+
+      {showAuthModal && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="card w-full max-w-md space-y-4 shadow-2xl border-2 border-primary-200">
+            <div className="flex items-center justify-between border-b border-primary-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-100 text-amber-800 rounded-xl">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-primary-800">Admin Authorization Required</h2>
+                  <p className="text-xs text-primary-500">Enter password to edit sales entry</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAuthModal(false);
+                  setPendingEditTarget(null);
+                  setAuthError('');
+                }}
+                className="p-1.5 rounded-lg hover:bg-primary-50 text-primary-400 hover:text-primary-600 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleVerifyPassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-primary-600 mb-1">Admin Password *</label>
+                <div className="relative">
+                  <input
+                    type={showAdminPassword ? 'text' : 'password'}
+                    className={`w-full rounded-xl border bg-surface px-3 py-2 pr-10 text-sm text-primary-800 focus:outline-none focus:ring-2 transition ${
+                      authError
+                        ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
+                        : 'border-primary-200 focus:border-primary-400 focus:ring-primary-100'
+                    }`}
+                    placeholder="Enter admin password..."
+                    value={adminPasswordInput}
+                    onChange={(e) => {
+                      setAdminPasswordInput(e.target.value);
+                      if (authError) setAuthError('');
+                    }}
+                    autoFocus
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-600 cursor-pointer"
+                  >
+                    {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {authError && (
+                  <p className="mt-1.5 text-xs font-medium text-red-600 flex items-center gap-1">
+                    <X className="w-3.5 h-3.5 shrink-0" />
+                    {authError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAuthModal(false);
+                    setPendingEditTarget(null);
+                    setAuthError('');
+                  }}
+                  className="btn-secondary flex-1 !py-2 !text-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={verifyingPassword}
+                  className="btn-primary flex-1 !py-2 !text-sm disabled:opacity-50 cursor-pointer"
+                >
+                  {verifyingPassword ? 'Verifying...' : 'Unlock & Edit'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

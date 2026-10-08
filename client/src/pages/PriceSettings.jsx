@@ -53,7 +53,7 @@ export default function PriceSettings() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h1 className="page-title text-2xl font-bold text-primary-700 flex items-center gap-2">
-            <Settings className="w-5 h-5 text-emerald-600" /> Price Settings
+            <Settings className="w-5 h-5 text-primary-600" /> Price Settings
           </h1>
           <p className="text-xs text-primary-500 mt-1">
             రైతుపట్టి deductions — toggle Per bag for each charge

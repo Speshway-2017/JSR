@@ -255,7 +255,7 @@ export default function SalePatty({ path: windowPath }) {
                 </p>
               </div>
               {preview.load?.billGenerated && (
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wide">
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-primary-100 text-primary-800 border border-primary-300 uppercase tracking-wide">
                   Bill generated
                 </span>
               )}
@@ -429,7 +429,7 @@ export default function SalePatty({ path: windowPath }) {
             {isOnline && (
               <button
                 type="button"
-                className="btn-secondary !py-2 !px-4 !text-sm font-semibold flex items-center gap-1.5 !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100 !border-emerald-200 shadow-xs"
+                className="btn-secondary !py-2 !px-4 !text-sm font-semibold flex items-center gap-1.5 shadow-xs"
                 onClick={async () => {
                   const vendorObj = preview.vendor || selected || {};
                   try {
@@ -446,7 +446,7 @@ export default function SalePatty({ path: windowPath }) {
                   }
                 }}
               >
-                <Send className="w-4 h-4 text-emerald-600" />
+                <Send className="w-4 h-4 text-primary-600" />
                 Send WhatsApp Patti
               </button>
             )}
