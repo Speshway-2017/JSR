@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Send } from 'lucide-react';
+import { FileText, Send, Share2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatKg } from '../utils/format';
@@ -442,12 +442,12 @@ export default function SalePatty({ path: windowPath }) {
                       caption: `Dear ${vendorObj.name || 'Vendor'}, your Sale Patti statement from JSR Traders is attached. Net Total: ${formatCurrency(preview.summary?.receivable)}. Thank you!`,
                     });
                   } catch (err) {
-                    toast.error(err.message || 'Failed to send WhatsApp Patti');
+                    toast.error(err.message || 'Failed to share Patti');
                   }
                 }}
               >
-                <Send className="w-4 h-4 text-primary-600" />
-                Send WhatsApp Patti
+                <Share2 className="w-4 h-4 text-primary-600" />
+                Share Patti
               </button>
             )}
             {preview.load?.billGenerated && (

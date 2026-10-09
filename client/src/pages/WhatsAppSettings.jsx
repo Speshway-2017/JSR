@@ -121,7 +121,7 @@ export default function WhatsAppSettings() {
               <h2 className="font-bold text-primary-900 text-sm">
                 {isConnected ? 'Meta WhatsApp API Configured' : 'WhatsApp API Credentials Needed'}
               </h2>
-              <p className="text-xs text-primary-500 mt-0.5">Sender Number: <span className="font-semibold text-primary-800">{config?.senderNumber || '+91 89774 81054'}</span></p>
+              <p className="text-xs text-primary-500 mt-0.5">Sender Number: <span className="font-semibold text-primary-800">{config?.senderNumber || '+91 90102 53076'}</span></p>
             </div>
           </div>
           <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase border ${isConnected ? 'bg-primary-100 text-primary-800 border-primary-300' : 'bg-amber-100 text-amber-800 border-amber-300'}`}>

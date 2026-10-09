@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Scale, Send, Printer } from 'lucide-react';
+import { ChevronDown, ChevronRight, Scale, Send, Share2, Printer } from 'lucide-react';
 import { openOutstandingPreview } from '../utils/reportPrint';
 import toast from 'react-hot-toast';
 import api from '../api';
@@ -113,10 +113,6 @@ export default function Outstanding({ path: windowPath }) {
   };
 
   const handleSendWhatsAppRow = async (row) => {
-    if (!row.mobile) {
-      toast.error(`No mobile number registered for ${row.name}`);
-      return;
-    }
     try {
       const htmlString = generateAccountStatementHtml({
         partyName: row.name,
@@ -127,11 +123,12 @@ export default function Outstanding({ path: windowPath }) {
         asOfDate: date,
       });
       await sendWhatsAppBillPdf({
-        recipientPhone: row.mobile,
+        recipientPhone: row.mobile || '',
         recipientName: row.name,
         htmlString,
         filename: `Outstanding_Statement_${row.name}.pdf`,
         caption: `Dear ${row.name}, your outstanding balance as of ${formatDateOnly(date)} is ${formatCurrency(row.closing)} from JSR Traders. Thank you!`,
+        summaryText: `*JSR AGRI TRADES - Outstanding Balance*\nCustomer: ${row.name}\nAs of: ${formatDateOnly(date)}\nAmount Due: ${formatCurrency(row.closing)}\nThank you! 🙏`,
       });
     } catch (err) {
       toast.error(err.message || 'Failed to send WhatsApp statement');
@@ -300,9 +297,9 @@ export default function Outstanding({ path: windowPath }) {
                                     type="button"
                                     onClick={() => handleSendWhatsAppRow(row)}
                                     className="px-2.5 py-1 bg-primary-100/70 hover:bg-primary-100 text-primary-800 border border-primary-300 rounded text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
-                                    title="Send Outstanding Statement via WhatsApp"
+                                    title="Share Statement (Windows Apps, WhatsApp, Teams, Mail)"
                                   >
-                                    <Send className="w-3 h-3 text-primary-600" /> Send
+                                    <Share2 className="w-3 h-3 text-primary-600" /> Share
                                   </button>
                                 )}
                               </td>

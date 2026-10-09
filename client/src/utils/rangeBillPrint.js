@@ -340,6 +340,109 @@ export function buildNUpCellContent(summaryRow, teluguMap) {
   return chunks[0] || '';
 }
 
+export const RANGE_BILL_CELL_CSS = `
+  .party {
+    font-size: 15px;
+    font-weight: 700;
+    color: #000000;
+    text-align: center;
+    border-bottom: 1.5px solid #000000;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+    line-height: 1.25;
+  }
+  .party .te { display: block; font-size: 13.5px; font-weight: normal; color: #000000; }
+  table.lines {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    line-height: 1.35;
+    color: #000000;
+  }
+  table.lines th {
+    padding: 4px 2px;
+    border-bottom: 1.5px solid #000000;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #000000;
+    text-align: left;
+  }
+  table.lines th.item { font-size: 14px; }
+  table.lines th.num { text-align: right; }
+  table.lines td {
+    padding: 2.5px 2px;
+    vertical-align: middle;
+    color: #000000;
+  }
+  table.lines td.date { width: 1%; white-space: nowrap; color: #000000; font-size: 12px; }
+  table.lines td.item {
+    width: 100%;
+    color: #000000;
+    font-size: 14.5px;
+    font-weight: 700;
+  }
+  table.lines td.mat-item {
+    font-size: 15px;
+    font-weight: 700;
+    color: #000000;
+  }
+  table.lines td.opening-item {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  table.lines td.num {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+    padding-left: 5px;
+    color: #000000;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  table.lines tr.rule td { border-top: 1.5px solid #000000; font-weight: 700; padding-top: 4px; color: #000000; font-size: 14px; }
+  table.lines tr.payment-row td { color: #047857; font-size: 13px; }
+`;
+
+export async function generateSingleStatementBillHtml(summaryRow) {
+  const [fontCss, teluguMap] = await Promise.all([
+    ramabhadraFontFaceCss(),
+    materialTeluguMap(),
+  ]);
+  const cellHtml = buildNUpCellContent(summaryRow, teluguMap);
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    ${fontCss}
+    body {
+      font-family: '${RAMABHADRA}', 'Noto Sans Telugu', sans-serif;
+      font-weight: 400;
+      background: #ffffff;
+      color: #000000;
+      margin: 0;
+      padding: 12px;
+      display: flex;
+      justify-content: center;
+    }
+    .bill-card {
+      width: 440px;
+      border: 1.5px solid #000000;
+      padding: 12px 14px;
+      background: #ffffff;
+      box-sizing: border-box;
+    }
+    ${RANGE_BILL_CELL_CSS}
+  </style>
+</head>
+<body>
+  <div class="bill-card">
+    ${cellHtml}
+  </div>
+</body>
+</html>`;
+}
+
 export async function openRangeBillsNUp(bills, perPage = 4, previewTab) {
   const [fontCss, teluguMap] = await Promise.all([
     ramabhadraFontFaceCss(),
@@ -553,7 +656,7 @@ table.lines tr.brought-row td { border-bottom: 1px solid #e5e7eb; font-weight: 7
 <body class="bill-preview">
   <div class="preview-toolbar no-print">
     <button type="button" class="secondary" onclick="window.close()">Close</button>
-    <button type="button" id="whatsapp-btn" class="whatsapp" onclick="sendWhatsAppBill()">Send WhatsApp</button>
+    <button type="button" id="whatsapp-btn" class="whatsapp" onclick="sendWhatsAppBill()">Share</button>
     <button type="button" onclick="window.print()">Print / Save PDF</button>
   </div>
   <div class="stage">
@@ -575,7 +678,12 @@ table.lines tr.brought-row td { border-bottom: 1px solid #e5e7eb; font-weight: 7
       var bodyText = stage ? stage.innerText : document.body.innerText;
       var lines = bodyText.split('\\n').map(function(l) { return l.trim(); }).filter(Boolean);
       var text = '*JSR AGRI TRADES - Customer Bills*\\n-----------------------------------\\n' + lines.slice(0, 40).join('\\n') + '\\n-----------------------------------\\n*Thank you!* 🙏';
-      window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+      var phone = window.prompt('Enter 10-digit WhatsApp phone number (or click OK to pick contact in WhatsApp):', '');
+      if (phone === null) return;
+      var digits = String(phone).replace(/\\D/g, '');
+      if (digits.length === 10) digits = '91' + digits;
+      var url = digits ? 'https://web.whatsapp.com/send?phone=' + digits + '&text=' + encodeURIComponent(text) : 'https://api.whatsapp.com/send?text=' + encodeURIComponent(text);
+      window.open(url, 'JSR_WhatsApp_Web');
     }
   </script>
 </body>

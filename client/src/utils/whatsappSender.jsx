@@ -2,11 +2,9 @@ import React from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
-import api from '../api';
-import { hasInternet } from './atlasNetwork';
 
 /**
- * Format phone number into clean digits for Meta API (e.g. 919010253076)
+ * Format phone number into clean digits for WhatsApp (e.g. 919010253076)
  */
 export function cleanPhone(rawPhone) {
   if (!rawPhone) return '';
@@ -18,13 +16,50 @@ export function cleanPhone(rawPhone) {
 }
 
 /**
- * Display 10-digit mobile number for UI toasts (e.g. 9010253076)
+ * Display 10-digit mobile number for UI toasts / inputs (e.g. 9010253076)
  */
 export function formatDisplayPhone(rawPhone) {
   if (!rawPhone) return '';
   const digits = String(rawPhone).replace(/\D/g, '');
   if (digits.length >= 10) return digits.slice(-10);
   return digits;
+}
+
+let whatsappWebWindowRef = null;
+
+/**
+ * Open external URL in system default browser or desktop handler (Electron-compatible).
+ * Automatically reuses existing WhatsApp Web tab to avoid opening duplicate tabs.
+ */
+export function openExternalUrl(url, target = 'JSR_WhatsApp_Web') {
+  if (!url) return;
+  try {
+    if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
+      window.electronAPI.openExternal(url);
+      return;
+    }
+  } catch (err) {
+    console.warn('Electron openExternal error:', err);
+  }
+
+  try {
+    if (target === 'JSR_WhatsApp_Web') {
+      if (whatsappWebWindowRef && !whatsappWebWindowRef.closed) {
+        whatsappWebWindowRef.location.href = url;
+        whatsappWebWindowRef.focus();
+        return;
+      }
+      whatsappWebWindowRef = window.open(url, 'JSR_WhatsApp_Web');
+      if (whatsappWebWindowRef) {
+        whatsappWebWindowRef.focus();
+      }
+      return;
+    }
+  } catch (e) {
+    console.warn('[WhatsApp] Tab reuse fallback:', e);
+  }
+
+  window.open(url, target);
 }
 
 /**
@@ -72,7 +107,7 @@ export async function renderHtmlToPdfBase64(htmlString) {
   document.body.appendChild(container);
 
   try {
-    await new Promise((r) => setTimeout(r, 350));
+    await new Promise((r) => setTimeout(r, 300));
 
     const canvas = await html2canvas(container, {
       scale: 2,
@@ -102,102 +137,234 @@ export async function renderHtmlToPdfBase64(htmlString) {
 }
 
 /**
- * Send WhatsApp PDF Bill to customer via 1-Click Meta Cloud API with Web WhatsApp fallback
+ * Render HTML string into PNG Image Base64 & Blob for clipboard / sharing
  */
-export async function sendWhatsAppBillPdf({
-  recipientPhone,
-  recipientName = 'Customer',
-  pdfBase64,
-  elementNode,
-  htmlString,
-  filename = 'JSR_Sales_Bill.pdf',
-  caption,
-  templateName = 'ledger_statement',
-  templateParams = [],
-}) {
-  if (!hasInternet()) {
-    toast.error('No internet connection. Connect to the internet to send WhatsApp bill.');
-    return false;
-  }
+export async function renderHtmlToImageBase64(htmlString) {
+  if (!htmlString) return { base64: '', blob: null };
 
-  const formattedPhone = cleanPhone(recipientPhone);
-  const displayPhone = formatDisplayPhone(recipientPhone);
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.style.width = '794px';
+  container.style.backgroundColor = '#ffffff';
+  container.style.zIndex = '-9999';
+  container.innerHTML = htmlString;
 
-  if (!formattedPhone || formattedPhone.length < 10) {
-    toast.error(`Invalid mobile number for ${recipientName}. Please update phone number in Customer Master.`);
-    return false;
-  }
-
-  const toastId = toast.loading(`Sending WhatsApp bill PDF to ${recipientName} (${displayPhone})...`);
+  document.body.appendChild(container);
 
   try {
-    let finalBase64 = pdfBase64;
-    if (!finalBase64 && htmlString) {
-      finalBase64 = await renderHtmlToPdfBase64(htmlString);
-    } else if (!finalBase64 && elementNode) {
-      finalBase64 = await generatePdfBase64FromElement(elementNode);
-    }
+    await new Promise((r) => setTimeout(r, 300));
 
-    if (!finalBase64) {
-      toast.error('Could not generate PDF bill payload', { id: toastId });
-      return false;
-    }
-
-    const defaultCaption = `Dear ${recipientName}, your sales bill from JSR Traders is attached. Thank you!`;
-
-    await api.post('/whatsapp/send-pdf', {
-      recipientPhone: formattedPhone,
-      recipientName,
-      pdfBase64: finalBase64,
-      filename,
-      caption: caption || defaultCaption,
-      templateName,
-      templateParams: templateParams.length > 0 ? templateParams : [recipientName, new Date().toLocaleDateString('en-IN')],
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
     });
 
-    toast.success(`WhatsApp PDF sent successfully to ${recipientName} (${displayPhone})!`, { id: toastId, duration: 5000 });
-    return true;
-  } catch (err) {
-    console.error('WhatsApp send error:', err);
-    const errMsg = err.response?.data?.message || err.message || 'Failed to send WhatsApp bill';
+    const dataUrl = canvas.toDataURL('image/png');
+    const base64 = dataUrl.split(',')[1];
 
-    const fallbackText = `Dear ${recipientName}, your sales bill from JSR Traders is generated. Thank you!`;
-    const waUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(fallbackText)}`;
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/png');
+    });
 
-    // Interactive Toast with direct 1-click Web WhatsApp trigger button
-    toast(
-      (t) => (
-        <div className="flex flex-col gap-2 p-1 max-w-sm">
-          <div className="font-bold text-xs text-amber-700">
-            Meta API Sandbox Limit: {errMsg.includes('133010') ? 'Number not registered in Meta Sandbox' : errMsg}
-          </div>
-          <p className="text-[11px] text-slate-600 leading-snug">
-            Send bill statement to <strong>{recipientName} ({displayPhone})</strong> via WhatsApp Web / App:
-          </p>
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => {
-                window.open(waUrl, '_blank');
-                toast.dismiss(t.id);
-              }}
-              className="px-3 py-1.5 bg-primary-700 hover:bg-primary-800 text-white rounded-lg text-xs font-bold shadow transition flex items-center gap-1.5 cursor-pointer"
-            >
-              🚀 Send via WhatsApp Web ({displayPhone})
-            </button>
-            <button
-              type="button"
-              onClick={() => toast.dismiss(t.id)}
-              className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      ),
-      { id: toastId, duration: 20000 }
-    );
-
-    return false;
+    return { base64, blob };
+  } finally {
+    if (document.body.contains(container)) {
+      document.body.removeChild(container);
+    }
   }
+}
+
+/**
+ * Render DOM element into PNG Image Base64 & Blob
+ */
+export async function renderElementToImageBase64(elementNode) {
+  if (!elementNode) return { base64: '', blob: null };
+
+  const canvas = await html2canvas(elementNode, {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    backgroundColor: '#ffffff',
+  });
+
+  const dataUrl = canvas.toDataURL('image/png');
+  const base64 = dataUrl.split(',')[1];
+
+  const blob = await new Promise((resolve) => {
+    canvas.toBlob(resolve, 'image/png');
+  });
+
+  return { base64, blob };
+}
+
+/**
+ * Copy visual bill image to system clipboard so user can press Ctrl+V in WhatsApp
+ */
+export async function copyBillImageToClipboard({ htmlString = '', elementNode = null, imageBlob = null, imageBase64 = '' } = {}) {
+  try {
+    let blob = imageBlob;
+    let b64 = imageBase64;
+
+    if (!blob && !b64) {
+      if (htmlString) {
+        const res = await renderHtmlToImageBase64(htmlString);
+        blob = res.blob;
+        b64 = res.base64;
+      } else if (elementNode) {
+        const res = await renderElementToImageBase64(elementNode);
+        blob = res.blob;
+        b64 = res.base64;
+      }
+    }
+
+    // 1. In Electron
+    if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.writeClipboardImage === 'function' && b64) {
+      await window.electronAPI.writeClipboardImage(b64);
+      return true;
+    }
+
+    // 2. In modern browser
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof window.ClipboardItem !== 'undefined' && blob) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': blob,
+        }),
+      ]);
+      return true;
+    }
+  } catch (err) {
+    console.warn('[Clipboard] Failed to copy bill image to clipboard:', err);
+  }
+  return false;
+}
+
+/**
+ * Open the Universal Multi-Channel Share Modal (WhatsApp Web, WhatsApp App, Mail, System Share, PDF)
+ */
+export function openShareModal({
+  recipientPhone = '',
+  recipientName = 'Customer',
+  recipientEmail = '',
+  pdfBase64 = '',
+  elementNode = null,
+  htmlString = '',
+  filename = 'JSR_Report.pdf',
+  caption = '',
+  summaryText = '',
+} = {}) {
+  const detail = {
+    recipientPhone,
+    recipientName,
+    recipientEmail,
+    pdfBase64,
+    elementNode,
+    htmlString,
+    filename,
+    caption: caption || summaryText,
+    summaryText: summaryText || caption,
+  };
+
+  window.dispatchEvent(new CustomEvent('jsr_open_share_modal', { detail }));
+  return true;
+}
+
+/**
+ * Send WhatsApp / Multi-Channel Bill Statement
+ * Triggers native system popup notification (WhatsApp Desktop, Teams, Telegram, Mail, PDF)
+ * and automatically copies high-res bill image to system clipboard for 1-click Ctrl+V pasting in WhatsApp.
+ */
+export async function sendWhatsAppBillPdf(options = {}) {
+  const {
+    recipientPhone = '',
+    recipientName = 'Customer',
+    recipientEmail = '',
+    pdfBase64 = '',
+    elementNode = null,
+    htmlString = '',
+    filename = 'JSR_Report.pdf',
+    caption = '',
+    summaryText = '',
+  } = options;
+
+  const text =
+    caption ||
+    summaryText ||
+    `Dear ${recipientName}, your bill statement from JSR AGRI TRADES is ready. Thank you!`;
+
+  // Render bill image and copy to clipboard in background
+  let imgBase64 = '';
+  let pdfB64 = pdfBase64;
+
+  try {
+    if (htmlString) {
+      const [imgRes, pdfRes] = await Promise.all([
+        renderHtmlToImageBase64(htmlString).catch(() => ({ base64: '', blob: null })),
+        pdfB64 ? Promise.resolve(pdfB64) : renderHtmlToPdfBase64(htmlString).catch(() => ''),
+      ]);
+      imgBase64 = imgRes.base64;
+      pdfB64 = pdfRes || '';
+      if (imgRes.blob || imgRes.base64) {
+        await copyBillImageToClipboard({ imageBlob: imgRes.blob, imageBase64: imgRes.base64 });
+      }
+    } else if (elementNode) {
+      const [imgRes, pdfRes] = await Promise.all([
+        renderElementToImageBase64(elementNode).catch(() => ({ base64: '', blob: null })),
+        pdfB64 ? Promise.resolve(pdfB64) : generatePdfBase64FromElement(elementNode).catch(() => ''),
+      ]);
+      imgBase64 = imgRes.base64;
+      pdfB64 = pdfRes || '';
+      if (imgRes.blob || imgRes.base64) {
+        await copyBillImageToClipboard({ imageBlob: imgRes.blob, imageBase64: imgRes.base64 });
+      }
+    }
+  } catch (err) {
+    console.warn('[Share] Pre-rendering bill image error:', err);
+  }
+
+  // 1. Electron Native System Dialog (identical to Quit JSR dialog)
+  if (
+    typeof window !== 'undefined' &&
+    window.electronAPI &&
+    typeof window.electronAPI.showNativeShareDialog === 'function'
+  ) {
+    const res = await window.electronAPI.showNativeShareDialog({
+      recipientPhone,
+      recipientName,
+      recipientEmail,
+      text,
+      fileBase64: pdfB64,
+      imageBase64: imgBase64,
+      fileName: filename,
+    });
+
+    if (res?.success) {
+      if (res.app === 'whatsapp_desktop' || res.app === 'whatsapp_web') {
+        toast.success('📋 Bill image copied to clipboard! Press Ctrl+V in WhatsApp to attach.', {
+          duration: 6000,
+        });
+      } else if (res.app === 'teams') {
+        toast.success('Opening Microsoft Teams (Press Ctrl+V to attach bill image)');
+      } else if (res.app === 'telegram') {
+        toast.success('Opening Telegram (Press Ctrl+V to attach bill image)');
+      } else if (res.app === 'mail') {
+        toast.success('Opening Mail client…');
+      } else if (res.app === 'save_pdf') {
+        toast.success('PDF saved and revealed in folder!');
+      }
+      return true;
+    }
+    if (res?.cancelled) {
+      return false;
+    }
+  }
+
+  // 2. Fallback / Browser Environment: Open System Dialog Modal
+  return openShareModal({
+    ...options,
+    pdfBase64: pdfB64,
+  });
 }

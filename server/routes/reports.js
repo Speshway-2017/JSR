@@ -657,7 +657,7 @@ router.get('/bills', async (req, res) => {
       Sale.find({ createdAt: { $gte: start, $lte: end } })
         .populate({
           path: 'customer',
-          select: 'name nameTelugu schedule',
+          select: 'name nameTelugu mobile schedule',
           populate: { path: 'schedule', select: 'name' },
         })
         .populate('vendor', 'name city mobile')
@@ -670,7 +670,7 @@ router.get('/bills', async (req, res) => {
       })
         .populate({
           path: 'customer',
-          select: 'name nameTelugu schedule',
+          select: 'name nameTelugu mobile schedule',
           populate: { path: 'schedule', select: 'name' },
         })
         .lean(),
@@ -690,6 +690,7 @@ router.get('/bills', async (req, res) => {
           customerId: key,
           name: custObj?.name || '—',
           nameTelugu: custObj?.nameTelugu || '',
+          mobile: custObj?.mobile || '',
           scheduleId: schedId,
           scheduleName: schedName,
           opening: 0,
@@ -698,6 +699,9 @@ router.get('/bills', async (req, res) => {
         });
       } else {
         const bucket = byCustomer.get(key);
+        if (!bucket.mobile && custObj?.mobile) {
+          bucket.mobile = custObj.mobile;
+        }
         if (!bucket.scheduleId && schedId) {
           bucket.scheduleId = schedId;
           bucket.scheduleName = schedName;
@@ -848,6 +852,7 @@ router.get('/bills', async (req, res) => {
           customerId: b.customerId,
           name: b.name,
           nameTelugu: b.nameTelugu,
+          mobile: b.mobile || '',
           scheduleId: b.scheduleId || '',
           scheduleName: b.scheduleName || '',
           opening,

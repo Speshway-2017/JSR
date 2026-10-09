@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Pencil, X, Save, FileText, Send, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, CreditCard, Pencil, X, Save, FileText, Send, Share2, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import MDIModalWindow from '../components/mdi/MDIModalWindow';
@@ -288,8 +288,9 @@ export default function CustomerDetail({ path: windowPath }) {
                   type="button"
                   onClick={handleSendWhatsAppStatement}
                   className="btn-secondary !py-2 !text-xs font-bold w-full flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  title="Share Statement (Windows Apps, WhatsApp, Teams, Mail)"
                 >
-                  <Send className="w-3.5 h-3.5 text-primary-600" /> WhatsApp Statement
+                  <Share2 className="w-3.5 h-3.5 text-primary-600" /> Share Statement
                 </button>
               )}
             </div>
@@ -367,9 +368,9 @@ export default function CustomerDetail({ path: windowPath }) {
                           type="button"
                           onClick={() => handleSendWhatsAppSale(sale)}
                           className="btn-secondary !py-1.5 !px-2.5 !text-xs font-semibold"
-                          title="Send Bill via WhatsApp"
+                          title="Share Bill (Windows Apps, WhatsApp, Teams, Mail)"
                         >
-                          <Send className="w-3.5 h-3.5 text-primary-600" /> WhatsApp
+                          <Share2 className="w-3.5 h-3.5 text-primary-600" /> Share
                         </button>
                       )}
                     </div>

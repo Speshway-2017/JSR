@@ -23,6 +23,7 @@ import BrandLogo from './BrandLogo';
 import ChangePasswordModal from './ChangePasswordModal';
 import UtilConfirmModal from './UtilConfirmModal';
 import LogoutConfirmModal from './LogoutConfirmModal';
+import ShareReportModal from './ShareReportModal';
 import MDIWorkspace from './mdi/MDIWorkspace';
 import { useMDI } from '../context/MDIContext';
 import { warmRaituBillAssets } from '../utils/raituBillShared';
@@ -636,6 +637,7 @@ export default function Layout({ children }) {
         onConfirm={handleUtilConfirm}
         busy={utilBusy}
       />
+      <ShareReportModal />
     </div>
   );
 }

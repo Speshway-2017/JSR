@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Send, Printer } from 'lucide-react';
+import { BookOpen, Send, Share2, Printer } from 'lucide-react';
 import { openLedgerPreview } from '../utils/reportPrint';
 import toast from 'react-hot-toast';
 import api from '../api';
@@ -187,14 +187,7 @@ export default function Ledger() {
 
   const handleSendWhatsApp = async () => {
     if (!data) return;
-    const targetPhone = selected?.mobile || data.customer?.mobile || '';
-    let phoneToUse = targetPhone;
-
-    if (!phoneToUse || String(phoneToUse).replace(/\D/g, '').length < 10) {
-      const input = window.prompt(`Enter WhatsApp mobile number for ${data.customer?.name || 'Party'}:`, '');
-      if (!input) return;
-      phoneToUse = input;
-    }
+    const phoneToUse = selected?.mobile || data.customer?.mobile || '';
 
     setSendingWa(true);
     try {
@@ -366,9 +359,10 @@ export default function Ledger() {
                   onClick={handleSendWhatsApp}
                   disabled={sendingWa}
                   className="btn-secondary !py-1.5 !px-3 !text-sm font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                  title="Share Statement (Windows Apps, WhatsApp, Teams, Mail)"
                 >
-                  <Send className="w-4 h-4 text-primary-600" />
-                  {sendingWa ? 'Sending...' : 'Send to WhatsApp'}
+                  <Share2 className="w-4 h-4 text-primary-600" />
+                  {sendingWa ? 'Sharing...' : 'Share'}
                 </button>
               )}
             </div>

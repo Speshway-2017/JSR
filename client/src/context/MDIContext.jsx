@@ -526,6 +526,26 @@ export function MDIProvider({ children }) {
     );
   }, []);
 
+  const updateBounds = useCallback((id, { position, size } = {}) => {
+    setWindows((prev) =>
+      prev.map((w) => {
+        if (w.id !== id) return w;
+        return {
+          ...w,
+          ...(position ? { position: { x: Math.max(0, position.x), y: Math.max(0, position.y) } } : {}),
+          ...(size
+            ? {
+                size: {
+                  width: Math.max(size.width, MIN_WIDTH),
+                  height: Math.max(size.height, MIN_HEIGHT),
+                },
+              }
+            : {}),
+        };
+      })
+    );
+  }, []);
+
   const updateWindowPath = useCallback((id, newPath) => {
     if (!id || !newPath) return;
     const basePath = id.split('?')[0];
@@ -795,6 +815,7 @@ export function MDIProvider({ children }) {
         arrangeWindows,
         updatePosition,
         updateSize,
+        updateBounds,
         updateWindowPath,
         setUnsavedChanges,
         confirmCloseId,

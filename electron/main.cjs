@@ -8,6 +8,8 @@ const {
   dialog,
   ipcMain,
   shell,
+  clipboard,
+  nativeImage,
 } = electron;
 
 if (!app) {
@@ -193,7 +195,17 @@ function createWindow() {
         },
       };
     }
-    // Stay offline-friendly: do not open external browser for unknown links
+    // Open external URLs (WhatsApp Web, WhatsApp app, Email, etc.) in system default browser / app
+    if (
+      url.startsWith('http:') ||
+      url.startsWith('https:') ||
+      url.startsWith('mailto:') ||
+      url.startsWith('whatsapp:') ||
+      url.startsWith('tel:')
+    ) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
     return { action: 'deny' };
   });
 
@@ -426,6 +438,181 @@ function registerIpc() {
     const next = !mainWindow.isFullScreen();
     mainWindow.setFullScreen(next);
     return next;
+  });
+
+  ipcMain.handle('app:openExternal', async (_event, url) => {
+    if (url && typeof url === 'string') {
+      try {
+        await shell.openExternal(url);
+        return true;
+      } catch (err) {
+        console.error('[electron] openExternal failed:', err);
+        return false;
+      }
+    }
+    return false;
+  });
+
+  ipcMain.handle('app:systemShare', async (_event, { title, text, fileBase64, fileName }) => {
+    try {
+      if (fileBase64) {
+        const tempDir = app.getPath('temp');
+        const safeName = (fileName || 'JSR_Report.pdf').replace(/[/\\?%*:|"<>]/g, '_');
+        const filePath = path.join(tempDir, safeName);
+        fs.writeFileSync(filePath, Buffer.from(fileBase64, 'base64'));
+        
+        // Show file in folder so user can use Windows context menu "Send to" / share, or open
+        shell.showItemInFolder(filePath);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[electron] systemShare failed:', err);
+      return false;
+    }
+  });
+
+  ipcMain.handle('clipboard:writeImage', async (_event, imageBase64) => {
+    try {
+      if (imageBase64) {
+        const dataUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+        const img = nativeImage.createFromDataURL(dataUrl);
+        clipboard.writeImage(img);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[electron] clipboard:writeImage error:', err);
+      return false;
+    }
+  });
+
+  ipcMain.handle('app:nativeShareDialog', async (_event, data = {}) => {
+    const {
+      recipientPhone = '',
+      recipientName = 'Customer',
+      recipientEmail = '',
+      text = '',
+      fileBase64 = '',
+      imageBase64 = '',
+      fileName = 'JSR_Report.pdf',
+    } = data;
+
+    // Auto-copy bill image to system clipboard if available
+    if (imageBase64) {
+      try {
+        const dataUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+        const img = nativeImage.createFromDataURL(dataUrl);
+        clipboard.writeImage(img);
+      } catch (err) {
+        console.warn('[electron] Failed to auto-copy image to clipboard:', err);
+      }
+    }
+
+    // Auto-save PDF to temporary folder so it's ready on disk
+    let savedPdfPath = '';
+    if (fileBase64) {
+      try {
+        const tempDir = app.getPath('temp');
+        const safeName = (fileName || 'JSR_Report.pdf').replace(/[/\\?%*:|"<>]/g, '_');
+        savedPdfPath = path.join(tempDir, safeName);
+        fs.writeFileSync(savedPdfPath, Buffer.from(fileBase64, 'base64'));
+      } catch (err) {
+        console.warn('[electron] Failed to save temp PDF:', err);
+      }
+    }
+
+    // Clean phone number (e.g. 918074407095)
+    let cleanDigits = String(recipientPhone || '').replace(/\D/g, '');
+    if (cleanDigits.length === 10) cleanDigits = '91' + cleanDigits;
+    const displayPhone = cleanDigits ? (cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits) : '';
+
+    const buttons = [
+      'WhatsApp Desktop',
+      'Microsoft Teams',
+      'Telegram Desktop',
+      'Mail / Outlook',
+      'WhatsApp Web',
+      'Save PDF',
+      'Cancel',
+    ];
+
+    const { response } = await dialog.showMessageBox(mainWindow || null, {
+      type: 'question',
+      buttons,
+      defaultId: 0,
+      cancelId: 6,
+      title: 'Share Statement',
+      message: `Share statement for ${recipientName}?`,
+      detail: `Recipient: ${recipientName}${displayPhone ? ` (${displayPhone})` : ''}\n\n• Bill image copied to clipboard (Press Ctrl+V in WhatsApp to attach visual bill)\n• Choose which desktop application you want to share with:`,
+      noLink: true,
+    });
+
+    try {
+      // 0: WhatsApp Desktop
+      if (response === 0) {
+        const waUrl = cleanDigits
+          ? `whatsapp://send?phone=${cleanDigits}&text=${encodeURIComponent(text)}`
+          : `whatsapp://send?text=${encodeURIComponent(text)}`;
+        try {
+          await shell.openExternal(waUrl);
+        } catch {
+          const fallbackUrl = cleanDigits
+            ? `https://api.whatsapp.com/send?phone=${cleanDigits}&text=${encodeURIComponent(text)}`
+            : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+          await shell.openExternal(fallbackUrl);
+        }
+        return { success: true, app: 'whatsapp_desktop', imageCopied: !!imageBase64, pdfPath: savedPdfPath };
+      }
+
+      // 1: Microsoft Teams
+      if (response === 1) {
+        const teamsUrl = `https://teams.microsoft.com/share?msgText=${encodeURIComponent(text)}`;
+        await shell.openExternal(teamsUrl);
+        return { success: true, app: 'teams', imageCopied: !!imageBase64, pdfPath: savedPdfPath };
+      }
+
+      // 2: Telegram Desktop
+      if (response === 2) {
+        try {
+          await shell.openExternal(`tg://msg_url?text=${encodeURIComponent(text)}`);
+        } catch {
+          await shell.openExternal(`https://t.me/share/url?url=&text=${encodeURIComponent(text)}`);
+        }
+        return { success: true, app: 'telegram', imageCopied: !!imageBase64, pdfPath: savedPdfPath };
+      }
+
+      // 3: Mail / Outlook
+      if (response === 3) {
+        const subject = encodeURIComponent(`Statement / Bill - JSR Agri Trades (${recipientName})`);
+        const body = encodeURIComponent(text);
+        const mailUrl = recipientEmail ? `mailto:${recipientEmail}?subject=${subject}&body=${body}` : `mailto:?subject=${subject}&body=${body}`;
+        await shell.openExternal(mailUrl);
+        return { success: true, app: 'mail', pdfPath: savedPdfPath };
+      }
+
+      // 4: WhatsApp Web
+      if (response === 4) {
+        const webUrl = cleanDigits
+          ? `https://web.whatsapp.com/send?phone=${cleanDigits}&text=${encodeURIComponent(text)}`
+          : `https://web.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+        await shell.openExternal(webUrl);
+        return { success: true, app: 'whatsapp_web', imageCopied: !!imageBase64, pdfPath: savedPdfPath };
+      }
+
+      // 5: Save PDF / Show in folder
+      if (response === 5) {
+        if (savedPdfPath) {
+          shell.showItemInFolder(savedPdfPath);
+          return { success: true, app: 'save_pdf', path: savedPdfPath };
+        }
+      }
+
+      return { success: false, cancelled: true };
+    } catch (err) {
+      console.error('[electron] nativeShareDialog error:', err);
+      return { success: false, error: err.message };
+    }
   });
 }
 

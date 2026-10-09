@@ -15,4 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   reload: () => ipcRenderer.invoke('app:reload'),
   toggleDevTools: () => ipcRenderer.invoke('app:toggleDevTools'),
   toggleFullscreen: () => ipcRenderer.invoke('app:toggleFullscreen'),
+  openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
+  systemShare: (data) => ipcRenderer.invoke('app:systemShare', data),
+  showNativeShareDialog: (data) => ipcRenderer.invoke('app:nativeShareDialog', data),
+  writeClipboardImage: (imageBase64) => ipcRenderer.invoke('clipboard:writeImage', imageBase64),
 });

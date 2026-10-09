@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { useMDI, isPathAllowedForRole } from '../../context/MDIContext';
 import { useAuth } from '../../context/AuthContext';
@@ -100,6 +100,10 @@ function renderModuleComponent(path) {
   }
 }
 
+const WindowContent = memo(function WindowContent({ path }) {
+  return renderModuleComponent(path);
+});
+
 export default function MDIWorkspace({ fallbackChildren }) {
   const { windows, confirmCloseId, cancelCloseModal, confirmCloseModal } = useMDI();
   const { role } = useAuth();
@@ -118,7 +122,7 @@ export default function MDIWorkspace({ fallbackChildren }) {
         {/* Floating Internal Windows */}
         {visibleWindows.map((win) => (
           <MDIWindow key={win.id} windowItem={win}>
-            {renderModuleComponent(win.path)}
+            <WindowContent path={win.path} />
           </MDIWindow>
         ))}
       </div>

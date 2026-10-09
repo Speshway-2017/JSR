@@ -188,7 +188,7 @@ ${BILL_CSS}
 <body class="bill-preview" style="font-family:'${RAMABHADRA}','Noto Sans Telugu',sans-serif;font-weight:400;">
   <div class="preview-toolbar no-print">
     <button type="button" class="secondary" onclick="window.close()">Close</button>
-    <button type="button" id="whatsapp-btn" style="background:#25D366;color:#fff;border-color:#25D366;font-weight:600;" onclick="sendWhatsAppBill()">Send WhatsApp</button>
+    <button type="button" id="whatsapp-btn" style="background:#25D366;color:#fff;border-color:#25D366;font-weight:600;" onclick="sendWhatsAppBill()">Share</button>
     <button type="button" onclick="window.print()">Print / Save PDF</button>
   </div>
   <div class="preview-stage">
@@ -208,9 +208,14 @@ ${BILL_CSS}
     function sendWhatsAppBill() {
       var stage = document.querySelector('.preview-stage');
       var bodyText = stage ? stage.innerText : document.body.innerText;
-      var lines = bodyText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-      var text = '*JSR AGRI TRADES - Bills Summary*\n-----------------------------------\n' + lines.slice(0, 40).join('\n') + '\n-----------------------------------\n*Thank you!* 🙏';
-      window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+      var lines = bodyText.split('\\n').map(function(l) { return l.trim(); }).filter(Boolean);
+      var text = '*JSR AGRI TRADES - Bills Summary*\\n-----------------------------------\\n' + lines.slice(0, 40).join('\\n') + '\\n-----------------------------------\\n*Thank you!* 🙏';
+      var phone = window.prompt('Enter 10-digit WhatsApp phone number (or click OK to pick contact in WhatsApp):', '');
+      if (phone === null) return;
+      var digits = String(phone).replace(/\\D/g, '');
+      if (digits.length === 10) digits = '91' + digits;
+      var url = digits ? 'https://web.whatsapp.com/send?phone=' + digits + '&text=' + encodeURIComponent(text) : 'https://api.whatsapp.com/send?text=' + encodeURIComponent(text);
+      window.open(url, 'JSR_WhatsApp_Web');
     }
     function fitNupCells() {
       document.querySelectorAll('.nup-cell').forEach(function (cell) {

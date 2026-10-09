@@ -13,7 +13,7 @@ const { MongoClient } = mongoose.mongo;
 
 const COLLECTION = 'app_license';
 const DOC_ID = 'jsr';
-const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000;
+const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000; // 90 days (3 months)
 
 export const MSG_OFFLINE_FIRST_LAUNCH =
   'Unable to verify your license. Please connect to the internet or contact the administrator.';
@@ -100,10 +100,10 @@ async function loadAtlasLicense(db) {
 /**
  * License validation workflow:
  * 1. If local `licenseUnlocked` is true or mode is 'LIFETIME' → unlock permanently.
- * 2. If within valid 10-day period (based on `lastSuccessfulValidationAt`) and clock not rolled back and not forced → unlock locally without network call.
+ * 2. If within valid 3-month (90-day) period (based on `lastSuccessfulValidationAt`) and clock not rolled back and not forced → unlock locally without network call.
  * 3. If validation is due (or 1st launch or forced or clock rolled back) → connect to Atlas cloud DB.
  *    a) Atlas `lifetime: true` → activate lifetime mode permanently, unlock locally.
- *    b) Atlas `lifetime: false` → update local `lastSuccessfulValidationAt = now`, update Atlas `firstReadAt` & `updatedAt`, unlock locally for next 10 days.
+ *    b) Atlas `lifetime: false` → update local `lastSuccessfulValidationAt = now`, update Atlas `firstReadAt` & `updatedAt`, unlock locally for next 3 months (90 days).
  *    c) Atlas offline & never validated (1st launch) → lock app with MSG_OFFLINE_FIRST_LAUNCH.
  *    d) Atlas offline & validation due → lock app with MSG_OFFLINE_VALIDATION_DUE.
  *    e) Atlas license revoked/disabled → lock app with MSG_LICENSE_INVALID.
@@ -128,9 +128,9 @@ export async function refreshLicense(options = {}) {
     force ||
     clockRolledBack ||
     !lastValidTime ||
-    now - lastValidTime >= TEN_DAYS_MS;
+    now - lastValidTime >= THREE_MONTHS_MS;
 
-  // If validation is NOT due, app is still within valid 10-day window
+  // If validation is NOT due, app is still within valid 3-month (90-day) window
   if (!isValidationDue) {
     return setState({ unlocked: false, locked: false, message: '' });
   }
@@ -182,7 +182,7 @@ export async function refreshLicense(options = {}) {
       company.licenseRevoked = false;
       await company.save();
 
-      console.log('[license] License validation successful. Next check due in 10 days.');
+      console.log('[license] License validation successful. Next check due in 3 months (90 days).');
       return setState({ unlocked: false, locked: false, message: '' });
     });
   } catch (error) {

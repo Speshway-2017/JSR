@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Printer,
   Send,
+  Share2,
   FileText,
   CheckSquare,
   Square,
@@ -20,8 +21,7 @@ import { openPurchaseBillPreview } from '../utils/reportPrint';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
-import { openRangeBillsNUp } from '../utils/rangeBillPrint';
-import { generateSingleCustomerBillHtml } from '../utils/customerSaleBillPdf';
+import { openRangeBillsNUp, generateSingleStatementBillHtml } from '../utils/rangeBillPrint';
 import { sendWhatsAppBillPdf } from '../utils/whatsappSender';
 import { matchesPrefix } from '../utils/search';
 import { useDataRestored } from '../utils/useDataRestored';
@@ -65,6 +65,12 @@ export default function BillPrint({ path: windowPath }) {
   const [endDate, setEndDate] = useState(dateParam);
   const [billType, setBillType] = useState(() => (effectiveSearchParams.get('type') === 'purchase' ? 'purchase' : 'customer'));
 
+  const [filterCustomer, setFilterCustomer] = useState(() => effectiveSearchParams.get('customer') || '');
+  const [filterVendor, setFilterVendor] = useState(() => effectiveSearchParams.get('vendor') || '');
+  const [filterItem, setFilterItem] = useState(() => effectiveSearchParams.get('item') || '');
+  const [filterSchedule, setFilterSchedule] = useState(() => effectiveSearchParams.get('schedule') || '');
+  const [searchQuery, setSearchQuery] = useState('');
+
   /* Track whether the windowPath change was triggered internally by our own
      updateWindowPath call (i.e. the user changed the From date), vs externally
      (e.g. navigating from another page). We skip re-syncing endDate on internal updates. */
@@ -83,12 +89,6 @@ export default function BillPrint({ path: windowPath }) {
       updateWindowPath('/bill-print', `/bill-print?${params.toString()}`);
     }
   }, [startDate, billType, filterCustomer, filterVendor, filterItem, filterSchedule, updateWindowPath]);
-
-  const [filterCustomer, setFilterCustomer] = useState(() => effectiveSearchParams.get('customer') || '');
-  const [filterVendor, setFilterVendor] = useState(() => effectiveSearchParams.get('vendor') || '');
-  const [filterItem, setFilterItem] = useState(() => effectiveSearchParams.get('item') || '');
-  const [filterSchedule, setFilterSchedule] = useState(() => effectiveSearchParams.get('schedule') || '');
-  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     /* If this effect was triggered by our own startDate → updateWindowPath call,
@@ -117,6 +117,11 @@ export default function BillPrint({ path: windowPath }) {
 
   const [materials, setMaterials] = useState([]);
   const [teluguMap, setTeluguMap] = useState({});
+  const [customers, setCustomers] = useState([]);
+
+  useEffect(() => {
+    api.get('/customers').then((res) => setCustomers(res.data || [])).catch(() => {});
+  }, []);
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -431,49 +436,61 @@ export default function BillPrint({ path: windowPath }) {
     try {
       for (const st of selectedStatements) {
         if (st.isPurchase) {
-          let phone = st.mobile || st.vendor?.mobile || '';
-          if (!phone) {
-            phone = window.prompt(`Please enter 10-digit WhatsApp phone number for vendor "${st.name}":`, '');
-            if (!phone) {
-              toast.error(`Skipped ${st.name} (no phone number provided)`);
-              continue;
-            }
-          }
-          const cleanPhone = phone.replace(/\D/g, '');
+          const phone = st.mobile || st.vendor?.mobile || '';
           const periodStr = startDate === endDate ? formatDateOnly(startDate) : `${formatDateOnly(startDate)} to ${formatDateOnly(endDate)}`;
           const text = `*JSR AGRI TRADES - Purchase Bill*\nVendor: ${st.name}\nPeriod: ${periodStr}\nTotal Bags: ${st.totalBags || '—'}\nTotal Weight: ${Number(st.totalWeight || 0).toFixed(1)} kg\n*Total Amount: ${formatCurrency(st.totalAmount || st.totalSale)}*\nClosing Balance: ${formatCurrency(st.closing)}\nThank you! 🙏`;
-          window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`, '_blank');
+          
+          await sendWhatsAppBillPdf({
+            recipientPhone: phone,
+            recipientName: st.name,
+            summaryText: text,
+            caption: text,
+            filename: `Purchase_Bill_${st.name.replace(/[^a-zA-Z0-9]/g, '_')}_${startDate}.pdf`,
+          });
           continue;
         }
 
         const cid = String(st.customerId);
-        let phone = st.mobile || '';
+        const matchedCust = customers.find(
+          (c) => String(c._id) === cid || c.name?.toLowerCase() === String(st.name || '').trim().toLowerCase()
+        );
+        const phone = st.mobile || matchedCust?.mobile || '';
+        const html = await generateSingleStatementBillHtml(st);
+        const filename = `Customer_Bill_${st.name.replace(/[^a-zA-Z0-9]/g, '_')}_${startDate}.pdf`;
 
-        if (!phone) {
-          phone = window.prompt(`Please enter 10-digit WhatsApp phone number for customer "${st.name}":`, '');
-          if (!phone) {
-            toast.error(`Skipped ${st.name} (no phone number provided)`);
-            continue;
-          }
+        // Itemized text summary for WhatsApp
+        let linesSummary = '';
+        if (st.sales && st.sales.length) {
+          linesSummary = st.sales.map((s, idx) => {
+            const mat = s.materialName || s.material || `Item ${idx + 1}`;
+            const bags = s.bags ? `${s.bags} bags` : '';
+            const wt = s.weight ? `${Number(s.weight).toFixed(1)} kg` : (s.qty ? `${s.qty} kg` : '');
+            const rate = s.rate ? `@ ₹${s.rate}` : '';
+            const amt = s.amount ? `₹${s.amount}` : (s.totalAmount ? `₹${s.totalAmount}` : '');
+            const details = [bags, wt, rate].filter(Boolean).join(', ');
+            return `• ${mat}${details ? ` (${details})` : ''} = ${amt}`;
+          }).join('\n');
         }
 
-        const saleObj = {
-          customer: { _id: st.customerId, name: st.name, nameTelugu: st.nameTelugu },
-          createdAt: startDate,
-          lines: st.sales || [],
-          handlingCharges: st.sales?.reduce((acc, s) => acc + (Number(s.cooly) || (s.isCoolyLine ? Number(s.amount) || 0 : 0)), 0) || 0,
-          totalAmount: st.totalSale,
-        };
-
-        const html = await generateSingleCustomerBillHtml(saleObj);
-        const filename = `Customer_Bill_${st.name.replace(/[^a-zA-Z0-9]/g, '_')}_${startDate}.pdf`;
+        const cooly = saleObj.handlingCharges || 0;
+        const richCaption = `🧾 *JSR AGRI TRADES - Customer Bill*
+👤 Customer: *${st.name}*
+📅 Date: ${formatDateOnly(startDate)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 *Bill Items:*
+${linesSummary || `• Total Sale: ${formatCurrency(st.totalSale)}`}
+${cooly > 0 ? `• Handling / Coolie: ${formatCurrency(cooly)}\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 *Total Bill: ${formatCurrency(st.totalSale)}*
+${st.closing != null ? `📊 Closing Balance: ${formatCurrency(st.closing)}\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━
+🙏 *Thank you for your business!*`;
 
         await sendWhatsAppBillPdf({
           recipientPhone: phone,
           recipientName: st.name,
           htmlString: html,
           filename,
-          caption: `Dear ${st.name}, your bill statement for date ${formatDateOnly(startDate)} total ₹${st.totalSale} is generated. Please find your bill attached below. Thank you, JSR Traders.`,
+          caption: richCaption,
+          summaryText: richCaption,
           templateName: 'customer_sales_bill',
           templateParams: [st.name, formatDateOnly(startDate), String(st.totalSale)],
         });
@@ -561,8 +578,9 @@ export default function BillPrint({ path: windowPath }) {
               className="btn-secondary !py-1.5 !px-3 !text-sm font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
               onClick={handleSendWhatsApp}
               disabled={!selectedStatements.length}
+              title="Share Bill Statement (Windows Apps, WhatsApp, Teams, Mail)"
             >
-              <Send className="w-4 h-4 text-primary-600" /> Send WhatsApp
+              <Share2 className="w-4 h-4 text-primary-600" /> Share
             </button>
           )}
           <button

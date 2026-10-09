@@ -182,7 +182,7 @@ function baseReportHtml({ title, subtitle, metaBadge, bodyHtml, whatsappText }) 
   <div class="preview-toolbar no-print">
     <span class="doc-name">${esc(title)}</span>
     <button type="button" class="secondary" onclick="window.close()">Close</button>
-    ${whatsappText ? `<button type="button" id="wa-btn" class="whatsapp" onclick="sendWhatsApp()">Send WhatsApp</button>` : ''}
+    ${whatsappText ? `<button type="button" id="wa-btn" class="whatsapp" onclick="shareReport()">Share</button>` : ''}
     <button type="button" onclick="window.print()">Print / Save PDF</button>
   </div>
   <div class="stage">
@@ -202,9 +202,14 @@ function baseReportHtml({ title, subtitle, metaBadge, bodyHtml, whatsappText }) 
   </div>
   ${whatsappText ? `
   <script>
-    function sendWhatsApp() {
+    function shareReport() {
       var text = decodeURIComponent('${encodeURIComponent(whatsappText)}');
-      window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+      var phone = window.prompt('Enter 10-digit WhatsApp number (or click OK to pick contact in WhatsApp):', '');
+      if (phone === null) return;
+      var digits = String(phone).replace(/\\D/g, '');
+      if (digits.length === 10) digits = '91' + digits;
+      var url = digits ? 'https://web.whatsapp.com/send?phone=' + digits + '&text=' + encodeURIComponent(text) : 'https://api.whatsapp.com/send?text=' + encodeURIComponent(text);
+      window.open(url, 'JSR_WhatsApp_Web');
     }
   </script>` : ''}
 </body>

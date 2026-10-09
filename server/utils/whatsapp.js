@@ -49,7 +49,7 @@ export async function getWhatsAppCredentials(customCreds = {}) {
   phoneNumberId = (phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
   accessToken = (accessToken || process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
   wabaId = (wabaId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '').trim();
-  senderNumber = (senderNumber || process.env.WHATSAPP_SENDER_NUMBER || '').trim();
+  senderNumber = (senderNumber || process.env.WHATSAPP_SENDER_NUMBER || '9010253076').trim();
 
   return { phoneNumberId, accessToken, wabaId, senderNumber };
 }

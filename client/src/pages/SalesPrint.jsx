@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Printer, Send, FileText, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Edit2, Calendar, CheckCircle2, DollarSign, Users, X, Lock, Eye, EyeOff } from 'lucide-react';
+import { Printer, Send, Share2, FileText, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw, Edit2, Calendar, CheckCircle2, DollarSign, Users, X, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api';
 import { formatCurrency, formatDateOnly } from '../utils/format';
@@ -360,15 +360,7 @@ export default function SalesPrint({ path: windowPath }) {
         const matchedCust = customers.find(
           (c) => String(c._id) === cid || c.name.toLowerCase() === String(st.name || '').trim().toLowerCase()
         );
-        let phone = matchedCust?.mobile || st.mobile || '';
-
-        if (!phone) {
-          phone = window.prompt(`Please enter 10-digit WhatsApp phone number for customer "${st.name}":`, '');
-          if (!phone) {
-            toast.error(`Skipped ${st.name} (no phone number provided)`);
-            continue;
-          }
-        }
+        const phone = matchedCust?.mobile || st.mobile || '';
 
         const saleObj = {
           customer: matchedCust || { _id: st.customerId, name: st.name, nameTelugu: st.nameTelugu },
@@ -381,12 +373,39 @@ export default function SalesPrint({ path: windowPath }) {
         const html = await generateSingleCustomerBillHtml(saleObj);
         const filename = `Sales_Bill_${st.name.replace(/[^a-zA-Z0-9]/g, '_')}_${startDate}.pdf`;
 
+        // Itemized text summary for WhatsApp
+        let linesSummary = '';
+        if (st.sales && st.sales.length) {
+          linesSummary = st.sales.map((s, idx) => {
+            const mat = s.materialName || s.material || `Item ${idx + 1}`;
+            const bags = s.bags ? `${s.bags} bags` : '';
+            const wt = s.weight ? `${Number(s.weight).toFixed(1)} kg` : (s.qty ? `${s.qty} kg` : '');
+            const rate = s.rate ? `@ ₹${s.rate}` : '';
+            const amt = s.amount ? `₹${s.amount}` : (s.totalAmount ? `₹${s.totalAmount}` : '');
+            const details = [bags, wt, rate].filter(Boolean).join(', ');
+            return `• ${mat}${details ? ` (${details})` : ''} = ${amt}`;
+          }).join('\n');
+        }
+
+        const cooly = saleObj.handlingCharges || 0;
+        const richCaption = `🧾 *JSR AGRI TRADES - Customer Bill*
+👤 Customer: *${st.name}*
+📅 Date: ${formatDateOnly(startDate)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 *Bill Items:*
+${linesSummary || `• Total Sale: ${formatCurrency(st.totalSale)}`}
+${cooly > 0 ? `• Handling / Coolie: ${formatCurrency(cooly)}\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 *Total Bill: ${formatCurrency(st.totalSale)}*
+${st.closing != null ? `📊 Closing Balance: ${formatCurrency(st.closing)}\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━
+🙏 *Thank you for your business!*`;
+
         await sendWhatsAppBillPdf({
           recipientPhone: phone,
           recipientName: st.name,
           htmlString: html,
           filename,
-          caption: `Dear ${st.name}, your sales bill for date ${formatDateOnly(startDate)} total ₹${st.totalSale} is generated. Please find your bill attached below. Thank you, JSR Traders.`,
+          caption: richCaption,
+          summaryText: richCaption,
           templateName: 'customer_sales_bill',
           templateParams: [st.name, formatDateOnly(startDate), String(st.totalSale)],
         });
@@ -622,8 +641,9 @@ export default function SalesPrint({ path: windowPath }) {
               className="btn-secondary !py-1.5 !px-3 !text-sm font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
               onClick={handleSendWhatsApp}
               disabled={!selectedStatements.length}
+              title="Share Bill Statement (Windows Apps, WhatsApp, Teams, Mail)"
             >
-              <Send className="w-4 h-4 text-primary-600" /> Send WhatsApp
+              <Share2 className="w-4 h-4 text-primary-600" /> Share
             </button>
           )}
           <button

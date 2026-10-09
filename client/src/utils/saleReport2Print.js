@@ -588,7 +588,7 @@ ${SALE_REPORT_2_CSS}
 <body>
   <div class="preview-toolbar">
     <button type="button" onclick="window.close()">Close</button>
-    <button type="button" id="whatsapp-btn" style="background:#25D366;color:#fff;border-color:#25D366;font-weight:600;" onclick="sendWhatsAppBill()">Send WhatsApp</button>
+    <button type="button" id="whatsapp-btn" style="background:#25D366;color:#fff;border-color:#25D366;font-weight:600;" onclick="sendWhatsAppBill()">Share</button>
     <button type="button" class="primary" onclick="window.print()">Print / Save PDF</button>
   </div>
   <div class="stage">${inner}</div>
@@ -608,7 +608,12 @@ ${SALE_REPORT_2_CSS}
       var bodyText = stage ? stage.innerText : document.body.innerText;
       var lines = bodyText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
       var text = '*JSR AGRI TRADES - ${title}*\\n-----------------------------------\\n' + lines.slice(0, 40).join('\\n') + '\\n-----------------------------------\\n*Thank you!* 🙏';
-      window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+      var phone = window.prompt('Enter 10-digit WhatsApp phone number (or click OK to pick contact in WhatsApp):', '');
+      if (phone === null) return;
+      var digits = String(phone).replace(/\\D/g, '');
+      if (digits.length === 10) digits = '91' + digits;
+      var url = digits ? 'https://web.whatsapp.com/send?phone=' + digits + '&text=' + encodeURIComponent(text) : 'https://api.whatsapp.com/send?text=' + encodeURIComponent(text);
+      window.open(url, 'JSR_WhatsApp_Web');
     }
   </script>
 </body>
