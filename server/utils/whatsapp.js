@@ -9,7 +9,7 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 
 /**
  * Format raw phone number into standard international format without leading + or symbols.
- * Example: "9010253076" -> "919010253076", "+91 89774-81054" -> "918977481054"
+ * Example: "8977481054" -> "918977481054", "+91 89774-81054" -> "918977481054"
  */
 export function formatPhoneNumber(rawPhone) {
   if (!rawPhone) return '';
@@ -49,7 +49,7 @@ export async function getWhatsAppCredentials(customCreds = {}) {
   phoneNumberId = (phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
   accessToken = (accessToken || process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
   wabaId = (wabaId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '').trim();
-  senderNumber = (senderNumber || process.env.WHATSAPP_SENDER_NUMBER || '9010253076').trim();
+  senderNumber = (senderNumber || process.env.WHATSAPP_SENDER_NUMBER || '8977481054').trim();
 
   return { phoneNumberId, accessToken, wabaId, senderNumber };
 }

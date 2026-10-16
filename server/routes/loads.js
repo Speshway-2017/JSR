@@ -73,7 +73,7 @@ router.get('/vendors-by-date', async (req, res) => {
 /** Sale Patty preview: vendor + date → that day's sales */
 router.get('/sale-patty', async (req, res) => {
   try {
-    const { vendorId, date } = req.query;
+    const { vendorId, date, materials } = req.query;
     if (!vendorId || !date) {
       return res.status(400).json({ message: 'vendorId and date are required' });
     }
@@ -92,7 +92,7 @@ router.get('/sale-patty', async (req, res) => {
     const load = await findOrCreateDayLoad(vendorId, date);
     await load.populate('vendor', 'name nameTelugu city mobile address creditBalance');
 
-    const bill = await buildVendorDayBill(load.vendor || vendor, load, date);
+    const bill = await buildVendorDayBill(load.vendor || vendor, load, date, undefined, materials);
     res.json(bill);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -102,7 +102,7 @@ router.get('/sale-patty', async (req, res) => {
 /** Generate / update Sale Patty for vendor + date */
 router.post('/sale-patty', async (req, res) => {
   try {
-    const { vendorId, date } = req.body;
+    const { vendorId, date, materials } = req.body;
     if (!vendorId || !date) {
       return res.status(400).json({ message: 'vendorId and date are required' });
     }
@@ -129,7 +129,7 @@ router.post('/sale-patty', async (req, res) => {
     load.billGeneratedAt = new Date();
     await load.save();
 
-    const bill = await buildVendorDayBill(load.vendor || vendor, load, date, snapshot);
+    const bill = await buildVendorDayBill(load.vendor || vendor, load, date, snapshot, materials);
     res.status(wasGenerated ? 200 : 201).json(bill);
   } catch (error) {
     res.status(500).json({ message: error.message });

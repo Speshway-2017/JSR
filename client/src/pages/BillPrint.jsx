@@ -435,22 +435,29 @@ export default function BillPrint({ path: windowPath }) {
     setPrinting(true);
     try {
       for (const st of selectedStatements) {
-        if (st.isPurchase) {
-          const phone = st.mobile || st.vendor?.mobile || '';
+        if (st.isPurchase || billType === 'vendor') {
+          const vid = String(st.vendorId || st._id || '');
+          const matchedVendor = vendors.find(
+            (v) => String(v._id) === vid || v.name?.toLowerCase() === String(st.name || '').trim().toLowerCase()
+          );
+          const phone = st.mobile || matchedVendor?.mobile || '';
           const periodStr = startDate === endDate ? formatDateOnly(startDate) : `${formatDateOnly(startDate)} to ${formatDateOnly(endDate)}`;
+          const html = await generateSingleStatementBillHtml({ ...st, isPurchase: true });
+          const filename = `Purchase_Bill_${st.name.replace(/[^a-zA-Z0-9]/g, '_')}_${startDate}.pdf`;
           const text = `*JSR AGRI TRADES - Purchase Bill*\nVendor: ${st.name}\nPeriod: ${periodStr}\nTotal Bags: ${st.totalBags || '—'}\nTotal Weight: ${Number(st.totalWeight || 0).toFixed(1)} kg\n*Total Amount: ${formatCurrency(st.totalAmount || st.totalSale)}*\nClosing Balance: ${formatCurrency(st.closing)}\nThank you! 🙏`;
           
           await sendWhatsAppBillPdf({
             recipientPhone: phone,
             recipientName: st.name,
+            htmlString: html,
+            filename,
             summaryText: text,
             caption: text,
-            filename: `Purchase_Bill_${st.name.replace(/[^a-zA-Z0-9]/g, '_')}_${startDate}.pdf`,
           });
           continue;
         }
 
-        const cid = String(st.customerId);
+        const cid = String(st.customerId || st._id || '');
         const matchedCust = customers.find(
           (c) => String(c._id) === cid || c.name?.toLowerCase() === String(st.name || '').trim().toLowerCase()
         );
@@ -472,7 +479,7 @@ export default function BillPrint({ path: windowPath }) {
           }).join('\n');
         }
 
-        const cooly = saleObj.handlingCharges || 0;
+        const cooly = Number(st.handlingCharges || st.cooly || 0);
         const richCaption = `🧾 *JSR AGRI TRADES - Customer Bill*
 👤 Customer: *${st.name}*
 📅 Date: ${formatDateOnly(startDate)}

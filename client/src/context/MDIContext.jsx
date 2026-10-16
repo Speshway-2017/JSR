@@ -3,8 +3,52 @@ import { useAuth } from './AuthContext';
 
 const MDIContext = createContext(null);
 
-const MIN_WIDTH = 550;
-const MIN_HEIGHT = 380;
+const MIN_WIDTH = 500;
+const MIN_HEIGHT = 360;
+
+export function getWorkspaceBounds() {
+  if (typeof window === 'undefined') {
+    return { width: 1200, height: 700 };
+  }
+  const width = Math.max(500, window.innerWidth);
+  // Header (~48px) + Bottom Taskbar (~40px) = ~88px
+  const height = Math.max(360, window.innerHeight - 88);
+  return { width, height };
+}
+
+export function clampWindowBounds(pos, sz, customBounds) {
+  const { width: containerW, height: containerH } = customBounds || getWorkspaceBounds();
+
+  const rawW = Number(sz?.width);
+  const rawH = Number(sz?.height);
+  const width = Math.max(MIN_WIDTH, Math.min(Number.isFinite(rawW) ? rawW : 840, containerW - 20));
+  const height = Math.max(MIN_HEIGHT, Math.min(Number.isFinite(rawH) ? rawH : 540, containerH - 20));
+
+  let x = Number(pos?.x);
+  let y = Number(pos?.y);
+
+  // If coordinates are invalid, NaN, negative, or far outside visible container area:
+  const isInvalid =
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    x < 0 ||
+    y < 0 ||
+    x > containerW - 80 ||
+    y > containerH - 60;
+
+  if (isInvalid) {
+    x = Math.max(15, Math.floor((containerW - width) / 2));
+    y = Math.max(15, Math.floor((containerH - height) / 2));
+  } else {
+    x = Math.max(10, Math.min(x, Math.max(10, containerW - width - 10)));
+    y = Math.max(10, Math.min(y, Math.max(10, containerH - height - 10)));
+  }
+
+  return {
+    position: { x: Math.round(x), y: Math.round(y) },
+    size: { width: Math.round(width), height: Math.round(height) },
+  };
+}
 
 export function isPathAllowedForRole(path, role) {
   if (!path) return false;
@@ -166,12 +210,11 @@ export function MDIProvider({ children }) {
           let maxZ = 10;
           restored = validWindows.map((w) => {
             if (w.zIndex > maxZ) maxZ = w.zIndex;
+            const clamped = clampWindowBounds(w.position, w.size);
             return {
               ...w,
-              size: {
-                width: Math.max(w.size?.width || 800, MIN_WIDTH),
-                height: Math.max(w.size?.height || 520, MIN_HEIGHT),
-              },
+              position: clamped.position,
+              size: clamped.size,
             };
           });
           setNextZIndex(maxZ + 1);
@@ -219,18 +262,25 @@ export function MDIProvider({ children }) {
       const defaultHeight = isWide ? 620 : 540;
 
       if (existingIndex >= 0) {
-        restored = restored.map((w, idx) => ({
-          ...w,
-          path: idx === existingIndex ? currentPath : w.path,
-          isActive: idx === existingIndex,
-          isMinimized: idx === existingIndex ? false : w.isMinimized,
-        }));
+        restored = restored.map((w, idx) => {
+          if (idx !== existingIndex) return { ...w, isActive: false };
+          const clamped = clampWindowBounds(w.position, w.size || { width: defaultWidth, height: defaultHeight });
+          return {
+            ...w,
+            path: currentPath,
+            isActive: true,
+            isMinimized: false,
+            position: clamped.position,
+            size: clamped.size,
+          };
+        });
       } else {
         const offsetCount = restored.length % 6;
         const startX = 35 + offsetCount * 30;
         const startY = 25 + offsetCount * 25;
         const newZ = 10 + restored.length * 5;
 
+        const clamped = clampWindowBounds({ x: startX, y: startY }, { width: defaultWidth, height: defaultHeight });
         const updatedOthers = restored.map((w) => ({ ...w, isActive: false }));
         updatedOthers.push({
           id: urlId,
@@ -242,12 +292,21 @@ export function MDIProvider({ children }) {
           isMaximized: false,
           isActive: true,
           zIndex: newZ,
-          position: { x: startX, y: startY },
-          size: { width: defaultWidth, height: defaultHeight },
-          prevPosition: { x: startX, y: startY },
-          prevSize: { width: defaultWidth, height: defaultHeight },
+          position: clamped.position,
+          size: clamped.size,
+          prevPosition: clamped.position,
+          prevSize: clamped.size,
         });
         restored = updatedOthers;
+      }
+    }
+
+    // Ensure at least one window is visible and active on restore if windows exist
+    const hasVisible = restored.some((w) => !w.isMinimized);
+    if (!hasVisible && restored.length > 0) {
+      const top = [...restored].sort((a, b) => b.zIndex - a.zIndex)[0];
+      if (top) {
+        restored = restored.map((w) => (w.id === top.id ? { ...w, isMinimized: false, isActive: true } : w));
       }
     }
 
@@ -257,10 +316,43 @@ export function MDIProvider({ children }) {
       setActiveWindowId(active.id);
     } else if (restored.length > 0) {
       const top = [...restored].sort((a, b) => b.zIndex - a.zIndex)[0];
-      if (top) setActiveWindowId(top.id);
+      if (top) {
+        setActiveWindowId(top.id);
+      }
     }
     isRestoredRef.current = true;
   }, [storageKey, role]);
+
+  // Ensure windows stay safely within container on screen / Electron resize
+  useEffect(() => {
+    const handleResize = () => {
+      setWindows((prev) => {
+        let changed = false;
+        const next = prev.map((w) => {
+          if (w.isMaximized) return w;
+          const clamped = clampWindowBounds(w.position, w.size);
+          if (
+            clamped.position.x !== w.position?.x ||
+            clamped.position.y !== w.position?.y ||
+            clamped.size.width !== w.size?.width ||
+            clamped.size.height !== w.size?.height
+          ) {
+            changed = true;
+            return {
+              ...w,
+              position: clamped.position,
+              size: clamped.size,
+            };
+          }
+          return w;
+        });
+        return changed ? next : prev;
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Save state to user-scoped localStorage ONLY AFTER restoration has completed
   useEffect(() => {
@@ -300,11 +392,20 @@ export function MDIProvider({ children }) {
   }, [activeWindowId, windows]);
 
   const focusWindow = useCallback((id) => {
+    if (!id) return;
     setWindows((prev) => {
       const target = prev.find((w) => w.id === id);
       if (!target) return prev;
       const others = prev.filter((w) => w.id !== id);
-      const reordered = [...others, target];
+      const clamped = clampWindowBounds(target.position, target.size);
+      const updatedTarget = {
+        ...target,
+        isMinimized: false,
+        isActive: true,
+        position: clamped.position,
+        size: clamped.size,
+      };
+      const reordered = [...others, updatedTarget];
       return reordered.map((w, idx) => ({
         ...w,
         zIndex: 10 + idx * 5,
@@ -348,47 +449,49 @@ export function MDIProvider({ children }) {
       }
       if (!icon) icon = 'Package';
 
+      const isWide =
+        path.startsWith('/sell') ||
+        path.startsWith('/sales-print') ||
+        path.startsWith('/bill-print') ||
+        path === '/ledger' ||
+        path === '/sales-report' ||
+        path === '/sales-report-2' ||
+        path === '/cash-checklist' ||
+        path === '/less-checklist' ||
+        path === '/hamali-report' ||
+        path === '/sales-orders' ||
+        id === 'sales-order-detail';
+
+      const { width: containerWidth, height: containerHeight } = getWorkspaceBounds();
+      const defaultWidth = Math.min(isWide ? 1040 : 760, Math.max(560, containerWidth - 40));
+      const defaultHeight = Math.min(isWide ? 620 : 510, Math.max(400, containerHeight - 40));
+
       setWindows((prev) => {
         const existing = prev.find((w) => w.id === id);
         if (existing) {
-          setTimeout(() => focusWindow(id), 0);
-          return prev.map((w) =>
-            w.id === id
-              ? {
-                  ...w,
-                  path,
-                  title: winTitle,
-                  iconName: icon,
-                  isMinimized: false,
-                  params: initialParams,
-                }
-              : w
-          );
+          const others = prev.filter((w) => w.id !== id);
+          const clamped = clampWindowBounds(existing.position, existing.size || { width: defaultWidth, height: defaultHeight });
+          const updatedTarget = {
+            ...existing,
+            path,
+            title: winTitle,
+            iconName: icon,
+            isMinimized: false,
+            isActive: true,
+            position: clamped.position,
+            size: clamped.size,
+            params: initialParams,
+          };
+          const reordered = [...others, updatedTarget];
+          return reordered.map((w, idx) => ({
+            ...w,
+            zIndex: 10 + idx * 5,
+            isActive: w.id === id,
+          }));
         }
-
-        const containerWidth = typeof window !== 'undefined' ? Math.max(800, window.innerWidth - 60) : 1200;
-        const containerHeight = typeof window !== 'undefined' ? Math.max(500, window.innerHeight - 140) : 700;
 
         const openNonMin = prev.filter((w) => !w.isMinimized);
         const count = openNonMin.length;
-
-        const isWide =
-          path.startsWith('/sell') ||
-          path.startsWith('/sales-print') ||
-          path.startsWith('/bill-print') ||
-          path === '/ledger' ||
-          path === '/sales-report' ||
-          path === '/sales-report-2' ||
-          path === '/cash-checklist' ||
-          path === '/less-checklist' ||
-          path === '/hamali-report' ||
-          path === '/sales-orders' ||
-          id === 'sales-order-detail';
-
-        const defaultWidth = Math.min(isWide ? 1040 : 760, Math.max(560, containerWidth - 40));
-        const defaultHeight = Math.min(isWide ? 620 : 510, Math.max(400, containerHeight - 40));
-
-        // Horizontal step spacing of ~ 260px - 300px ensures previous window title & body remain clearly visible side-by-side
         const stepX = Math.min(280, Math.max(160, Math.floor((containerWidth - 650) / Math.max(1, count))));
         const maxCols = Math.max(1, Math.floor((containerWidth - defaultWidth) / Math.max(1, stepX)) + 1);
 
@@ -406,6 +509,7 @@ export function MDIProvider({ children }) {
           startY = Math.max(10, containerHeight - defaultHeight - 15);
         }
 
+        const clamped = clampWindowBounds({ x: startX, y: startY }, { width: defaultWidth, height: defaultHeight });
         const updatedOthers = prev.map((w) => ({ ...w, isActive: false }));
         const newZ = 10 + updatedOthers.length * 5;
 
@@ -419,18 +523,19 @@ export function MDIProvider({ children }) {
           isMaximized: false,
           isActive: true,
           zIndex: newZ,
-          position: { x: startX, y: startY },
-          size: { width: defaultWidth, height: defaultHeight },
-          prevPosition: { x: startX, y: startY },
-          prevSize: { width: defaultWidth, height: defaultHeight },
+          position: clamped.position,
+          size: clamped.size,
+          prevPosition: clamped.position,
+          prevSize: clamped.size,
           params: initialParams,
         };
 
-        setActiveWindowId(id);
         return [...updatedOthers, newWin];
       });
+
+      setActiveWindowId(id);
     },
-    [focusWindow, role]
+    [role]
   );
 
   const closeWindow = useCallback((id, force = false) => {
@@ -476,7 +581,6 @@ export function MDIProvider({ children }) {
 
   const restoreWindow = useCallback(
     (id) => {
-      setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, isMinimized: false } : w)));
       focusWindow(id);
     },
     [focusWindow]
@@ -506,23 +610,25 @@ export function MDIProvider({ children }) {
 
   const updatePosition = useCallback((id, position) => {
     setWindows((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, position: { x: Math.max(0, position.x), y: Math.max(0, position.y) } } : w))
+      prev.map((w) => {
+        if (w.id !== id) return w;
+        const clamped = clampWindowBounds(position, w.size);
+        return { ...w, position: clamped.position };
+      })
     );
   }, []);
 
   const updateSize = useCallback((id, size) => {
     setWindows((prev) =>
-      prev.map((w) =>
-        w.id === id
-          ? {
-              ...w,
-              size: {
-                width: Math.max(size.width, MIN_WIDTH),
-                height: Math.max(size.height, MIN_HEIGHT),
-              },
-            }
-          : w
-      )
+      prev.map((w) => {
+        if (w.id !== id) return w;
+        const clamped = clampWindowBounds(w.position, size);
+        return {
+          ...w,
+          size: clamped.size,
+          position: clamped.position,
+        };
+      })
     );
   }, []);
 
@@ -530,17 +636,11 @@ export function MDIProvider({ children }) {
     setWindows((prev) =>
       prev.map((w) => {
         if (w.id !== id) return w;
+        const clamped = clampWindowBounds(position || w.position, size || w.size);
         return {
           ...w,
-          ...(position ? { position: { x: Math.max(0, position.x), y: Math.max(0, position.y) } } : {}),
-          ...(size
-            ? {
-                size: {
-                  width: Math.max(size.width, MIN_WIDTH),
-                  height: Math.max(size.height, MIN_HEIGHT),
-                },
-              }
-            : {}),
+          position: clamped.position,
+          size: clamped.size,
         };
       })
     );

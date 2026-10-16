@@ -100,8 +100,51 @@ function renderModuleComponent(path) {
   }
 }
 
+class WindowErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('[MDI Window Error]:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 text-center space-y-3">
+          <div className="inline-flex p-3 rounded-full bg-red-100 text-red-600 mb-2">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-primary-800">Failed to render page</h3>
+          <p className="text-xs text-primary-600 max-w-md mx-auto">
+            {this.state.error?.message || 'An unexpected error occurred while rendering this module.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="btn-primary !py-2 !px-4 !text-xs mt-2"
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const WindowContent = memo(function WindowContent({ path }) {
-  return renderModuleComponent(path);
+  return (
+    <WindowErrorBoundary>
+      {renderModuleComponent(path)}
+    </WindowErrorBoundary>
+  );
 });
 
 export default function MDIWorkspace({ fallbackChildren }) {

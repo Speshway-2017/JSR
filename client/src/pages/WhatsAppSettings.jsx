@@ -11,7 +11,7 @@ export default function WhatsAppSettings() {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savingConfig, setSavingConfig] = useState(false);
-  const [testPhone, setTestPhone] = useState('9010253076');
+  const [testPhone, setTestPhone] = useState('8977481054');
   const [sendingTest, setSendingTest] = useState(false);
 
   const [form, setForm] = useState({

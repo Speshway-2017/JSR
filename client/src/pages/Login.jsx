@@ -89,11 +89,6 @@ export default function Login() {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-
-        <div className="text-center text-primary-400 text-xs mt-6 space-y-0.5">
-          <p>Admin: <span className="font-mono text-primary-600">admin@jsr.com / admin123</span></p>
-          <p>Sales: <span className="font-mono text-primary-600">sales@jsr.com / sales123</span></p>
-        </div>
       </div>
     </div>
   );

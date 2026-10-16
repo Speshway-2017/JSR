@@ -300,7 +300,7 @@ export async function buildLoadBill(load, ratesOverride) {
  * Sale Patty: bill from sales of a vendor on a calendar day.
  * Requires a load arrival for that vendor on that day.
  */
-export async function buildVendorDayBill(vendor, load, dateStr, ratesOverride) {
+export async function buildVendorDayBill(vendor, load, dateStr, ratesOverride, selectedMaterials) {
   const { start, end } = dayRange(dateStr);
   const [sales, settings] = await Promise.all([
     Sale.find({
@@ -310,11 +310,46 @@ export async function buildVendorDayBill(vendor, load, dateStr, ratesOverride) {
     PriceSettings.findOne(),
   ]);
 
+  // Extract all available unique material names from the day's sales
+  const allAvailableMaterials = Array.from(
+    new Set(
+      sales.flatMap((s) => (s.lines || []).map((l) => l.materialName).filter(Boolean))
+    )
+  ).sort();
+
+  const selectedList = Array.isArray(selectedMaterials)
+    ? selectedMaterials
+    : typeof selectedMaterials === 'string' && selectedMaterials.trim()
+    ? selectedMaterials.split(',').map((s) => s.trim()).filter(Boolean)
+    : null;
+
+  // Filter sales lines if a specific subset of materials was chosen
+  let filteredSales = sales;
+  if (selectedList && selectedList.length > 0) {
+    filteredSales = sales
+      .map((sale) => {
+        const doc = sale.toObject ? sale.toObject() : { ...sale };
+        return {
+          ...doc,
+          lines: (doc.lines || []).filter((l) => selectedList.includes(l.materialName)),
+        };
+      })
+      .filter((sale) => (sale.lines || []).length > 0);
+  }
+
   const defaults = emptyRatesFromSettings(migrateLegacySettings(settings));
   const rates = normalizeRates(ratesOverride || load.billSnapshot || defaults, settings);
 
-  const { byMaterial, grossTotal, totalBags } = groupSalesMaterials(sales, rates);
-  const { bagWeights, rateLines } = extractSaleDetails(sales, rates);
+  const { byMaterial: allMaterialsGrouped } = groupSalesMaterials(sales, rates);
+  const availableMaterialsSummary = allMaterialsGrouped.map((m) => ({
+    materialName: m.materialName,
+    bagCount: m.lines.reduce((s, l) => s + (Number(l.bagCount) || 0), 0),
+    totalKg: Number(m.lines.reduce((s, l) => s + (Number(l.totalKg) || 0), 0).toFixed(1)),
+    totalAmount: Number(m.lines.reduce((s, l) => s + (Number(l.totalAmount) || 0), 0).toFixed(2)),
+  }));
+
+  const { byMaterial, grossTotal, totalBags } = groupSalesMaterials(filteredSales, rates);
+  const { bagWeights, rateLines } = extractSaleDetails(filteredSales, rates);
   const enriched = await enrichLoadStatus(load);
 
   const deductions = buildDeductions({
@@ -340,10 +375,13 @@ export async function buildVendorDayBill(vendor, load, dateStr, ratesOverride) {
       billGeneratedAt: load.billGeneratedAt || null,
     },
     vendor,
+    availableMaterials: allAvailableMaterials,
+    availableMaterialsSummary,
+    selectedMaterials: selectedList || allAvailableMaterials,
     materials: byMaterial,
     bagWeights,
     rateLines,
-    saleCount: sales.length,
+    saleCount: filteredSales.length,
     ratesUsed: rates,
     defaults,
     summary: {

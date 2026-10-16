@@ -4,7 +4,7 @@ import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
 
 /**
- * Format phone number into clean digits for WhatsApp (e.g. 919010253076)
+ * Format phone number into clean digits for WhatsApp (e.g. 918977481054)
  */
 export function cleanPhone(rawPhone) {
   if (!rawPhone) return '';
@@ -16,7 +16,7 @@ export function cleanPhone(rawPhone) {
 }
 
 /**
- * Display 10-digit mobile number for UI toasts / inputs (e.g. 9010253076)
+ * Display 10-digit mobile number for UI toasts / inputs (e.g. 8977481054)
  */
 export function formatDisplayPhone(rawPhone) {
   if (!rawPhone) return '';
@@ -95,21 +95,28 @@ export async function generatePdfBase64FromElement(element) {
  * Render complete HTML string into a PDF Base64 payload in background
  */
 export async function renderHtmlToPdfBase64(htmlString) {
-  const container = document.createElement('div');
-  container.style.position = 'fixed';
-  container.style.left = '-9999px';
-  container.style.top = '0';
-  container.style.width = '794px'; // ~A4 width in px
-  container.style.backgroundColor = '#ffffff';
-  container.style.zIndex = '-9999';
-  container.innerHTML = htmlString;
+  if (!htmlString) return '';
 
-  document.body.appendChild(container);
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.left = '-9999px';
+  iframe.style.top = '0';
+  iframe.style.width = '820px';
+  iframe.style.height = '1200px';
+  iframe.style.border = 'none';
+  iframe.style.zIndex = '-9999';
+  document.body.appendChild(iframe);
 
   try {
-    await new Promise((r) => setTimeout(r, 300));
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(htmlString);
+    iframeDoc.close();
 
-    const canvas = await html2canvas(container, {
+    await new Promise((r) => setTimeout(r, 350));
+
+    const targetElem = iframeDoc.querySelector('.bill-card') || iframeDoc.body;
+    const canvas = await html2canvas(targetElem, {
       scale: 2,
       useCORS: true,
       logging: false,
@@ -118,20 +125,20 @@ export async function renderHtmlToPdfBase64(htmlString) {
 
     const imgData = canvas.toDataURL('image/jpeg', 0.95);
     const pdf = new jsPDF({
-      orientation: 'portrait',
+      orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
       unit: 'mm',
       format: 'a4',
     });
 
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, Math.min(pdfHeight, 287));
 
     const dataUri = pdf.output('datauristring');
     return dataUri.split(',')[1];
   } finally {
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
+    if (document.body.contains(iframe)) {
+      document.body.removeChild(iframe);
     }
   }
 }
@@ -142,21 +149,26 @@ export async function renderHtmlToPdfBase64(htmlString) {
 export async function renderHtmlToImageBase64(htmlString) {
   if (!htmlString) return { base64: '', blob: null };
 
-  const container = document.createElement('div');
-  container.style.position = 'fixed';
-  container.style.left = '-9999px';
-  container.style.top = '0';
-  container.style.width = '794px';
-  container.style.backgroundColor = '#ffffff';
-  container.style.zIndex = '-9999';
-  container.innerHTML = htmlString;
-
-  document.body.appendChild(container);
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.left = '-9999px';
+  iframe.style.top = '0';
+  iframe.style.width = '820px';
+  iframe.style.height = '1200px';
+  iframe.style.border = 'none';
+  iframe.style.zIndex = '-9999';
+  document.body.appendChild(iframe);
 
   try {
-    await new Promise((r) => setTimeout(r, 300));
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(htmlString);
+    iframeDoc.close();
 
-    const canvas = await html2canvas(container, {
+    await new Promise((r) => setTimeout(r, 350));
+
+    const targetElem = iframeDoc.querySelector('.bill-card') || iframeDoc.body;
+    const canvas = await html2canvas(targetElem, {
       scale: 2,
       useCORS: true,
       logging: false,
@@ -172,8 +184,8 @@ export async function renderHtmlToImageBase64(htmlString) {
 
     return { base64, blob };
   } finally {
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
+    if (document.body.contains(iframe)) {
+      document.body.removeChild(iframe);
     }
   }
 }

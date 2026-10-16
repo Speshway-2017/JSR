@@ -4,7 +4,7 @@ const whatsappSettingSchema = new mongoose.Schema(
   {
     phoneNumberId: { type: String, default: '' },
     wabaId: { type: String, default: '' },
-    senderNumber: { type: String, default: '9010253076' },
+    senderNumber: { type: String, default: '8977481054' },
     accessToken: { type: String, default: '' },
   },
   { timestamps: true }

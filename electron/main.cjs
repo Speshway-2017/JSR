@@ -509,16 +509,27 @@ function registerIpc() {
       }
     }
 
-    // Auto-save PDF to temporary folder so it's ready on disk
+    // Auto-save PDF to Desktop/JSR_Bills folder and temp folder so it's ready on disk
     let savedPdfPath = '';
     if (fileBase64) {
       try {
-        const tempDir = app.getPath('temp');
         const safeName = (fileName || 'JSR_Report.pdf').replace(/[/\\?%*:|"<>]/g, '_');
-        savedPdfPath = path.join(tempDir, safeName);
+        const desktopBillsDir = path.join(app.getPath('desktop'), 'JSR_Bills');
+        if (!fs.existsSync(desktopBillsDir)) {
+          fs.mkdirSync(desktopBillsDir, { recursive: true });
+        }
+        savedPdfPath = path.join(desktopBillsDir, safeName);
         fs.writeFileSync(savedPdfPath, Buffer.from(fileBase64, 'base64'));
       } catch (err) {
-        console.warn('[electron] Failed to save temp PDF:', err);
+        console.warn('[electron] Failed to save Desktop PDF, falling back to temp:', err);
+        try {
+          const tempDir = app.getPath('temp');
+          const safeName = (fileName || 'JSR_Report.pdf').replace(/[/\\?%*:|"<>]/g, '_');
+          savedPdfPath = path.join(tempDir, safeName);
+          fs.writeFileSync(savedPdfPath, Buffer.from(fileBase64, 'base64'));
+        } catch (e) {
+          console.warn('[electron] Failed to save temp PDF:', e);
+        }
       }
     }
 

@@ -17,6 +17,18 @@ function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function isValidDateStr(str) {
+  if (!str || typeof str !== 'string') return false;
+  return /^\d{4}-\d{2}-\d{2}$/.test(str) && !isNaN(Date.parse(str));
+}
+
+function shiftDateStr(dateStr, days) {
+  if (!isValidDateStr(dateStr)) return todayInputValue();
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function SalePatty({ path: windowPath }) {
   const { updateWindowPath } = useMDI();
   const isOnline = useOnlineStatus();
@@ -30,12 +42,6 @@ export default function SalePatty({ path: windowPath }) {
   }, [windowPath, searchParams]);
 
   const [date, setDate] = useState(() => effectiveSearchParams.get('date') || todayInputValue());
-
-  useEffect(() => {
-    if (date && typeof updateWindowPath === 'function') {
-      updateWindowPath('/sale-patty', `/sale-patty?date=${date}`);
-    }
-  }, [date, updateWindowPath]);
   const [vendors, setVendors] = useState([]);
   const [vendorQuery, setVendorQuery] = useState('');
   const [vendorId, setVendorId] = useState('');
@@ -43,9 +49,32 @@ export default function SalePatty({ path: windowPath }) {
   const [highlight, setHighlight] = useState(-1);
   const [preview, setPreview] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [selectedMaterials, setSelectedMaterials] = useState([]);
   const [rates, setRates] = useState(() => emptyRatesState());
   const [saving, setSaving] = useState(false);
   const vendorListRef = useRef(null);
+  const isInternalPathUpdate = useRef(false);
+
+  useEffect(() => {
+    if (isValidDateStr(date) && typeof updateWindowPath === 'function') {
+      const current = effectiveSearchParams.get('date');
+      if (current !== date) {
+        isInternalPathUpdate.current = true;
+        updateWindowPath('/sale-patty', `/sale-patty?date=${date}`);
+      }
+    }
+  }, [date, updateWindowPath, effectiveSearchParams]);
+
+  useEffect(() => {
+    if (isInternalPathUpdate.current) {
+      isInternalPathUpdate.current = false;
+      return;
+    }
+    const pDate = effectiveSearchParams.get('date');
+    if (pDate && isValidDateStr(pDate) && pDate !== date) {
+      setDate(pDate);
+    }
+  }, [effectiveSearchParams]);
 
   const selected = vendors.find((v) => v._id === vendorId);
 
@@ -66,9 +95,14 @@ export default function SalePatty({ path: windowPath }) {
     el?.scrollIntoView({ block: 'nearest' });
   }, [highlight, suggestOpen]);
 
-  const loadVendors = useCallback(() => {
+  const loadVendors = useCallback((targetDate) => {
+    const d = targetDate || date;
+    if (!isValidDateStr(d)) {
+      setVendors([]);
+      return;
+    }
     api
-      .get('/loads/vendors-by-date', { params: { date } })
+      .get('/loads/vendors-by-date', { params: { date: d } })
       .then((res) => setVendors(res.data))
       .catch(() => {
         setVendors([]);
@@ -80,32 +114,101 @@ export default function SalePatty({ path: windowPath }) {
     setVendorId('');
     setVendorQuery('');
     setPreview(null);
-    loadVendors();
+    setSelectedMaterials([]);
+    if (isValidDateStr(date)) {
+      loadVendors(date);
+    } else {
+      setVendors([]);
+    }
   }, [date, loadVendors]);
 
-  useDataRestored(loadVendors);
+  useDataRestored(() => {
+    if (isValidDateStr(date)) loadVendors(date);
+  });
 
-  useEffect(() => {
-    if (!vendorId || !date) {
+  const fetchPreview = useCallback((vId, d, mats, preserveRates = false) => {
+    if (!vId || !isValidDateStr(d)) {
       setPreview(null);
       return;
     }
     setLoadingPreview(true);
+    const params = { vendorId: vId, date: d };
+    if (mats && mats.length > 0) {
+      params.materials = mats.join(',');
+    }
     api
-      .get('/loads/sale-patty', { params: { vendorId, date } })
+      .get('/loads/sale-patty', { params })
       .then((res) => {
         setPreview(res.data);
-        const source = res.data.load?.billGenerated
-          ? res.data.ratesUsed || {}
-          : res.data.defaults || {};
-        setRates(emptyRatesState(source));
+        if (!preserveRates) {
+          const source = res.data.load?.billGenerated
+            ? res.data.ratesUsed || {}
+            : res.data.defaults || {};
+          setRates(emptyRatesState(source));
+        }
+        if (mats === null || mats === undefined) {
+          setSelectedMaterials(res.data.availableMaterials || []);
+        }
       })
       .catch((err) => {
         setPreview(null);
         toast.error(err.response?.data?.message || 'Failed to load sale patty');
       })
       .finally(() => setLoadingPreview(false));
-  }, [vendorId, date]);
+  }, []);
+
+  useEffect(() => {
+    if (!vendorId || !isValidDateStr(date)) {
+      setPreview(null);
+      setSelectedMaterials([]);
+      return;
+    }
+    fetchPreview(vendorId, date, null, false);
+  }, [vendorId, date, fetchPreview]);
+
+  const availableItems = useMemo(() => {
+    if (!preview) return [];
+    if (preview.availableMaterialsSummary && preview.availableMaterialsSummary.length > 0) {
+      return preview.availableMaterialsSummary;
+    }
+    if (preview.availableMaterials && preview.availableMaterials.length > 0) {
+      return preview.availableMaterials.map((name) => ({ materialName: name }));
+    }
+    return [];
+  }, [preview]);
+
+  const allAvailableNames = useMemo(() => {
+    return availableItems.map((item) => item.materialName);
+  }, [availableItems]);
+
+  const isAllSelected =
+    allAvailableNames.length > 0 &&
+    selectedMaterials.length === allAvailableNames.length;
+
+  const handleToggleAll = () => {
+    if (isAllSelected) {
+      toast.error('Select at least one item');
+      return;
+    }
+    const next = [...allAvailableNames];
+    setSelectedMaterials(next);
+    fetchPreview(vendorId, date, next, true);
+  };
+
+  const handleToggleItem = (name) => {
+    let next;
+    if (selectedMaterials.includes(name)) {
+      if (selectedMaterials.length <= 1) {
+        toast.error('Select at least one item');
+        return;
+      }
+      next = selectedMaterials.filter((m) => m !== name);
+    } else {
+      next = [...selectedMaterials, name];
+    }
+    setSelectedMaterials(next);
+    fetchPreview(vendorId, date, next, true);
+  };
 
   const pickVendor = (v) => {
     setVendorId(v._id);
@@ -116,8 +219,12 @@ export default function SalePatty({ path: windowPath }) {
 
   const handleGenerate = async (e) => {
     e.preventDefault();
-    if (!vendorId || !date) {
+    if (!vendorId || !isValidDateStr(date)) {
       toast.error('Select date and vendor');
+      return;
+    }
+    if (selectedMaterials.length === 0) {
+      toast.error('Select at least one item');
       return;
     }
     setSaving(true);
@@ -125,6 +232,7 @@ export default function SalePatty({ path: windowPath }) {
       const res = await api.post('/loads/sale-patty', {
         vendorId,
         date,
+        materials: selectedMaterials,
         ...ratesPayload(rates),
       });
       setPreview(res.data);
@@ -151,9 +259,37 @@ export default function SalePatty({ path: windowPath }) {
 
       <div className="card !p-3.5 space-y-3">
         <div>
-          <label className="text-xs font-semibold text-primary-600 mb-1 block">
-            Date *
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs font-semibold text-primary-600 block">
+              Date *
+            </label>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setDate(shiftDateStr(date, -1))}
+                className="px-2 py-0.5 text-xs rounded border border-primary-200 bg-surface text-primary-600 hover:bg-primary-50 transition cursor-pointer"
+                title="Previous Day"
+              >
+                ◀ Prev Day
+              </button>
+              <button
+                type="button"
+                onClick={() => setDate(todayInputValue())}
+                className="px-2 py-0.5 text-xs rounded border border-primary-200 bg-surface text-primary-600 hover:bg-primary-50 transition cursor-pointer"
+                title="Today"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => setDate(shiftDateStr(date, 1))}
+                className="px-2 py-0.5 text-xs rounded border border-primary-200 bg-surface text-primary-600 hover:bg-primary-50 transition cursor-pointer"
+                title="Next Day"
+              >
+                Next Day ▶
+              </button>
+            </div>
+          </div>
           <input
             type="date"
             className="h-9 w-full rounded-lg border border-primary-200 bg-surface px-2.5 py-1 text-sm font-medium text-primary-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200 transition"
@@ -235,6 +371,72 @@ export default function SalePatty({ path: windowPath }) {
             Only vendors with a load on this date ({vendors.length})
           </p>
         </div>
+
+        {/* Checkbox List of All and Individual Available Items below Vendor Field */}
+        {vendorId && availableItems.length > 0 && (
+          <div className="pt-2.5 border-t border-primary-100 space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <label className="text-xs font-bold text-primary-700 uppercase tracking-wide block">
+                  Select Items / వస్తువులు ({selectedMaterials.length}/{availableItems.length})
+                </label>
+                <p className="text-[11px] text-primary-500">
+                  Choose which items to include in this Sale Patty bill
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-primary-800 bg-primary-100/70 hover:bg-primary-100 px-2.5 py-1 rounded-md border border-primary-200 select-none transition">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-primary-600 rounded cursor-pointer"
+                  checked={isAllSelected}
+                  onChange={handleToggleAll}
+                />
+                <span>All Items (అన్నీ)</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-0.5">
+              {availableItems.map((item) => {
+                const name = item.materialName;
+                const isChecked = selectedMaterials.includes(name);
+                return (
+                  <label
+                    key={name}
+                    className={`flex items-start gap-2.5 p-2 rounded-lg border transition cursor-pointer select-none ${
+                      isChecked
+                        ? 'border-primary-400 bg-primary-50/80 text-primary-900 shadow-xs ring-1 ring-primary-300'
+                        : 'border-primary-100 bg-surface/60 text-primary-400 hover:bg-primary-50/40 hover:border-primary-200'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 mt-0.5 accent-primary-600 rounded cursor-pointer shrink-0"
+                      checked={isChecked}
+                      onChange={() => handleToggleItem(name)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className={`text-xs font-bold uppercase truncate ${isChecked ? 'text-primary-800' : 'text-primary-500'}`}>
+                          {name}
+                        </span>
+                        {item.totalAmount !== undefined && (
+                          <span className={`text-xs font-semibold tabular-nums shrink-0 ${isChecked ? 'text-primary-700' : 'text-primary-400'}`}>
+                            {formatCurrency(item.totalAmount)}
+                          </span>
+                        )}
+                      </div>
+                      {item.bagCount !== undefined && (
+                        <div className={`text-[11px] mt-0.5 leading-tight ${isChecked ? 'text-primary-600' : 'text-primary-400'}`}>
+                          {item.bagCount} bags · {formatKg(item.totalKg)}
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {loadingPreview && (

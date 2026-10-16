@@ -113,8 +113,14 @@ function MDIWindow({ windowItem, children }) {
 
       const dx = me.clientX - state.startX;
       const dy = me.clientY - state.startY;
-      const nextX = Math.max(0, state.initialX + dx);
-      const nextY = Math.max(0, state.initialY + dy);
+
+      const containerW = typeof window !== 'undefined' ? window.innerWidth : 1200;
+      const containerH = typeof window !== 'undefined' ? window.innerHeight - 88 : 700;
+      const curW = size?.width || 800;
+      const curH = size?.height || 520;
+
+      const nextX = Math.max(10, Math.min(state.initialX + dx, Math.max(10, containerW - 100)));
+      const nextY = Math.max(10, Math.min(state.initialY + dy, Math.max(10, containerH - 60)));
 
       state.currentX = nextX;
       state.currentY = nextY;
@@ -307,6 +313,8 @@ function MDIWindow({ windowItem, children }) {
         top: `${position?.y || 0}px`,
         width: `${size?.width || 800}px`,
         height: `${size?.height || 520}px`,
+        maxWidth: 'calc(100% - 20px)',
+        maxHeight: 'calc(100% - 20px)',
         zIndex,
         willChange: 'left, top, width, height',
       };
